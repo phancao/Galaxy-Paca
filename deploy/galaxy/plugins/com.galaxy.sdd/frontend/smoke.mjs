@@ -47,26 +47,35 @@ const mod = await factory();
 const SddFleetView = mod?.default ?? mod;
 assert.ok(SddFleetView, "./SddFleetView has a component export");
 
-// ── The eight fleet view keys, as they render in the sub-rail (VN default) ───
-const NAV_LABELS = [
-	"Tổng quan", // overview
-	"Bảng task", // tasks
-	"Phiên", // sessions
-	"Luồng hoạt động", // activity
-	"Phân tích", // analytics
-	"Điều phối", // coordination
-	"Giai đoạn SDD", // sdd
-	"Fleet máy", // fleet
-];
+// ── The eight fleet sub-pages: slug -> VN header title. Each is now a distinct
+//    host-sidebar sub-page under "SDD Fleet"; the plugin renders exactly ONE
+//    view per forwarded slug (no in-content sub-rail). ─────────────────────────
+const VIEW_TITLES = {
+	overview: "Tổng quan đội",
+	tasks: "Điều phối task",
+	sessions: "Phiên",
+	activity: "Luồng hoạt động",
+	analytics: "Phân tích đội",
+	coordination: "Điều phối",
+	sdd: "Giai đoạn SDD",
+	fleet: "Fleet máy",
+};
 
-// ── a. BARE render: rail + first view loading ────────────────────────────────
-const bare = renderToStaticMarkup(react.createElement(SddFleetView, { projectId: "p1", __lang: "vi" }));
-for (const label of NAV_LABELS) {
-	assert.ok(bare.includes(label), `bare render sub-rail contains "${label}"`);
+// ── a. BARE render per slug: each view renders standalone, native, no iframe ──
+for (const [slug, title] of Object.entries(VIEW_TITLES)) {
+	const html = renderToStaticMarkup(
+		react.createElement(SddFleetView, { projectId: "p1", __lang: "vi", slug }),
+	);
+	assert.ok(html.includes(title), `bare render slug="${slug}" shows its header "${title}"`);
+	assert.ok(!html.includes("<iframe"), `bare render slug="${slug}" contains NO <iframe`);
 }
-assert.ok(bare.includes("Đang tải"), "bare render shows the loading state");
-assert.ok(!bare.includes("<iframe"), "bare render contains NO <iframe");
-console.log(`ok  bare render — all 8 view keys in the sub-rail (${bare.length} bytes)`);
+// Unknown slug falls back to overview (the dock/`view` surface passes none).
+const fallback = renderToStaticMarkup(
+	react.createElement(SddFleetView, { projectId: "p1", __lang: "vi" }),
+);
+assert.ok(fallback.includes("Tổng quan đội"), "no-slug render falls back to overview");
+assert.ok(fallback.includes("Đang tải"), "fallback render shows the loading state");
+console.log("ok  bare render — all 8 slugs render standalone (native, no iframe)");
 
 // ── b. SEEDED render: overview with a fixture ────────────────────────────────
 const overview = {

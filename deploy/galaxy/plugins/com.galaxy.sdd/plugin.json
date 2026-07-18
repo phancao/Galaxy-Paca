@@ -1,17 +1,15 @@
 {
   "id": "com.galaxy.sdd",
   "displayName": "SDD Fleet",
-  "description": "Native Spec-Driven Development fleet dashboard inside Paca (ADR-038): eight team-wide views (overview, task board, sessions, activity, analytics, coordination, SDD phases, machine fleet) rendered as Module Federation components with a left sub-rail and dependency-free inline-SVG cards/tables/timelines. Reads the SDD Coordination Server same-origin through the /sdd-api gateway proxy — no iframe, no chart libraries, no secrets.",
-  "version": "0.2.0",
+  "description": "Native Spec-Driven Development fleet dashboard inside Paca (ADR-038): eight team-wide views (overview, task board, sessions, activity, analytics, coordination, SDD phases, machine fleet) each rendered as a full-width Module Federation page and nested as sub-pages under the SDD Fleet entry in Paca's own left sidebar — no in-content sub-rail, no iframe, no chart libraries, no secrets. Reads the SDD Coordination Server same-origin through the /sdd-api gateway proxy.",
+  "version": "0.3.0",
   "permissions": [],
-
   "backend": {
     "routes": [],
     "eventSubscriptions": []
   },
-
   "frontend": {
-    "remoteEntryUrl": "/plugins/com.galaxy.sdd/assets/remoteEntry.js?v=3",
+    "remoteEntryUrl": "/plugins/com.galaxy.sdd/assets/remoteEntry.js?v=4",
     "extensionPoints": [
       {
         "point": "view",
@@ -29,11 +27,67 @@
     "navItems": [
       {
         "scope": "project",
-        "slug": "sdd-fleet",
-        "label": "SDD Fleet",
-        "icon": "Radar",
+        "slug": "overview",
+        "label": "Overview",
+        "icon": "LayoutDashboard",
+        "component": "SddFleetView",
+        "order": 10
+      },
+      {
+        "scope": "project",
+        "slug": "tasks",
+        "label": "Task board",
+        "icon": "KanbanSquare",
+        "component": "SddFleetView",
+        "order": 20
+      },
+      {
+        "scope": "project",
+        "slug": "sessions",
+        "label": "Sessions",
+        "icon": "SquareTerminal",
+        "component": "SddFleetView",
+        "order": 30
+      },
+      {
+        "scope": "project",
+        "slug": "activity",
+        "label": "Activity",
+        "icon": "Activity",
+        "component": "SddFleetView",
+        "order": 40
+      },
+      {
+        "scope": "project",
+        "slug": "analytics",
+        "label": "Analytics",
+        "icon": "BarChart3",
         "component": "SddFleetView",
         "order": 50
+      },
+      {
+        "scope": "project",
+        "slug": "coordination",
+        "label": "Coordination",
+        "icon": "Network",
+        "component": "SddFleetView",
+        "order": 60
+      },
+      {
+        "scope": "project",
+        "slug": "sdd",
+        "label": "SDD phases",
+        "icon": "Workflow",
+        "component": "SddFleetView",
+        "order": 70
+      },
+      {
+        "scope": "project",
+        "slug": "fleet",
+        "label": "Fleet",
+        "icon": "Server",
+        "component": "SddFleetView",
+        "order": 80
       }
     ]
   }
