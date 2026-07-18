@@ -250,6 +250,21 @@ func Load() (*Config, error) {
 		AIAgentURL: env("AI_AGENT_URL", "http://ai-agent:8080"),
 		// Galaxy chat dock (ADR-038 P3.2) — empty keeps the dock disabled.
 		GalaxyDockSrc: env("GALAXY_DOCK_SRC", ""),
+		// Galaxy platform AI for one-shot write-with-ai (ADR-038). Empty
+		// IdentityURL/ServiceSecret disables the feature (returns 503).
+		GalaxyAI: func() GalaxyAIConfig {
+			idURL := env("GALAXY_IDENTITY_URL", "")
+			proxy := env("GALAXY_AI_PROXY_URL", "")
+			if proxy == "" && idURL != "" {
+				proxy = strings.TrimRight(idURL, "/") + "/ai/v1"
+			}
+			return GalaxyAIConfig{
+				IdentityURL:   idURL,
+				ServiceSecret: env("GALAXY_INTERNAL_SERVICE_SECRET", ""),
+				ProxyURL:      proxy,
+				Role:          env("GALAXY_AI_ROLE", "paca-ai"),
+			}
+		}(),
 	}, nil
 }
 

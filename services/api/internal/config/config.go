@@ -21,7 +21,33 @@ type Config struct {
 	// e.g. https://ai.skyplatform.net/dock.js or /dock.js (same-origin via
 	// the gateway bridge).  Empty disables the dock.
 	GalaxyDockSrc string
-	Env           string // development | production
+	// GalaxyAI configures the one-shot "write task description with AI"
+	// feature (ADR-038). Empty IdentityURL/ServiceSecret disables it.
+	GalaxyAI GalaxyAIConfig
+	Env      string // development | production
+}
+
+// GalaxyAIConfig configures the one-shot "write task description with AI"
+// feature (ADR-038): the API mints a short-lived, non-privileged act_as token
+// at the Vortex identity service and calls its OpenAI-compatible /ai/v1 proxy
+// on behalf of the requesting user. This replaces the retired in-app agent
+// (OpenHands) runtime — the agent surface is the platform ChatDock now, and
+// this is the single in-context AI touchpoint left in Paca. The feature is
+// disabled (write-with-ai returns 503) unless IdentityURL + ServiceSecret set.
+type GalaxyAIConfig struct {
+	// IdentityURL is the base URL of the Vortex identity service used to mint
+	// act_as tokens (GALAXY_IDENTITY_URL), e.g. http://nexus-identity:8086.
+	IdentityURL string
+	// ServiceSecret is the platform INTERNAL_SERVICE_SECRET
+	// (GALAXY_INTERNAL_SERVICE_SECRET) presented as X-Service-Secret when
+	// minting. A leaked value can only mint non-privileged act_as tokens.
+	ServiceSecret string
+	// ProxyURL is the OpenAI-compatible chat base (GALAXY_AI_PROXY_URL),
+	// default {IdentityURL}/ai/v1. Completions POST to {ProxyURL}/chat/completions.
+	ProxyURL string
+	// Role is the model capability role sent as the `model` field
+	// (GALAXY_AI_ROLE); identity resolves it via ai_role_assignments. Default paca-ai.
+	Role string
 }
 
 // OIDCConfig holds settings for OIDC SSO login against the Vortex identity

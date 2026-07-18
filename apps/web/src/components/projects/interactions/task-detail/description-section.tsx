@@ -3,28 +3,16 @@ import "@blocknote/shadcn/style.css";
 
 import { SideMenuController, useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { CustomSideMenu } from "@/components/shared/blocknote-custom-side-menu";
 import { customSchema } from "@/components/shared/blocknote-schema";
 import { normalizeBlockContent } from "@/components/shared/comment-blocknote";
 import { MentionSuggestionMenus } from "@/components/shared/mention-suggestion-menus";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import { useThemeMode } from "@/hooks/use-theme-mode";
-import {
-	agentsQueryOptions,
-	writeTaskDescriptionWithAI,
-} from "@/lib/agent-api";
+import { writeTaskDescriptionWithAI } from "@/lib/agent-api";
 import {
 	getAttachmentDownloadURL,
 	uploadAttachment,
@@ -39,6 +27,8 @@ interface DescriptionSectionProps {
 	canEdit?: boolean;
 	projectId?: string;
 	taskId?: string;
+	/** Task title — sent as context to the one-shot "write with AI" call. */
+	title?: string;
 	onUpdate?: UpdateFn;
 }
 
@@ -50,41 +40,40 @@ export function DescriptionSection({
 	canEdit = true,
 	projectId,
 	taskId,
+	title,
 	onUpdate,
 }: DescriptionSectionProps) {
 	const { t } = useTranslation("projects");
 	const { resolvedMode } = useThemeMode();
 	const { teamMembers, tasks, documents } = useMentionData(projectId);
-	const qc = useQueryClient();
-	const [writeWithAIOpen, setWriteWithAIOpen] = useState(false);
-	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
-	const { data: agents = [] } = useQuery({
-		...agentsQueryOptions(projectId ?? ""),
-		enabled: !!projectId && writeWithAIOpen,
-	});
-
+	// One-shot "write with AI" (ADR-038): the in-app agent runtime is retired
+	// (agents live in the platform ChatDock now). Instead of picking a project
+	// agent, we send the task's title + current description text to the API,
+	// which calls the platform AI proxy and returns Markdown. We parse that into
+	// BlockNote blocks, replace the editor content, and save — all in place.
 	const writeWithAIMutation = useMutation({
-		mutationFn: () => {
-			if (!projectId || !taskId || !selectedAgentId)
-				throw new Error("missing context");
-			return writeTaskDescriptionWithAI(projectId, taskId, selectedAgentId);
+		mutationFn: async () => {
+			if (!projectId || !taskId) throw new Error("missing context");
+			const current = await editor.blocksToMarkdownLossy(editor.document);
+			return writeTaskDescriptionWithAI(
+				projectId,
+				taskId,
+				title ?? "",
+				current,
+			);
 		},
-		onSuccess: () => {
-			// Mirrors the assign-to-agent / mention-agent flows: don't rely solely
-			// on the realtime websocket event to surface the new "started an AI
-			// session" activity — refresh immediately so it shows without a reload.
-			if (projectId) {
-				qc.invalidateQueries({
-					queryKey: ["projects", projectId],
-					predicate: (q) => {
-						const key = q.queryKey as string[];
-						return key.includes("tasks") || key.includes("backlog-tasks");
-					},
-				});
-			}
-			setWriteWithAIOpen(false);
-			setSelectedAgentId(null);
+		onSuccess: async ({ text }) => {
+			const blocks = await editor.tryParseMarkdownToBlocks(text);
+			if (blocks.length === 0) return;
+			editor.replaceBlocks(
+				editor.document,
+				blocks as Parameters<typeof editor.replaceBlocks>[1],
+			);
+			// replaceBlocks fires onChange (→ pendingRef); set it explicitly too
+			// so the immediate save() below always persists the AI content.
+			pendingRef.current = true;
+			save();
 		},
 	});
 
@@ -214,14 +203,28 @@ export function DescriptionSection({
 				{canEdit && (
 					<button
 						type="button"
-						className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors duration-150 font-medium"
-						onClick={() => setWriteWithAIOpen(true)}
+						disabled={writeWithAIMutation.isPending}
+						className="flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors duration-150 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+						onClick={() => writeWithAIMutation.mutate()}
 					>
-						<Sparkles className="size-3" />
-						{t("taskDetail.description.writeWithAI")}
+						<Sparkles
+							className={cn(
+								"size-3",
+								writeWithAIMutation.isPending && "animate-pulse",
+							)}
+						/>
+						{writeWithAIMutation.isPending
+							? t("taskDetail.description.writeWithAIDialog.starting")
+							: t("taskDetail.description.writeWithAI")}
 					</button>
 				)}
 			</div>
+
+			{writeWithAIMutation.error && (
+				<p className="text-xs text-destructive">
+					{(writeWithAIMutation.error as Error).message}
+				</p>
+			)}
 
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: wrapper captures blur from BlockNote rich-text editor */}
 			<div
@@ -248,95 +251,6 @@ export function DescriptionSection({
 				</BlockNoteView>
 			</div>
 
-			<Dialog
-				open={writeWithAIOpen}
-				onOpenChange={(open) => {
-					setWriteWithAIOpen(open);
-					if (!open) setSelectedAgentId(null);
-				}}
-			>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2">
-							<Sparkles className="size-4 text-muted-foreground" />
-							{t("taskDetail.description.writeWithAIDialog.title")}
-						</DialogTitle>
-						<DialogDescription>
-							{t("taskDetail.description.writeWithAIDialog.description")}
-						</DialogDescription>
-					</DialogHeader>
-
-					<div className="space-y-2 py-2">
-						{agents.length === 0 ? (
-							<p className="text-base text-muted-foreground text-center py-4">
-								{t("taskDetail.description.writeWithAIDialog.noAgents")}
-							</p>
-						) : (
-							agents.map((agent) => (
-								<button
-									key={agent.id}
-									type="button"
-									onClick={() => setSelectedAgentId(agent.id)}
-									className={cn(
-										"w-full flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all duration-150",
-										selectedAgentId === agent.id
-											? "border-primary/60 bg-primary/5 text-foreground"
-											: "border-border/40 bg-card/50 hover:border-border/70 hover:bg-muted/30 text-muted-foreground hover:text-foreground",
-									)}
-								>
-									<div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
-										<Bot className="size-3.5" />
-									</div>
-									<div className="min-w-0">
-										<p className="text-base font-medium leading-tight truncate">
-											{agent.name}
-										</p>
-										<p className="text-xs text-muted-foreground/70 mt-0.5 truncate">
-											@{agent.handle}
-										</p>
-									</div>
-								</button>
-							))
-						)}
-					</div>
-
-					{writeWithAIMutation.error && (
-						<p className="text-sm text-destructive">
-							{writeWithAIMutation.error.message}
-						</p>
-					)}
-
-					<DialogFooter>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => {
-								setWriteWithAIOpen(false);
-								setSelectedAgentId(null);
-							}}
-						>
-							{t("taskDetail.description.writeWithAIDialog.cancel")}
-						</Button>
-						<Button
-							size="sm"
-							disabled={!selectedAgentId || writeWithAIMutation.isPending}
-							onClick={() => writeWithAIMutation.mutate()}
-						>
-							{writeWithAIMutation.isPending ? (
-								<>
-									<Sparkles className="size-3 mr-1.5 animate-pulse" />
-									{t("taskDetail.description.writeWithAIDialog.starting")}
-								</>
-							) : (
-								<>
-									<Sparkles className="size-3 mr-1.5" />
-									{t("taskDetail.description.writeWithAIDialog.writeButton")}
-								</>
-							)}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

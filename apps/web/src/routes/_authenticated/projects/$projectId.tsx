@@ -3,7 +3,6 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { AIChatFloat } from "@/components/projects/ai-chat-float";
 import { useProjectRealtime } from "@/hooks/use-project-realtime";
 import { projectQueryOptions } from "@/lib/project-api";
 
@@ -37,10 +36,5 @@ function ProjectLayout() {
 		);
 	}
 
-	return (
-		<>
-			<Outlet />
-			<AIChatFloat projectId={projectId} />
-		</>
-	);
+	return <Outlet />;
 }

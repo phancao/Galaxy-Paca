@@ -12,6 +12,7 @@ import (
 	agentdom "github.com/Paca-AI/api/internal/domain/agent"
 	domainauth "github.com/Paca-AI/api/internal/domain/auth"
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
+	"github.com/Paca-AI/api/internal/platform/galaxyai"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	httpmw "github.com/Paca-AI/api/internal/transport/http/middleware"
 	"github.com/go-chi/chi/v5"
@@ -438,20 +439,41 @@ func TestSendChatMessage_EmptyMessage_Returns400(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WriteTaskDescriptionWithAI validation test
+// WriteTaskDescriptionWithAI one-shot tests (ADR-038): the in-app agent runtime
+// is retired, so the endpoint no longer takes an agent_id — it mints an act_as
+// token and calls the platform AI proxy. These cover the two pre-network guards
+// (feature disabled, empty context) so neither reaches the AI service.
 // ---------------------------------------------------------------------------
 
-func TestWriteTaskDescriptionWithAI_MissingAgentID_Returns400(t *testing.T) {
+func TestWriteTaskDescriptionWithAI_NotConfigured_Returns500(t *testing.T) {
+	// newAgentRouter attaches no galaxyAI client → feature disabled.
 	r := newAgentRouter(&mockAgentSvc{})
 	projectID := uuid.New()
 	taskID := uuid.New()
 
-	// agent_id absent → decodes to uuid.Nil → handler returns 400
+	w := doAgentRequest(t, r, http.MethodPost,
+		"/projects/"+projectID.String()+"/tasks/"+taskID.String()+"/write-with-ai",
+		map[string]any{"title": "Something"})
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 when platform AI is not configured, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestWriteTaskDescriptionWithAI_EmptyContext_Returns400(t *testing.T) {
+	// A configured (Enabled) client passes the disabled-guard; an empty
+	// title+description then trips the 400 guard before any network call.
+	h := handler.NewAgentHandler(&mockAgentSvc{}, "").
+		WithGalaxyAI(galaxyai.New("http://identity.invalid", "secret", "", "paca-ai"))
+	r := chi.NewRouter()
+	r.Post("/projects/{projectId}/tasks/{taskId}/write-with-ai", h.WriteTaskDescriptionWithAI)
+	projectID := uuid.New()
+	taskID := uuid.New()
+
 	w := doAgentRequest(t, r, http.MethodPost,
 		"/projects/"+projectID.String()+"/tasks/"+taskID.String()+"/write-with-ai",
 		map[string]any{})
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for missing agent_id, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("expected 400 for empty title+description, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

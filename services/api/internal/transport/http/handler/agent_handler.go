@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	agentdom "github.com/Paca-AI/api/internal/domain/agent"
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
+	"github.com/Paca-AI/api/internal/platform/galaxyai"
 	agentsvc "github.com/Paca-AI/api/internal/service/agent"
 	"github.com/Paca-AI/api/internal/transport/http/dto"
 	"github.com/Paca-AI/api/internal/transport/http/middleware"
@@ -31,6 +33,7 @@ type AgentHandler struct {
 	httpClient  *http.Client
 	activityRec agentActivityRecorder
 	memberRepo  projectdom.MemberRepository
+	galaxyAI    *galaxyai.Client
 }
 
 // NewAgentHandler returns an AgentHandler wired to the agent service.
@@ -46,6 +49,13 @@ func NewAgentHandler(svc agentdom.Service, aiAgentURL string) *AgentHandler {
 // "agent.session.started" activity is recorded when a description-write is triggered.
 func (h *AgentHandler) WithActivityRecorder(r agentActivityRecorder) *AgentHandler {
 	h.activityRec = r
+	return h
+}
+
+// WithGalaxyAI attaches the platform-AI client used by the one-shot
+// write-with-ai endpoint (ADR-038). Nil / disabled makes that endpoint 503.
+func (h *AgentHandler) WithGalaxyAI(c *galaxyai.Client) *AgentHandler {
+	h.galaxyAI = c
 	return h
 }
 
@@ -676,15 +686,24 @@ func (h *AgentHandler) SendChatMessage(w http.ResponseWriter, r *http.Request) {
 // --- Write with AI ----------------------------------------------------------
 
 // WriteTaskDescriptionWithAI handles POST /projects/:projectId/tasks/:taskId/write-with-ai.
-// It triggers the selected agent to write the description for the given task.
+//
+// One-shot (ADR-038): the in-app agent (OpenHands) runtime this used to trigger
+// is retired — the agent surface is the platform ChatDock now. Instead of
+// spawning an agent conversation, it mints a short-lived act_as token for the
+// requesting user and calls the platform AI proxy to generate a Markdown
+// description from the client-supplied title + current description, returning
+// the text for the client to insert into the editor. Returns 503 when the
+// platform AI is not configured.
 func (h *AgentHandler) WriteTaskDescriptionWithAI(w http.ResponseWriter, r *http.Request) {
-	projectID, err := parseProjectID(r)
-	if err != nil {
+	if h.galaxyAI == nil || !h.galaxyAI.Enabled() {
+		presenter.Error(w, r, apierr.New(apierr.CodeInternalError, "AI writing is not configured"))
+		return
+	}
+	if _, err := parseProjectID(r); err != nil {
 		presenter.Error(w, r, err)
 		return
 	}
-	taskID, err := parseParamUUID(r, "taskId")
-	if err != nil {
+	if _, err := parseParamUUID(r, "taskId"); err != nil {
 		presenter.Error(w, r, err)
 		return
 	}
@@ -694,39 +713,23 @@ func (h *AgentHandler) WriteTaskDescriptionWithAI(w http.ResponseWriter, r *http
 		presenter.Error(w, r, err)
 		return
 	}
-	if req.AgentID == uuid.Nil {
-		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "agent_id is required"))
+	if strings.TrimSpace(req.Title) == "" && strings.TrimSpace(req.Description) == "" {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "title or description is required"))
 		return
 	}
 
-	memberID, err := h.resolveMemberID(r, projectID)
+	// Attribute usage to the requesting user (claims.Subject is the Paca user
+	// id, the same subject resolveMemberID trusts). ClaimsFrom is guaranteed
+	// non-nil on authenticated routes.
+	sub := middleware.ClaimsFrom(r).Subject
+
+	text, err := h.galaxyAI.WriteDescription(r.Context(), sub, req.Title, req.Description)
 	if err != nil {
-		presenter.Error(w, r, err)
+		presenter.Error(w, r, apierr.New(apierr.CodeInternalError, "AI writing failed: "+err.Error()))
 		return
 	}
 
-	conv, err := h.svc.TriggerDescriptionWrite(r.Context(), projectID, req.AgentID, taskID, memberID)
-	if err != nil {
-		presenter.Error(w, r, err)
-		return
-	}
-
-	if conv != nil && h.activityRec != nil {
-		content, _ := json.Marshal(map[string]any{
-			"conversation_id": conv.ID.String(),
-			"agent_id":        req.AgentID.String(),
-		})
-		agentID := req.AgentID
-		_ = h.activityRec.RecordActivity(r.Context(), taskdom.RecordActivityInput{
-			TaskID:       taskID,
-			ProjectID:    projectID,
-			ActorAgentID: &agentID,
-			ActivityType: taskdom.ActivityTypeAgentSessionStarted,
-			Content:      content,
-		})
-	}
-
-	presenter.Created(w, r, map[string]any{"conversation": dto.ConversationFromEntity(conv)})
+	presenter.OK(w, r, dto.WriteWithAIResponse{Text: text})
 }
 
 // --- helpers ----------------------------------------------------------------

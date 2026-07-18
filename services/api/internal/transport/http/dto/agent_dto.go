@@ -284,8 +284,19 @@ func EnvVarFromEntity(v *agentdom.AgentEnvironmentVariable) AgentEnvVarResponse 
 }
 
 // WriteWithAIRequest is the body for POST /projects/:projectId/tasks/:taskId/write-with-ai.
+//
+// One-shot rewrite (ADR-038): the in-app agent runtime is retired, so the
+// caller no longer picks an agent. Instead the client passes the task's
+// current title + description text as context, and the API returns AI-written
+// Markdown (WriteWithAIResponse) for the client to insert into the editor.
 type WriteWithAIRequest struct {
-	AgentID uuid.UUID `json:"agent_id" binding:"required"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+// WriteWithAIResponse carries the AI-generated Markdown description.
+type WriteWithAIResponse struct {
+	Text string `json:"text"`
 }
 
 // =========================================================================
