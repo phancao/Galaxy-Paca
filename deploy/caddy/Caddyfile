@@ -155,6 +155,25 @@
 	handle /api/identity* {
 		import galaxy_dock_bridge
 	}
+	# The dock's other tabs (Thông báo / Thư / Lịch / Chat / plan-approve) call
+	# these platform prefixes with relative URLs too — bridge them the same way,
+	# or those panels 404 against the Paca API ("Không đọc được thông báo").
+	# None collide with Paca's own /api/v1 + /api/healthz namespace.
+	handle /api/notify* {
+		import galaxy_dock_bridge
+	}
+	handle /api/calendar* {
+		import galaxy_dock_bridge
+	}
+	handle /api/email* {
+		import galaxy_dock_bridge
+	}
+	handle /api/chat* {
+		import galaxy_dock_bridge
+	}
+	handle /api/pm-mcp* {
+		import galaxy_dock_bridge
+	}
 
 	# -- API routes ---------------------------------------------------------------
 	#
