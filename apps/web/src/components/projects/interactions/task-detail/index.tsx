@@ -390,6 +390,7 @@ export function TaskDetailModal({
 							canEdit={canEdit}
 							projectId={projectId}
 							taskId={task.id}
+							title={task.title}
 							onUpdate={handleUpdate}
 						/>
 						{/* Child tasks section */}

@@ -69,6 +69,17 @@ services:
       # Advertised on the public /auth/config endpoint; the SPA mounts the
       # dock after login. Empty keeps the dock disabled.
       GALAXY_DOCK_SRC: ${GALAXY_DOCK_SRC:-}
+      # ── ADR-038: one-shot "write task description with AI" ──────────────
+      # The in-app agent (OpenHands) runtime is retired; the agent surface is
+      # ChatDock. This remaining in-context AI touchpoint mints a short-lived
+      # act_as token at identity (X-Service-Secret) and calls its /ai/v1
+      # proxy. Empty identity/secret disables it (write-with-ai → 503).
+      # GALAXY_INTERNAL_SERVICE_SECRET = platform INTERNAL_SERVICE_SECRET,
+      # referenced host-side from runtime/galaxy-shared/*.env — NEVER committed.
+      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://nexus-identity:8086}
+      GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
+      GALAXY_AI_PROXY_URL: ${GALAXY_AI_PROXY_URL:-}
+      GALAXY_AI_ROLE: ${GALAXY_AI_ROLE:-paca-ai}
     # Split-horizon OIDC (SỰ CỐ "invalid id_token" 17/07): identity mints
     # iss=http://nexus-identity:8086 (OIDC_ISSUER nội bộ của identity), nên
     # api phải fetch discovery/token/JWKS qua galaxy_network như RAGFlow.

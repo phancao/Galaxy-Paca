@@ -8,7 +8,6 @@ import {
 import {
 	ArrowLeft,
 	BookOpen,
-	Bot,
 	ChevronDown,
 	ChevronRight,
 	File,
@@ -871,8 +870,9 @@ function NavItem({
 }
 
 // ── Project Nav ───────────────────────────────────────────────────────────────
+// The in-app "Agents" surface was retired (ADR-038): agents live in the
+// platform ChatDock now, so it no longer appears in the project nav.
 const PROJECT_NAV_ITEMS = [
-	{ segment: "agents", icon: Bot, labelKey: "nav.agents" },
 	{ segment: "automation", icon: Workflow, labelKey: "nav.automation" },
 	{ segment: "team", icon: Users, labelKey: "nav.team" },
 	{ segment: "settings", icon: Settings, labelKey: "nav.settings" },
@@ -901,7 +901,6 @@ function ProjectNav() {
 }
 
 const ANON_HIDDEN_SEGMENTS = new Set([
-	"agents",
 	"automation",
 	"team",
 	"settings",

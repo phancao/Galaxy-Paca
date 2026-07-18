@@ -19,6 +19,7 @@ import (
 	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/Paca-AI/api/internal/platform/cache"
 	"github.com/Paca-AI/api/internal/platform/database"
+	"github.com/Paca-AI/api/internal/platform/galaxyai"
 	"github.com/Paca-AI/api/internal/platform/logger"
 	"github.com/Paca-AI/api/internal/platform/messaging"
 	oidcplatform "github.com/Paca-AI/api/internal/platform/oidc"
@@ -281,7 +282,13 @@ func New(cfg *config.Config) (*App, error) {
 
 	agentHandler := handler.NewAgentHandler(agentService, cfg.AIAgentURL).
 		WithActivityRecorder(activityService).
-		WithMemberRepo(projectRepo)
+		WithMemberRepo(projectRepo).
+		WithGalaxyAI(galaxyai.New(
+			cfg.GalaxyAI.IdentityURL,
+			cfg.GalaxyAI.ServiceSecret,
+			cfg.GalaxyAI.ProxyURL,
+			cfg.GalaxyAI.Role,
+		))
 	convHandler := handler.NewConversationHandler(agentService)
 	workflowHandler := handler.NewWorkflowHandler(workflowService)
 
