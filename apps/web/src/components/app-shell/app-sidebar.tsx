@@ -63,10 +63,18 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	SidebarMenuSub,
+	SidebarMenuSubButton,
+	SidebarMenuSubItem,
 	SidebarRail,
 	SidebarSeparator,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useProjectPermissions } from "@/hooks/use-project-permissions";
 import type { ThemeMode } from "@/hooks/use-theme-mode";
@@ -994,6 +1002,124 @@ function ProjectNavItems({
 /** Sidebar nav items for plugin `project.page` extension points (e.g. a
  * project-wide time-tracking view), routed to
  * /projects/:projectId/plugins/:pluginId/:slug. */
+function pluginNavItemPath(projectId: string, item: PluginNavRegistration) {
+	return `/projects/${projectId}/plugins/${item.pluginId}/${item.slug}`;
+}
+
+/** A single flat sidebar entry for a plugin that exposes exactly one page. */
+function PluginNavLeaf({
+	projectId,
+	item,
+	location,
+}: {
+	projectId: string;
+	item: PluginNavRegistration;
+	location: string;
+}) {
+	const Icon = resolvePluginIcon(item.icon);
+	const to = pluginNavItemPath(projectId, item);
+	const isActive = location === to || location.startsWith(`${to}/`);
+	return (
+		<SidebarMenuItem>
+			<SidebarMenuButton
+				isActive={isActive}
+				tooltip={item.label}
+				render={<Link to={to} />}
+				className={cn(
+					"relative transition-all duration-150",
+					isActive
+						? "bg-primary/10 text-primary font-medium before:absolute before:left-0 before:inset-y-2 before:w-0.75 before:rounded-full before:bg-primary"
+						: "hover:bg-sidebar-accent/60",
+				)}
+			>
+				<Icon className="size-4" />
+				<span>{item.label}</span>
+			</SidebarMenuButton>
+		</SidebarMenuItem>
+	);
+}
+
+/**
+ * Collapsible sidebar group for a plugin that exposes MULTIPLE pages (e.g. the
+ * native SDD Fleet plugin's eight views). The plugin's displayName becomes the
+ * parent row; each nav item nests as a sub-page underneath, so there is no
+ * second in-content sub-rail eating horizontal space (ADR-038). Owns its own
+ * open/closed state and auto-expands whenever one of its children is active.
+ */
+function PluginNavGroup({
+	projectId,
+	items,
+	location,
+}: {
+	projectId: string;
+	items: PluginNavRegistration[];
+	location: string;
+}) {
+	const head = items[0];
+	const HeadIcon = resolvePluginIcon(head.icon);
+	const childActive = items.some((it) => {
+		const to = pluginNavItemPath(projectId, it);
+		return location === to || location.startsWith(`${to}/`);
+	});
+	const [open, setOpen] = useState(childActive);
+	// Auto-open when the user navigates into one of the group's pages from
+	// elsewhere (the sidebar persists across route changes, so initial state
+	// alone isn't enough).
+	useEffect(() => {
+		if (childActive) setOpen(true);
+	}, [childActive]);
+
+	return (
+		<Collapsible open={open} onOpenChange={setOpen} className="group/plnav">
+			<SidebarMenuItem>
+				<CollapsibleTrigger
+					render={
+						<SidebarMenuButton
+							tooltip={head.pluginName}
+							className={cn(
+								"transition-all duration-150",
+								childActive
+									? "text-primary font-medium"
+									: "hover:bg-sidebar-accent/60",
+							)}
+						/>
+					}
+				>
+					<HeadIcon className="size-4" />
+					<span>{head.pluginName}</span>
+					<ChevronRight className="ml-auto size-4 transition-transform duration-150 group-data-[open]/plnav:rotate-90" />
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<SidebarMenuSub>
+						{items.map((item) => {
+							const Icon = resolvePluginIcon(item.icon);
+							const to = pluginNavItemPath(projectId, item);
+							const isActive =
+								location === to || location.startsWith(`${to}/`);
+							return (
+								<SidebarMenuSubItem key={`${item.pluginId}:${item.slug}`}>
+									<SidebarMenuSubButton
+										isActive={isActive}
+										render={<Link to={to} />}
+										className={cn(
+											isActive
+												? "bg-primary/10 text-primary font-medium"
+												: "",
+										)}
+									>
+										<Icon className="size-4" />
+										<span>{item.label}</span>
+									</SidebarMenuSubButton>
+								</SidebarMenuSubItem>
+							);
+						})}
+					</SidebarMenuSub>
+				</CollapsibleContent>
+			</SidebarMenuItem>
+		</Collapsible>
+	);
+}
+
 function PluginProjectPages({ projectId }: { projectId: string }) {
 	const { t } = useTranslation("appShell");
 	const { getNavItems } = usePluginRegistry();
@@ -1005,34 +1131,38 @@ function PluginProjectPages({ projectId }: { projectId: string }) {
 	);
 	if (navItems.length === 0) return null;
 
+	// Group items by plugin (insertion order preserved). A plugin that
+	// contributes several pages is rendered as one collapsible parent so its
+	// pages nest under the plugin name instead of flooding the flat list.
+	const byPlugin = new Map<string, PluginNavRegistration[]>();
+	for (const item of navItems) {
+		const bucket = byPlugin.get(item.pluginId);
+		if (bucket) bucket.push(item);
+		else byPlugin.set(item.pluginId, [item]);
+	}
+
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>{t("nav.plugins")}</SidebarGroupLabel>
 			<SidebarGroupContent>
 				<SidebarMenu>
-					{navItems.map((item) => {
-						const Icon = resolvePluginIcon(item.icon);
-						const to = `/projects/${projectId}/plugins/${item.pluginId}/${item.slug}`;
-						const isActive = location === to || location.startsWith(`${to}/`);
-						return (
-							<SidebarMenuItem key={`${item.pluginId}:${item.slug}`}>
-								<SidebarMenuButton
-									isActive={isActive}
-									tooltip={item.label}
-									render={<Link to={to} />}
-									className={cn(
-										"relative transition-all duration-150",
-										isActive
-											? "bg-primary/10 text-primary font-medium before:absolute before:left-0 before:inset-y-2 before:w-0.75 before:rounded-full before:bg-primary"
-											: "hover:bg-sidebar-accent/60",
-									)}
-								>
-									<Icon className="size-4" />
-									<span>{item.label}</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						);
-					})}
+					{[...byPlugin.entries()].map(([pluginId, items]) =>
+						items.length === 1 ? (
+							<PluginNavLeaf
+								key={pluginId}
+								projectId={projectId}
+								item={items[0]}
+								location={location}
+							/>
+						) : (
+							<PluginNavGroup
+								key={pluginId}
+								projectId={projectId}
+								items={items}
+								location={location}
+							/>
+						),
+					)}
 				</SidebarMenu>
 			</SidebarGroupContent>
 		</SidebarGroup>
