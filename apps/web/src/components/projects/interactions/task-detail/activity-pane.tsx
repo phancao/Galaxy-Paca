@@ -1,6 +1,4 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Bot } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityPane } from "@/components/shared/activity-pane";
@@ -113,28 +111,11 @@ export function TaskActivityPane({
 				}
 				case "task.link.removed":
 					return t("taskDetail.activity.removedTaskLink");
-				case "agent.session.started": {
-					const convId = (c as Record<string, unknown>).conversation_id as
-						| string
-						| undefined;
-					return (
-						<span className="flex items-center gap-1.5 flex-wrap">
-							<span>{t("taskDetail.activity.startedAiSession")}</span>
-							{convId && (
-								<Link
-									to="/projects/$projectId/conversations/$conversationId"
-									params={{ projectId, conversationId: convId }}
-									target="_blank"
-									rel="noreferrer"
-									className="inline-flex items-center gap-1 text-xs font-medium text-primary/80 hover:text-primary underline-offset-2 hover:underline transition-colors"
-								>
-									<Bot className="size-3" />
-									{t("taskDetail.activity.watchSession")}
-								</Link>
-							)}
-						</span>
-					);
-				}
+				case "agent.session.started":
+					// The in-app agent runtime is retired (ADR-038): no new sessions
+					// are created and there is no conversation page to link to, so
+					// historical activities render as plain text.
+					return t("taskDetail.activity.startedAiSession");
 				default:
 					return (
 						((c as Record<string, unknown>)._description as
