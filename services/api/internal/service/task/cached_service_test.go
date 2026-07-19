@@ -206,6 +206,18 @@ func (s *stubTaskSvc) DeleteCustomFieldDefinition(ctx context.Context, projectID
 	return nil
 }
 
+func (s *stubTaskSvc) ListStatusTransitions(_ context.Context, _ uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	return nil, nil
+}
+
+func (s *stubTaskSvc) CreateStatusTransition(_ context.Context, _ taskdom.CreateStatusTransitionInput) (*taskdom.StatusTransition, error) {
+	return nil, nil
+}
+
+func (s *stubTaskSvc) DeleteStatusTransition(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}
+
 // --- TaskLinkService stubs --------------------------------------------------
 
 func (s *stubTaskSvc) ListTaskLinks(_ context.Context, _, _ uuid.UUID) ([]*taskdom.TaskLink, error) {

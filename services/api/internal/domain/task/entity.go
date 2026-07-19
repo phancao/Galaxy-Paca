@@ -70,6 +70,11 @@ const (
 	FieldTypeMultiSelect FieldType = "multi_select"
 	FieldTypeBoolean     FieldType = "boolean"
 	FieldTypeURL         FieldType = "url"
+	// FieldTypeUser stores a project member's UUID (a people picker).
+	FieldTypeUser FieldType = "user"
+	// FieldTypeLabel stores a free-form array of strings (open vocabulary tags,
+	// unlike multi_select which is constrained to predefined options).
+	FieldTypeLabel FieldType = "label"
 )
 
 // ValidFieldTypes is the set of allowed field type values.
@@ -81,6 +86,8 @@ var ValidFieldTypes = map[FieldType]bool{
 	FieldTypeMultiSelect: true,
 	FieldTypeBoolean:     true,
 	FieldTypeURL:         true,
+	FieldTypeUser:        true,
+	FieldTypeLabel:       true,
 }
 
 // CustomFieldDefinition is a project-level schema entry that describes one
@@ -99,6 +106,20 @@ type CustomFieldDefinition struct {
 	DefaultValue any
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+// StatusTransition is one allowed workflow move for a project (ADR-040). A nil
+// TaskTypeID applies to every task type; a nil FromStatusID allows the move
+// from any source status. RequiredFields lists custom-field field_keys that
+// must be non-empty on the task for the transition to be permitted.
+type StatusTransition struct {
+	ID             uuid.UUID
+	ProjectID      uuid.UUID
+	TaskTypeID     *uuid.UUID
+	FromStatusID   *uuid.UUID
+	ToStatusID     uuid.UUID
+	RequiredFields []string
+	CreatedAt      time.Time
 }
 
 // LinkType describes the directional relationship stored in a TaskLink row.

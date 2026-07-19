@@ -254,6 +254,18 @@ func (f *fakeTaskSvc) DeleteCustomFieldDefinition(_ context.Context, _, _ uuid.U
 	return nil
 }
 
+func (f *fakeTaskSvc) ListStatusTransitions(_ context.Context, _ uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	return nil, nil
+}
+
+func (f *fakeTaskSvc) CreateStatusTransition(_ context.Context, _ taskdom.CreateStatusTransitionInput) (*taskdom.StatusTransition, error) {
+	return nil, nil
+}
+
+func (f *fakeTaskSvc) DeleteStatusTransition(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}
+
 // --- TaskLinkService stubs --------------------------------------------------
 
 func (f *fakeTaskSvc) ListTaskLinks(_ context.Context, _, _ uuid.UUID) ([]*taskdom.TaskLink, error) {

@@ -603,6 +603,18 @@ func (r *fakeTaskRepo) ClearCustomFieldValues(_ context.Context, _ uuid.UUID, _ 
 	return nil
 }
 
+func (r *fakeTaskRepo) ListStatusTransitions(_ context.Context, _ uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	return nil, nil
+}
+
+func (r *fakeTaskRepo) CreateStatusTransition(_ context.Context, _ *taskdom.StatusTransition) error {
+	return nil
+}
+
+func (r *fakeTaskRepo) DeleteStatusTransition(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}
+
 // -- fakeTaskRepo: TaskLink methods --
 
 func (r *fakeTaskRepo) ListTaskLinks(_ context.Context, _ uuid.UUID) ([]*taskdom.TaskLink, error) {

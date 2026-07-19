@@ -330,6 +330,23 @@ func (c *CachedService) DeleteCustomFieldDefinition(ctx context.Context, project
 	return nil
 }
 
+// --- Status Transitions (pass-through, ADR-040) ------------------------------
+
+// ListStatusTransitions delegates directly to the underlying service (not cached).
+func (c *CachedService) ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	return c.svc.ListStatusTransitions(ctx, projectID)
+}
+
+// CreateStatusTransition delegates directly to the underlying service.
+func (c *CachedService) CreateStatusTransition(ctx context.Context, in taskdom.CreateStatusTransitionInput) (*taskdom.StatusTransition, error) {
+	return c.svc.CreateStatusTransition(ctx, in)
+}
+
+// DeleteStatusTransition delegates directly to the underlying service.
+func (c *CachedService) DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error {
+	return c.svc.DeleteStatusTransition(ctx, projectID, id)
+}
+
 // --- Task Links (pass-through) -----------------------------------------------
 
 // ListTaskLinks delegates directly to the underlying service (not cached).
