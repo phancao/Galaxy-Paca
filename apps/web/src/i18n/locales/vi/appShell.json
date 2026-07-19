@@ -51,7 +51,11 @@
     "newSubfolder": "Thư mục con mới",
     "rename": "Đổi tên",
     "delete": "Xóa",
-    "untitled": "Chưa đặt tên"
+    "untitled": "Chưa đặt tên",
+    "openSpace": "Mở không gian tài liệu",
+    "searchWiki": "Tìm trong tài liệu…",
+    "noResults": "Không có kết quả",
+    "wikiUnavailable": "Dịch vụ tài liệu Wiki hiện chưa sẵn sàng."
   },
   "notifications": {
     "title": "Thông báo",
