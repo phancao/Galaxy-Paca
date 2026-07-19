@@ -80,6 +80,14 @@ services:
       GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
       GALAXY_AI_PROXY_URL: ${GALAXY_AI_PROXY_URL:-}
       GALAXY_AI_ROLE: ${GALAXY_AI_ROLE:-paca-ai}
+      # Wiki-backed Documentation (ADR-042): Paca provisions one Galaxy AI
+      # Wiki Folder per project and embeds the Wiki editor. Empty
+      # WIKI_API_TOKEN disables the surface (routes unregistered).
+      # PACA_WIKI_API_TOKEN is referenced host-side from
+      # runtime/galaxy-shared/*.env — NEVER committed.
+      WIKI_API_URL: ${PACA_WIKI_API_URL:-http://docx:3000}
+      WIKI_API_TOKEN: ${PACA_WIKI_API_TOKEN:-}
+      WIKI_PUBLIC_URL: ${PACA_WIKI_PUBLIC_URL:-https://wiki.skyplatform.net}
     # Split-horizon OIDC (SỰ CỐ "invalid id_token" 17/07): identity mints
     # iss=http://nexus-identity:8086 (OIDC_ISSUER nội bộ của identity), nên
     # api phải fetch discovery/token/JWKS qua galaxy_network như RAGFlow.

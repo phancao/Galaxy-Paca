@@ -22,6 +22,7 @@ import (
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	versiondom "github.com/Paca-AI/api/internal/domain/version"
+	wikispacedom "github.com/Paca-AI/api/internal/domain/wikispace"
 	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 	worklogdom "github.com/Paca-AI/api/internal/domain/worklog"
 	"github.com/Paca-AI/api/internal/transport/http/httpx"
@@ -262,6 +263,12 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusBadRequest, apierr.CodeComponentNameInvalid
 	case errors.Is(err, componentdom.ErrComponentNameTaken):
 		return http.StatusConflict, apierr.CodeComponentNameTaken
+	case errors.Is(err, wikispacedom.ErrDisabled):
+		return http.StatusServiceUnavailable, apierr.CodeWikiUnavailable
+	case errors.Is(err, wikispacedom.ErrSpaceNotFound):
+		return http.StatusNotFound, apierr.CodeDocFolderNotFound
+	case errors.Is(err, wikispacedom.ErrLinkNotFound):
+		return http.StatusNotFound, apierr.CodeWikiLinkNotFound
 	case errors.Is(err, worklogdom.ErrWorklogNotFound):
 		return http.StatusNotFound, apierr.CodeWorklogNotFound
 	case errors.Is(err, worklogdom.ErrWorklogMinutesInvalid):
@@ -591,6 +598,10 @@ func httpStatusForCode(code apierr.Code) int {
 		return http.StatusBadRequest
 	case apierr.CodeBadRequest:
 		return http.StatusBadRequest
+	case apierr.CodeWikiUnavailable:
+		return http.StatusServiceUnavailable
+	case apierr.CodeWikiLinkNotFound:
+		return http.StatusNotFound
 	case apierr.CodePasswordChangeRequired:
 		return http.StatusForbidden
 	case apierr.CodeInvalidCurrentPassword:

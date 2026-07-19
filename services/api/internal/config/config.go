@@ -24,8 +24,29 @@ type Config struct {
 	// GalaxyAI configures the one-shot "write task description with AI"
 	// feature (ADR-038). Empty IdentityURL/ServiceSecret disables it.
 	GalaxyAI GalaxyAIConfig
-	Env      string // development | production
+	// Wiki configures the Wiki-backed Documentation surface (ADR-042).
+	// Empty APIURL/APIToken disables it (routes stay unregistered).
+	Wiki WikiConfig
+	Env  string // development | production
 }
+
+// WikiConfig configures the Galaxy AI Wiki integration (ADR-042): Paca
+// provisions one Wiki Folder (space) per project and proxies tree/search,
+// acting as the requesting user via the platform act-as pattern.
+type WikiConfig struct {
+	// APIURL is the server-to-server Wiki base URL (WIKI_API_URL),
+	// e.g. http://docx:3000.
+	APIURL string
+	// APIToken is the Paca service account's Wiki API token (WIKI_API_TOKEN)
+	// sent as the bearer; the end user is named via X-Galaxy-Act-As.
+	APIToken string
+	// PublicURL is the browser-facing Wiki base URL (WIKI_PUBLIC_URL),
+	// e.g. https://wiki.skyplatform.net. Defaults to APIURL.
+	PublicURL string
+}
+
+// Enabled reports whether the Wiki integration is configured.
+func (c WikiConfig) Enabled() bool { return c.APIURL != "" && c.APIToken != "" }
 
 // GalaxyAIConfig configures the one-shot "write task description with AI"
 // feature (ADR-038): the API mints a short-lived, non-privileged act_as token

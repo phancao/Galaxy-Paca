@@ -20,6 +20,7 @@ import (
 	"github.com/Paca-AI/api/internal/platform/cache"
 	"github.com/Paca-AI/api/internal/platform/database"
 	"github.com/Paca-AI/api/internal/platform/galaxyai"
+	"github.com/Paca-AI/api/internal/platform/wiki"
 	"github.com/Paca-AI/api/internal/platform/logger"
 	"github.com/Paca-AI/api/internal/platform/messaging"
 	oidcplatform "github.com/Paca-AI/api/internal/platform/oidc"
@@ -46,6 +47,7 @@ import (
 	usersvc "github.com/Paca-AI/api/internal/service/user"
 	versionsvc "github.com/Paca-AI/api/internal/service/version"
 	workflowsvc "github.com/Paca-AI/api/internal/service/workflow"
+	wikispacesvc "github.com/Paca-AI/api/internal/service/wikispace"
 	worklogsvc "github.com/Paca-AI/api/internal/service/worklog"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	httpmw "github.com/Paca-AI/api/internal/transport/http/middleware"
@@ -109,6 +111,7 @@ func New(cfg *config.Config) (*App, error) {
 	versionRepo := pgRepo.NewVersionRepository(db)
 	componentRepo := pgRepo.NewComponentRepository(db)
 	worklogRepo := pgRepo.NewWorklogRepository(db)
+	wikiRepo := pgRepo.NewWikiRepository(db)
 	activityRepo := pgRepo.NewTaskActivityRepository(db)
 	notificationRepo := pgRepo.NewNotificationRepository(db)
 	sprintRepo := pgRepo.NewSprintRepository(db)
@@ -156,6 +159,11 @@ func New(cfg *config.Config) (*App, error) {
 	versionService := versionsvc.New(versionRepo)
 	componentService := componentsvc.New(componentRepo)
 	worklogService := worklogsvc.New(worklogRepo, worklogsvc.NewTaskOwnerChecker(taskRepo))
+	// Wiki-backed Documentation (ADR-042). A disabled client (missing
+	// WIKI_API_URL/WIKI_API_TOKEN) leaves the routes unregistered.
+	wikiSpaceService := wikispacesvc.New(wikiRepo,
+		wiki.New(cfg.Wiki.APIURL, cfg.Wiki.APIToken, cfg.Wiki.PublicURL),
+		projectRepo, projectRepo, userRepo, log)
 	sprintService := sprintsvc.NewCachedSprintService(sprintsvc.New(sprintRepo, taskRepo), cacheStore, cfg.Cache.SprintTTL, log)
 	viewService := sprintsvc.NewCachedViewService(sprintsvc.NewViewService(viewRepo), cacheStore, cfg.Cache.SprintTTL, log)
 	notificationService := notificationsvc.New(notificationRepo, projectRepo, publisher)
@@ -409,6 +417,7 @@ func New(cfg *config.Config) (*App, error) {
 		Agent:        agentHandler,
 		Conversation: convHandler,
 		Workflow:     workflowHandler,
+		Wiki:         handler.NewWikiHandler(wikiSpaceService),
 		Log:          log,
 	}
 

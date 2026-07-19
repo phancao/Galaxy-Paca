@@ -45,7 +45,10 @@ type Deps struct {
 	Agent                *handler.AgentHandler
 	Conversation         *handler.ConversationHandler
 	Workflow             *handler.WorkflowHandler
-	Log                  *slog.Logger
+	// Wiki is the ADR-042 Wiki-backed Documentation surface; nil / disabled
+	// leaves its routes unregistered.
+	Wiki *handler.WikiHandler
+	Log  *slog.Logger
 }
 
 // New builds and returns a configured http.Handler.
@@ -397,6 +400,21 @@ func New(deps Deps) http.Handler {
 							Delete("/{linkId}", deps.Task.DeleteTaskLink)
 					})
 
+					// Linked wiki pages (ADR-042) — registered only when the
+					// Wiki integration is configured.
+					if deps.Wiki.Enabled() {
+						r.Route("/{taskId}/wiki-links", func(r chi.Router) {
+							r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+								httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+								httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionTasksRead}},
+							)).Get("/", deps.Wiki.ListTaskLinks)
+							r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+								Post("/", deps.Wiki.AddTaskLink)
+							r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+								Delete("/{recordId}", deps.Wiki.RemoveTaskLink)
+						})
+					}
+
 					// Worklogs (time tracking) — ADR-040 Phase 2
 					if deps.Worklog != nil {
 						r.Route("/{taskId}/worklogs", func(r chi.Router) {
@@ -511,6 +529,23 @@ func New(deps Deps) http.Handler {
 							Patch("/{componentId}", deps.Component.UpdateComponent)
 						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
 							Delete("/{componentId}", deps.Component.DeleteComponent)
+					})
+				}
+
+				// Wiki-backed Documentation (ADR-042) — the project's Galaxy
+				// AI Wiki space. Registered only when the integration is
+				// configured (WIKI_API_URL + WIKI_API_TOKEN).
+				if deps.Wiki.Enabled() {
+					r.Route("/wiki-space", func(r chi.Router) {
+						wikiRead := httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
+						)
+						r.With(wikiRead).Get("/", deps.Wiki.GetSpace)
+						r.With(wikiRead).Get("/tree", deps.Wiki.GetTree)
+						r.With(wikiRead).Get("/search", deps.Wiki.Search)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
+							Post("/pages", deps.Wiki.CreatePage)
 					})
 				}
 
