@@ -123,6 +123,10 @@ func (c *Client) rpc(ctx context.Context, actor Actor, method string, body any, 
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiToken)
+	// The Wiki enforces https on POST /api/* by proto; internal http calls
+	// must assert the forwarded proto or they are answered 405 (the same
+	// gotcha as the RAGFlow internal callers).
+	req.Header.Set("X-Forwarded-Proto", "https")
 	if actor.Sub != "" {
 		req.Header.Set("X-Galaxy-Act-As", actor.Sub)
 	}
