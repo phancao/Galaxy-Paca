@@ -17,6 +17,7 @@ import {
 	FolderKanban,
 	FolderOpen,
 	GanttChart,
+	Gauge,
 	GitBranch,
 	Home,
 	KanbanSquare,
@@ -48,6 +49,11 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuGroup,
@@ -75,11 +81,6 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "@/components/ui/sidebar";
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useProjectPermissions } from "@/hooks/use-project-permissions";
 import type { ThemeMode } from "@/hooks/use-theme-mode";
@@ -881,6 +882,7 @@ function NavItem({
 const PROJECT_NAV_ITEMS = [
 	{ segment: "automation", icon: Workflow, labelKey: "nav.automation" },
 	{ segment: "team", icon: Users, labelKey: "nav.team" },
+	{ segment: "efficiency", icon: Gauge, labelKey: "nav.efficiency" },
 	{ segment: "settings", icon: Settings, labelKey: "nav.settings" },
 ] as const;
 

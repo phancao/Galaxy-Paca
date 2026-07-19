@@ -1,71 +1,72 @@
 {
-	"language": {
-		"label": "Ngôn ngữ",
-		"toggleTooltip": "Ngôn ngữ: {{language}} — nhấp để thay đổi"
-	},
-	"brand": {
-		"logoAlt": "Logo Paca"
-	},
-	"theme": {
-		"label": "Giao diện",
-		"light": "Sáng",
-		"dark": "Tối",
-		"auto": "Tự động",
-		"cycleTooltip": "Giao diện: {{mode}} — nhấp để chuyển",
-		"modeAutoTooltip": "Chế độ giao diện: tự động (theo hệ thống). Nhấp để chuyển sang chế độ sáng.",
-		"modeTooltip": "Chế độ giao diện: {{mode}}. Nhấp để chuyển chế độ."
-	},
-	"nav": {
-		"home": "Trang chủ",
-		"administration": "Quản trị",
-		"globalRoles": "Vai trò toàn cục",
-		"users": "Người dùng",
-		"plugins": "Plugin",
-		"allProjects": "Tất cả dự án",
-		"project": "Dự án",
-		"agents": "Agent",
-		"automation": "Tự động hóa",
-		"team": "Đội nhóm",
-		"settings": "Cài đặt"
-	},
-	"projectSwitcher": {
-		"projects": "Dự án",
-		"yourProjects": "Dự án của bạn",
-		"noProjectsYet": "Chưa có dự án nào",
-		"newProject": "Dự án mới"
-	},
-	"interactions": {
-		"title": "Tương tác",
-		"timeline": "Dòng thời gian",
-		"productBacklog": "Product Backlog"
-	},
-	"docs": {
-		"documentation": "Tài liệu",
-		"noDocumentsYet": "Chưa có tài liệu nào",
-		"emptyFolder": "Thư mục trống",
-		"add": "Thêm",
-		"newDocument": "Tài liệu mới",
-		"newFolder": "Thư mục mới",
-		"newFolderDefaultName": "Thư mục mới",
-		"newSubfolder": "Thư mục con mới",
-		"rename": "Đổi tên",
-		"delete": "Xóa",
-		"untitled": "Chưa đặt tên"
-	},
-	"notifications": {
-		"title": "Thông báo",
-		"empty": "Chưa có thông báo nào",
-		"markAllAsRead": "Đánh dấu tất cả là đã đọc",
-		"text": {
-			"assigned": "{{actor}} đã giao cho bạn nhiệm vụ #{{taskNumber}} — {{taskTitle}}",
-			"mentioned": "{{actor}} đã nhắc đến bạn trong #{{taskNumber}} — {{taskTitle}}"
-		}
-	},
-	"userMenu": {
-		"signIn": "Đăng nhập",
-		"myProfile": "Hồ sơ của tôi",
-		"apiKeys": "Khóa API",
-		"logOut": "Đăng xuất",
-		"loggingOut": "Đang đăng xuất…"
-	}
+  "language": {
+    "label": "Ngôn ngữ",
+    "toggleTooltip": "Ngôn ngữ: {{language}} — nhấp để thay đổi"
+  },
+  "brand": {
+    "logoAlt": "Logo Paca"
+  },
+  "theme": {
+    "label": "Giao diện",
+    "light": "Sáng",
+    "dark": "Tối",
+    "auto": "Tự động",
+    "cycleTooltip": "Giao diện: {{mode}} — nhấp để chuyển",
+    "modeAutoTooltip": "Chế độ giao diện: tự động (theo hệ thống). Nhấp để chuyển sang chế độ sáng.",
+    "modeTooltip": "Chế độ giao diện: {{mode}}. Nhấp để chuyển chế độ."
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "administration": "Quản trị",
+    "globalRoles": "Vai trò toàn cục",
+    "users": "Người dùng",
+    "plugins": "Plugin",
+    "allProjects": "Tất cả dự án",
+    "project": "Dự án",
+    "agents": "Agent",
+    "automation": "Tự động hóa",
+    "team": "Đội nhóm",
+    "settings": "Cài đặt",
+    "efficiency": "Hiệu suất"
+  },
+  "projectSwitcher": {
+    "projects": "Dự án",
+    "yourProjects": "Dự án của bạn",
+    "noProjectsYet": "Chưa có dự án nào",
+    "newProject": "Dự án mới"
+  },
+  "interactions": {
+    "title": "Tương tác",
+    "timeline": "Dòng thời gian",
+    "productBacklog": "Product Backlog"
+  },
+  "docs": {
+    "documentation": "Tài liệu",
+    "noDocumentsYet": "Chưa có tài liệu nào",
+    "emptyFolder": "Thư mục trống",
+    "add": "Thêm",
+    "newDocument": "Tài liệu mới",
+    "newFolder": "Thư mục mới",
+    "newFolderDefaultName": "Thư mục mới",
+    "newSubfolder": "Thư mục con mới",
+    "rename": "Đổi tên",
+    "delete": "Xóa",
+    "untitled": "Chưa đặt tên"
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "empty": "Chưa có thông báo nào",
+    "markAllAsRead": "Đánh dấu tất cả là đã đọc",
+    "text": {
+      "assigned": "{{actor}} đã giao cho bạn nhiệm vụ #{{taskNumber}} — {{taskTitle}}",
+      "mentioned": "{{actor}} đã nhắc đến bạn trong #{{taskNumber}} — {{taskTitle}}"
+    }
+  },
+  "userMenu": {
+    "signIn": "Đăng nhập",
+    "myProfile": "Hồ sơ của tôi",
+    "apiKeys": "Khóa API",
+    "logOut": "Đăng xuất",
+    "loggingOut": "Đang đăng xuất…"
+  }
 }

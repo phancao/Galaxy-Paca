@@ -1,71 +1,72 @@
 {
-	"language": {
-		"label": "Language",
-		"toggleTooltip": "Language: {{language}} — click to change"
-	},
-	"brand": {
-		"logoAlt": "Paca Logo"
-	},
-	"theme": {
-		"label": "Theme",
-		"light": "Light",
-		"dark": "Dark",
-		"auto": "Auto",
-		"cycleTooltip": "Theme: {{mode}} — click to cycle",
-		"modeAutoTooltip": "Theme mode: auto (system). Click to switch to light mode.",
-		"modeTooltip": "Theme mode: {{mode}}. Click to switch mode."
-	},
-	"nav": {
-		"home": "Home",
-		"administration": "Administration",
-		"globalRoles": "Global Roles",
-		"users": "Users",
-		"plugins": "Plugins",
-		"allProjects": "All Projects",
-		"project": "Project",
-		"agents": "Agents",
-		"automation": "Automation",
-		"team": "Team",
-		"settings": "Settings"
-	},
-	"projectSwitcher": {
-		"projects": "Projects",
-		"yourProjects": "Your Projects",
-		"noProjectsYet": "No projects yet",
-		"newProject": "New project"
-	},
-	"interactions": {
-		"title": "Interactions",
-		"timeline": "Timeline",
-		"productBacklog": "Product Backlog"
-	},
-	"docs": {
-		"documentation": "Documentation",
-		"noDocumentsYet": "No documents yet",
-		"emptyFolder": "Empty folder",
-		"add": "Add",
-		"newDocument": "New Document",
-		"newFolder": "New Folder",
-		"newFolderDefaultName": "New Folder",
-		"newSubfolder": "New Subfolder",
-		"rename": "Rename",
-		"delete": "Delete",
-		"untitled": "Untitled"
-	},
-	"notifications": {
-		"title": "Notifications",
-		"empty": "No notifications yet",
-		"markAllAsRead": "Mark all as read",
-		"text": {
-			"assigned": "{{actor}} assigned you to task #{{taskNumber}} — {{taskTitle}}",
-			"mentioned": "{{actor}} mentioned you in #{{taskNumber}} — {{taskTitle}}"
-		}
-	},
-	"userMenu": {
-		"signIn": "Sign in",
-		"myProfile": "My Profile",
-		"apiKeys": "API Keys",
-		"logOut": "Log out",
-		"loggingOut": "Logging out…"
-	}
+  "language": {
+    "label": "Language",
+    "toggleTooltip": "Language: {{language}} — click to change"
+  },
+  "brand": {
+    "logoAlt": "Paca Logo"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "auto": "Auto",
+    "cycleTooltip": "Theme: {{mode}} — click to cycle",
+    "modeAutoTooltip": "Theme mode: auto (system). Click to switch to light mode.",
+    "modeTooltip": "Theme mode: {{mode}}. Click to switch mode."
+  },
+  "nav": {
+    "home": "Home",
+    "administration": "Administration",
+    "globalRoles": "Global Roles",
+    "users": "Users",
+    "plugins": "Plugins",
+    "allProjects": "All Projects",
+    "project": "Project",
+    "agents": "Agents",
+    "automation": "Automation",
+    "team": "Team",
+    "settings": "Settings",
+    "efficiency": "Efficiency"
+  },
+  "projectSwitcher": {
+    "projects": "Projects",
+    "yourProjects": "Your Projects",
+    "noProjectsYet": "No projects yet",
+    "newProject": "New project"
+  },
+  "interactions": {
+    "title": "Interactions",
+    "timeline": "Timeline",
+    "productBacklog": "Product Backlog"
+  },
+  "docs": {
+    "documentation": "Documentation",
+    "noDocumentsYet": "No documents yet",
+    "emptyFolder": "Empty folder",
+    "add": "Add",
+    "newDocument": "New Document",
+    "newFolder": "New Folder",
+    "newFolderDefaultName": "New Folder",
+    "newSubfolder": "New Subfolder",
+    "rename": "Rename",
+    "delete": "Delete",
+    "untitled": "Untitled"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications yet",
+    "markAllAsRead": "Mark all as read",
+    "text": {
+      "assigned": "{{actor}} assigned you to task #{{taskNumber}} — {{taskTitle}}",
+      "mentioned": "{{actor}} mentioned you in #{{taskNumber}} — {{taskTitle}}"
+    }
+  },
+  "userMenu": {
+    "signIn": "Sign in",
+    "myProfile": "My Profile",
+    "apiKeys": "API Keys",
+    "logOut": "Log out",
+    "loggingOut": "Logging out…"
+  }
 }

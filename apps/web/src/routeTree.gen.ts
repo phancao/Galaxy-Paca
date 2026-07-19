@@ -22,6 +22,7 @@ import { Route as AuthenticatedAdminPluginsIndexRouteImport } from './routes/_au
 import { Route as AuthenticatedAdminGlobalRolesIndexRouteImport } from './routes/_authenticated/admin/global-roles/index'
 import { Route as AuthenticatedProjectsProjectIdTeamIndexRouteImport } from './routes/_authenticated/projects/$projectId/team/index'
 import { Route as AuthenticatedProjectsProjectIdSettingsIndexRouteImport } from './routes/_authenticated/projects/$projectId/settings/index'
+import { Route as AuthenticatedProjectsProjectIdEfficiencyIndexRouteImport } from './routes/_authenticated/projects/$projectId/efficiency/index'
 import { Route as AuthenticatedProjectsProjectIdDocsIndexRouteImport } from './routes/_authenticated/projects/$projectId/docs/index'
 import { Route as AuthenticatedProjectsProjectIdAutomationIndexRouteImport } from './routes/_authenticated/projects/$projectId/automation/index'
 import { Route as AuthenticatedProjectsProjectIdTasksTaskIdRouteImport } from './routes/_authenticated/projects/$projectId/tasks/$taskId'
@@ -106,6 +107,12 @@ const AuthenticatedProjectsProjectIdSettingsIndexRoute =
     path: '/settings/',
     getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
+const AuthenticatedProjectsProjectIdEfficiencyIndexRoute =
+  AuthenticatedProjectsProjectIdEfficiencyIndexRouteImport.update({
+    id: '/efficiency/',
+    path: '/efficiency/',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any)
 const AuthenticatedProjectsProjectIdDocsIndexRoute =
   AuthenticatedProjectsProjectIdDocsIndexRouteImport.update({
     id: '/docs/',
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/tasks/$taskId': typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   '/projects/$projectId/automation/': typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
   '/projects/$projectId/docs/': typeof AuthenticatedProjectsProjectIdDocsIndexRoute
+  '/projects/$projectId/efficiency/': typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   '/projects/$projectId/settings/': typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   '/projects/$projectId/team/': typeof AuthenticatedProjectsProjectIdTeamIndexRoute
   '/projects/$projectId/interactions/sprints/$sprintId': typeof AuthenticatedProjectsProjectIdInteractionsSprintsSprintIdRoute
@@ -209,6 +217,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/tasks/$taskId': typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   '/projects/$projectId/automation': typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
   '/projects/$projectId/docs': typeof AuthenticatedProjectsProjectIdDocsIndexRoute
+  '/projects/$projectId/efficiency': typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   '/projects/$projectId/settings': typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   '/projects/$projectId/team': typeof AuthenticatedProjectsProjectIdTeamIndexRoute
   '/projects/$projectId/interactions/sprints/$sprintId': typeof AuthenticatedProjectsProjectIdInteractionsSprintsSprintIdRoute
@@ -235,6 +244,7 @@ export interface FileRoutesById {
   '/_authenticated/projects/$projectId/tasks/$taskId': typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   '/_authenticated/projects/$projectId/automation/': typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
   '/_authenticated/projects/$projectId/docs/': typeof AuthenticatedProjectsProjectIdDocsIndexRoute
+  '/_authenticated/projects/$projectId/efficiency/': typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   '/_authenticated/projects/$projectId/settings/': typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   '/_authenticated/projects/$projectId/team/': typeof AuthenticatedProjectsProjectIdTeamIndexRoute
   '/_authenticated/projects/$projectId/interactions/sprints/$sprintId': typeof AuthenticatedProjectsProjectIdInteractionsSprintsSprintIdRoute
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/tasks/$taskId'
     | '/projects/$projectId/automation/'
     | '/projects/$projectId/docs/'
+    | '/projects/$projectId/efficiency/'
     | '/projects/$projectId/settings/'
     | '/projects/$projectId/team/'
     | '/projects/$projectId/interactions/sprints/$sprintId'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/tasks/$taskId'
     | '/projects/$projectId/automation'
     | '/projects/$projectId/docs'
+    | '/projects/$projectId/efficiency'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/team'
     | '/projects/$projectId/interactions/sprints/$sprintId'
@@ -309,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/$projectId/tasks/$taskId'
     | '/_authenticated/projects/$projectId/automation/'
     | '/_authenticated/projects/$projectId/docs/'
+    | '/_authenticated/projects/$projectId/efficiency/'
     | '/_authenticated/projects/$projectId/settings/'
     | '/_authenticated/projects/$projectId/team/'
     | '/_authenticated/projects/$projectId/interactions/sprints/$sprintId'
@@ -414,6 +427,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
+    '/_authenticated/projects/$projectId/efficiency/': {
+      id: '/_authenticated/projects/$projectId/efficiency/'
+      path: '/efficiency'
+      fullPath: '/projects/$projectId/efficiency/'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdEfficiencyIndexRouteImport
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
+    }
     '/_authenticated/projects/$projectId/docs/': {
       id: '/_authenticated/projects/$projectId/docs/'
       path: '/docs'
@@ -496,6 +516,7 @@ interface AuthenticatedProjectsProjectIdRouteChildren {
   AuthenticatedProjectsProjectIdTasksTaskIdRoute: typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   AuthenticatedProjectsProjectIdAutomationIndexRoute: typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
   AuthenticatedProjectsProjectIdDocsIndexRoute: typeof AuthenticatedProjectsProjectIdDocsIndexRoute
+  AuthenticatedProjectsProjectIdEfficiencyIndexRoute: typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   AuthenticatedProjectsProjectIdSettingsIndexRoute: typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   AuthenticatedProjectsProjectIdTeamIndexRoute: typeof AuthenticatedProjectsProjectIdTeamIndexRoute
   AuthenticatedProjectsProjectIdInteractionsSprintsSprintIdRoute: typeof AuthenticatedProjectsProjectIdInteractionsSprintsSprintIdRoute
@@ -520,6 +541,8 @@ const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectI
       AuthenticatedProjectsProjectIdAutomationIndexRoute,
     AuthenticatedProjectsProjectIdDocsIndexRoute:
       AuthenticatedProjectsProjectIdDocsIndexRoute,
+    AuthenticatedProjectsProjectIdEfficiencyIndexRoute:
+      AuthenticatedProjectsProjectIdEfficiencyIndexRoute,
     AuthenticatedProjectsProjectIdSettingsIndexRoute:
       AuthenticatedProjectsProjectIdSettingsIndexRoute,
     AuthenticatedProjectsProjectIdTeamIndexRoute:
