@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // ValidateFieldDefinition enforces structural rules on a custom-field
@@ -85,6 +87,19 @@ func ValidateCustomFields(defs []*CustomFieldDefinition, values map[string]any, 
 	}
 
 	return out, nil
+}
+
+// MissingRequiredField returns the first key in keys that is absent or empty in
+// cf (and true), or "" and false when every key is satisfied. Used to enforce a
+// workflow transition's required fields.
+func MissingRequiredField(cf map[string]any, keys []string) (string, bool) {
+	for _, k := range keys {
+		v, ok := cf[k]
+		if !ok || isEmptyFieldValue(v) {
+			return k, true
+		}
+	}
+	return "", false
 }
 
 // CoerceDefaultValue validates a proposed default value against a field type,
@@ -177,6 +192,32 @@ func coerceFieldValue(d *CustomFieldDefinition, v any) (any, error) {
 			}
 		}
 		return arr, nil
+
+	case FieldTypeUser:
+		s, ok := v.(string)
+		if !ok {
+			return nil, fieldValueErr(d, "expected a member UUID")
+		}
+		s = strings.TrimSpace(s)
+		if s != "" {
+			if _, err := uuid.Parse(s); err != nil {
+				return nil, fieldValueErr(d, "is not a valid member id")
+			}
+		}
+		return s, nil
+
+	case FieldTypeLabel:
+		arr, ok := toStringSlice(v)
+		if !ok {
+			return nil, fieldValueErr(d, "expected an array of labels")
+		}
+		out := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if t := strings.TrimSpace(item); t != "" {
+				out = append(out, t)
+			}
+		}
+		return out, nil
 
 	default:
 		return v, nil

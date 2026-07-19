@@ -30,6 +30,12 @@ var (
 	ErrCustomFieldRequired       = errors.New("custom field: a required field is missing")
 	ErrCustomFieldValueInvalid   = errors.New("custom field: value does not match the field type")
 
+	// Workflow transition errors (ADR-040).
+	ErrTransitionNotFound      = errors.New("status transition: not found")
+	ErrTransitionInvalid       = errors.New("status transition: to_status is required and must differ where applicable")
+	ErrTransitionNotAllowed    = errors.New("status transition: this status change is not permitted by the project's workflow")
+	ErrTransitionRequiredField = errors.New("status transition: a field required to make this transition is missing")
+
 	// Task link errors.
 	ErrTaskLinkNotFound     = errors.New("task link: not found")
 	ErrTaskLinkSelf         = errors.New("task link: a task cannot be linked to itself")

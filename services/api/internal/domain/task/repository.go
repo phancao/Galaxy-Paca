@@ -13,6 +13,7 @@ type Repository interface {
 	TaskRepository
 	TaskLinkRepository
 	CustomFieldDefinitionRepository
+	StatusTransitionRepository
 }
 
 // TaskLinkRepository defines persistence operations for task links.
@@ -112,6 +113,24 @@ type TaskFilter struct {
 	// Search, when non-nil and non-blank, restricts results to tasks whose title
 	// or "#<task_number>" id contains the text (case-insensitive).
 	Search *string
+	// CustomFields restricts results by values stored in tasks.custom_fields.
+	CustomFields []CustomFieldFilter
+}
+
+// CustomFieldFilterOp enumerates the supported custom-field predicates.
+const (
+	CFOpEq       = "eq"       // scalar equality (text/number/boolean/date/select)
+	CFOpNeq      = "neq"      // scalar inequality
+	CFOpContains = "contains" // multi_select array membership
+	CFOpSet      = "set"      // field has a value
+	CFOpUnset    = "unset"    // field has no value
+)
+
+// CustomFieldFilter is one predicate over a task's custom_fields JSONB.
+type CustomFieldFilter struct {
+	Key   string // custom field field_key
+	Op    string // one of the CFOp* constants (defaults to eq)
+	Value string // compared value (ignored for set/unset)
 }
 
 // CustomFieldDefinitionRepository defines persistence operations for custom
@@ -125,4 +144,12 @@ type CustomFieldDefinitionRepository interface {
 	// ClearCustomFieldValues strips one field_key from every task's
 	// custom_fields JSONB in a project (used on a field type change).
 	ClearCustomFieldValues(ctx context.Context, projectID uuid.UUID, fieldKey string) error
+}
+
+// StatusTransitionRepository defines persistence operations for the opt-in
+// workflow transition rules (ADR-040).
+type StatusTransitionRepository interface {
+	ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*StatusTransition, error)
+	CreateStatusTransition(ctx context.Context, t *StatusTransition) error
+	DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error
 }

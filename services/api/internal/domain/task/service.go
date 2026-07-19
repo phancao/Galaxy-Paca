@@ -188,6 +188,22 @@ type CustomFieldDefinitionService interface {
 	UpdateCustomFieldDefinition(ctx context.Context, projectID, id uuid.UUID, in UpdateCustomFieldDefinitionInput) (*CustomFieldDefinition, error)
 	// DeleteCustomFieldDefinition removes the field definition identified by id, verifying it belongs to projectID.
 	DeleteCustomFieldDefinition(ctx context.Context, projectID, id uuid.UUID) error
+
+	// Workflow transitions (ADR-040).
+	ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*StatusTransition, error)
+	CreateStatusTransition(ctx context.Context, in CreateStatusTransitionInput) (*StatusTransition, error)
+	DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error
+}
+
+// CreateStatusTransitionInput carries fields to declare one allowed workflow
+// transition. A nil TaskTypeID applies to all types; a nil FromStatusID allows
+// the move from any source status.
+type CreateStatusTransitionInput struct {
+	ProjectID      uuid.UUID
+	TaskTypeID     *uuid.UUID
+	FromStatusID   *uuid.UUID
+	ToStatusID     uuid.UUID
+	RequiredFields []string
 }
 
 // CreateCustomFieldDefinitionInput carries fields required to create a custom

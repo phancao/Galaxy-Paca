@@ -497,6 +497,43 @@ func applyTaskFilter(b *queryBuilder, filter taskdom.TaskFilter) {
 				"(title ILIKE %s OR ('#' || task_number::text) ILIKE %s)", p1, p2))
 		}
 	}
+
+	// Custom-field predicates over tasks.custom_fields JSONB. Uses jsonb_exists()
+	// (the function form of the ? operator) so no operator is ever confused with
+	// a driver placeholder.
+	for _, cf := range filter.CustomFields {
+		if cf.Key == "" {
+			continue
+		}
+		switch cf.Op {
+		case taskdom.CFOpSet:
+			pk := b.placeholder()
+			b.args = append(b.args, cf.Key)
+			b.whereClauses = append(b.whereClauses, "jsonb_exists(custom_fields, "+pk+")")
+		case taskdom.CFOpUnset:
+			pk := b.placeholder()
+			b.args = append(b.args, cf.Key)
+			b.whereClauses = append(b.whereClauses, "NOT jsonb_exists(custom_fields, "+pk+")")
+		case taskdom.CFOpContains:
+			pk := b.placeholder()
+			b.args = append(b.args, cf.Key)
+			pv := b.placeholder()
+			b.args = append(b.args, cf.Value)
+			b.whereClauses = append(b.whereClauses, "jsonb_exists(custom_fields -> "+pk+", "+pv+")")
+		case taskdom.CFOpNeq:
+			pk := b.placeholder()
+			b.args = append(b.args, cf.Key)
+			pv := b.placeholder()
+			b.args = append(b.args, cf.Value)
+			b.whereClauses = append(b.whereClauses, "(custom_fields ->> "+pk+") IS DISTINCT FROM "+pv)
+		default: // eq
+			pk := b.placeholder()
+			b.args = append(b.args, cf.Key)
+			pv := b.placeholder()
+			b.args = append(b.args, cf.Value)
+			b.whereClauses = append(b.whereClauses, "(custom_fields ->> "+pk+") = "+pv)
+		}
+	}
 }
 
 // escapeLikePattern escapes the LIKE/ILIKE wildcard characters (% and _) and
@@ -1411,7 +1448,7 @@ func (r *TaskRepository) DeleteCustomFieldDefinition(ctx context.Context, id uui
 		return fmt.Errorf("custom field repo: delete: %w", err)
 	}
 	if _, err = tx.ExecContext(ctx,
-		`UPDATE tasks SET custom_fields = custom_fields - $1 WHERE project_id = $2 AND custom_fields ? $1`,
+		`UPDATE tasks SET custom_fields = custom_fields - $1 WHERE project_id = $2 AND jsonb_exists(custom_fields, $1)`,
 		rec.FieldKey, rec.ProjectID,
 	); err != nil {
 		return fmt.Errorf("custom field repo: delete strip values: %w", err)
@@ -1427,7 +1464,7 @@ func (r *TaskRepository) DeleteCustomFieldDefinition(ctx context.Context, id uui
 // type-incompatible values don't linger (ADR-040 Phase 0).
 func (r *TaskRepository) ClearCustomFieldValues(ctx context.Context, projectID uuid.UUID, fieldKey string) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE tasks SET custom_fields = custom_fields - $1 WHERE project_id = $2 AND custom_fields ? $1`,
+		`UPDATE tasks SET custom_fields = custom_fields - $1 WHERE project_id = $2 AND jsonb_exists(custom_fields, $1)`,
 		fieldKey, projectID.String(),
 	)
 	if err != nil {
@@ -1482,6 +1519,101 @@ func marshalDefaultValue(v any) ([]byte, error) {
 		return nil, fmt.Errorf("custom field repo: marshal default_value: %w", err)
 	}
 	return b, nil
+}
+
+// --- Status Transitions (workflow engine, ADR-040) --------------------------
+
+type statusTransitionRecord struct {
+	ID             string    `db:"id"`
+	ProjectID      string    `db:"project_id"`
+	TaskTypeID     *string   `db:"task_type_id"`
+	FromStatusID   *string   `db:"from_status_id"`
+	ToStatusID     string    `db:"to_status_id"`
+	RequiredFields []byte    `db:"required_fields"`
+	CreatedAt      time.Time `db:"created_at"`
+}
+
+const statusTransitionCols = `id, project_id, task_type_id, from_status_id, to_status_id, required_fields, created_at`
+
+// ListStatusTransitions returns a project's workflow transition rules.
+func (r *TaskRepository) ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	var records []statusTransitionRecord
+	if err := r.db.SelectContext(ctx, &records, `SELECT `+statusTransitionCols+` FROM status_transitions WHERE project_id = $1 ORDER BY created_at ASC`, projectID.String()); err != nil {
+		return nil, fmt.Errorf("status transition repo: list: %w", err)
+	}
+	out := make([]*taskdom.StatusTransition, 0, len(records))
+	for i := range records {
+		t, err := toStatusTransitionEntity(&records[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+// CreateStatusTransition persists a new transition rule.
+func (r *TaskRepository) CreateStatusTransition(ctx context.Context, t *taskdom.StatusTransition) error {
+	rf := t.RequiredFields
+	if rf == nil {
+		rf = []string{}
+	}
+	rfJSON, err := json.Marshal(rf)
+	if err != nil {
+		return fmt.Errorf("status transition repo: marshal required_fields: %w", err)
+	}
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO status_transitions (id, project_id, task_type_id, from_status_id, to_status_id, required_fields, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		t.ID.String(), t.ProjectID.String(),
+		uuidPtrToStringPtr(t.TaskTypeID), uuidPtrToStringPtr(t.FromStatusID),
+		t.ToStatusID.String(), rfJSON, t.CreatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return taskdom.ErrTransitionInvalid
+		}
+		return fmt.Errorf("status transition repo: create: %w", err)
+	}
+	return nil
+}
+
+// DeleteStatusTransition removes a transition rule scoped to its project.
+func (r *TaskRepository) DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error {
+	res, err := r.db.ExecContext(ctx, `DELETE FROM status_transitions WHERE id = $1 AND project_id = $2`, id.String(), projectID.String())
+	if err != nil {
+		return fmt.Errorf("status transition repo: delete: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return taskdom.ErrTransitionNotFound
+	}
+	return nil
+}
+
+func toStatusTransitionEntity(rec *statusTransitionRecord) (*taskdom.StatusTransition, error) {
+	id, _ := uuid.Parse(rec.ID)
+	pid, _ := uuid.Parse(rec.ProjectID)
+	toID, _ := uuid.Parse(rec.ToStatusID)
+
+	var rf []string
+	if len(rec.RequiredFields) > 0 {
+		if err := json.Unmarshal(rec.RequiredFields, &rf); err != nil {
+			return nil, fmt.Errorf("status transition repo: unmarshal required_fields: %w", err)
+		}
+	}
+	if rf == nil {
+		rf = []string{}
+	}
+
+	return &taskdom.StatusTransition{
+		ID:             id,
+		ProjectID:      pid,
+		TaskTypeID:     strPtrToUUIDPtr(rec.TaskTypeID),
+		FromStatusID:   strPtrToUUIDPtr(rec.FromStatusID),
+		ToStatusID:     toID,
+		RequiredFields: rf,
+		CreatedAt:      rec.CreatedAt,
+	}, nil
 }
 
 func marshalOptions(opts []string) ([]byte, error) {
