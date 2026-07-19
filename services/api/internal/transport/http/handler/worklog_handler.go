@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -70,6 +72,48 @@ func (h *WorklogHandler) ListWorklogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	worklogs, err := h.svc.ListWorklogs(r.Context(), projectID, taskID)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	resp := make([]dto.WorklogResponse, 0, len(worklogs))
+	totalMinutes := 0
+	for _, wl := range worklogs {
+		resp = append(resp, dto.WorklogFromEntity(wl))
+		totalMinutes += wl.Minutes
+	}
+	presenter.OK(w, r, map[string]any{"items": resp, "total_minutes": totalMinutes})
+}
+
+// ListProjectWorklogs handles GET /projects/:projectId/worklogs. It returns every
+// worklog across the project's tasks, filtered by the optional query params
+// `from` / `to` (RFC3339 timestamps, inclusive) and `member_id`. Powers the team
+// efficiency / time-tracking reports.
+func (h *WorklogHandler) ListProjectWorklogs(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	q := r.URL.Query()
+	var filter worklogdom.WorklogFilter
+	if v := strings.TrimSpace(q.Get("from")); v != "" {
+		if t, perr := time.Parse(time.RFC3339, v); perr == nil {
+			filter.From = &t
+		}
+	}
+	if v := strings.TrimSpace(q.Get("to")); v != "" {
+		if t, perr := time.Parse(time.RFC3339, v); perr == nil {
+			filter.To = &t
+		}
+	}
+	if v := strings.TrimSpace(q.Get("member_id")); v != "" {
+		if id, perr := uuid.Parse(v); perr == nil {
+			filter.MemberID = &id
+		}
+	}
+
+	worklogs, err := h.svc.ListProjectWorklogs(r.Context(), projectID, filter)
 	if err != nil {
 		presenter.Error(w, r, err)
 		return
