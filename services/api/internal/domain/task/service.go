@@ -219,13 +219,14 @@ type CreateStatusTransitionInput struct {
 // CreateCustomFieldDefinitionInput carries fields required to create a custom
 // field definition.
 type CreateCustomFieldDefinitionInput struct {
-	ProjectID    uuid.UUID
-	FieldKey     string
-	DisplayName  string
-	FieldType    FieldType
-	Options      []string
-	IsRequired   bool
-	DefaultValue any
+	ProjectID      uuid.UUID
+	FieldKey       string
+	DisplayName    string
+	FieldType      FieldType
+	Options        []string
+	CascadeOptions []CascadeOption
+	IsRequired     bool
+	DefaultValue   any
 	// TaskTypeID scopes the field to a single task type (nil = all types).
 	// Set at creation; immutable afterward (like FieldKey).
 	TaskTypeID *uuid.UUID
@@ -235,9 +236,10 @@ type CreateCustomFieldDefinitionInput struct {
 // fields. DefaultValue uses a pointer-to-any so the zero value (untouched) is
 // distinguishable from an explicit clear (a non-nil pointer to a nil any).
 type UpdateCustomFieldDefinitionInput struct {
-	DisplayName  string
-	FieldType    *FieldType
-	Options      []string
-	IsRequired   *bool
-	DefaultValue *any
+	DisplayName    string
+	FieldType      *FieldType
+	Options        []string
+	CascadeOptions []CascadeOption
+	IsRequired     *bool
+	DefaultValue   *any
 }

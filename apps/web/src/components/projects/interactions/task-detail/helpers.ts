@@ -37,6 +37,7 @@ const API_TO_UI_FIELD_TYPE: Record<FieldType, CustomFieldDef["field_type"]> = {
 	url: "Url",
 	user: "User",
 	label: "Label",
+	cascading_select: "Cascading",
 };
 
 const UI_TO_API_FIELD_TYPE: Record<CustomFieldDef["field_type"], FieldType> = {
@@ -49,6 +50,7 @@ const UI_TO_API_FIELD_TYPE: Record<CustomFieldDef["field_type"], FieldType> = {
 	Url: "url",
 	User: "user",
 	Label: "label",
+	Cascading: "cascading_select",
 };
 
 export function mapApiFieldToUi(
@@ -61,6 +63,7 @@ export function mapApiFieldToUi(
 		field_type: API_TO_UI_FIELD_TYPE[apiField.field_type] ?? "Text",
 		required: apiField.is_required,
 		options: apiField.options,
+		cascade_options: apiField.cascade_options,
 		task_type_id: apiField.task_type_id,
 	};
 }

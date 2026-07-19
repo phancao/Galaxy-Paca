@@ -539,6 +539,7 @@ export function PropertiesPanel({
 							});
 						}}
 						customOptions={cf.options}
+						customCascadeOptions={cf.cascade_options ?? []}
 						customUsers={memberUserOptions}
 						canEdit={canEdit}
 					/>

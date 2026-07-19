@@ -73,23 +73,46 @@ func TestValidateCustomFields_DropsUnknownKeys(t *testing.T) {
 }
 
 func TestValidateFieldDefinition_OptionsRequired(t *testing.T) {
-	if err := ValidateFieldDefinition(FieldTypeSelect, nil); !errors.Is(err, ErrCustomFieldOptionsInvalid) {
+	if err := ValidateFieldDefinition(FieldTypeSelect, nil, nil); !errors.Is(err, ErrCustomFieldOptionsInvalid) {
 		t.Fatalf("select without options should fail, got %v", err)
 	}
-	if err := ValidateFieldDefinition(FieldTypeText, nil); err != nil {
+	if err := ValidateFieldDefinition(FieldTypeText, nil, nil); err != nil {
 		t.Fatalf("text without options should pass, got %v", err)
+	}
+	if err := ValidateFieldDefinition(FieldTypeCascadingSelect, nil, nil); !errors.Is(err, ErrCustomFieldOptionsInvalid) {
+		t.Fatalf("cascading without options should fail, got %v", err)
+	}
+	if err := ValidateFieldDefinition(FieldTypeCascadingSelect, nil, []CascadeOption{{Value: "p", Children: []string{"c"}}}); err != nil {
+		t.Fatalf("cascading with options should pass, got %v", err)
 	}
 }
 
 func TestCoerceDefaultValue(t *testing.T) {
-	v, err := CoerceDefaultValue(FieldTypeNumber, nil, float64(5))
+	v, err := CoerceDefaultValue(FieldTypeNumber, nil, nil, float64(5))
 	if err != nil || v.(float64) != 5 {
 		t.Fatalf("number default: %v %v", v, err)
 	}
-	if _, err := CoerceDefaultValue(FieldTypeSelect, []string{"a"}, "b"); err == nil {
+	if _, err := CoerceDefaultValue(FieldTypeSelect, []string{"a"}, nil, "b"); err == nil {
 		t.Fatalf("select default out of options should fail")
 	}
-	if v, err := CoerceDefaultValue(FieldTypeText, nil, nil); err != nil || v != nil {
+	if v, err := CoerceDefaultValue(FieldTypeText, nil, nil, nil); err != nil || v != nil {
 		t.Fatalf("nil default should stay nil: %v %v", v, err)
+	}
+}
+
+func TestCoerceFieldValue_Cascading(t *testing.T) {
+	d := &CustomFieldDefinition{FieldType: FieldTypeCascadingSelect, DisplayName: "Loc",
+		CascadeOptions: []CascadeOption{{Value: "VN", Children: []string{"HN", "HCM"}}}}
+	if _, err := coerceFieldValue(d, map[string]any{"parent": "VN", "child": "HN"}); err != nil {
+		t.Fatalf("valid cascading value should pass, got %v", err)
+	}
+	if _, err := coerceFieldValue(d, map[string]any{"parent": "US", "child": "NYC"}); err == nil {
+		t.Fatalf("unknown parent should fail")
+	}
+	if _, err := coerceFieldValue(d, map[string]any{"parent": "VN", "child": "SGN"}); err == nil {
+		t.Fatalf("child not under parent should fail")
+	}
+	if _, err := coerceFieldValue(d, map[string]any{"parent": "VN"}); err == nil {
+		t.Fatalf("missing child when parent has children should fail")
 	}
 }

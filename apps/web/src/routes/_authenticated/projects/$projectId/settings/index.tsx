@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ComponentsSettings } from "@/components/projects/settings/ComponentsSettings";
+import { CopyConfigSettings } from "@/components/projects/settings/CopyConfigSettings";
 import { CustomFieldsSettings } from "@/components/projects/settings/CustomFieldsSettings";
 import { DangerZone } from "@/components/projects/settings/DangerZone";
 import { GeneralSettings } from "@/components/projects/settings/GeneralSettings";
@@ -233,10 +234,16 @@ function SettingsPage() {
 						/>
 					)}
 					{activeSection === "task-types" && (
-						<TaskTypesSettings
-							projectId={projectId}
-							canWrite={canManageTasks}
-						/>
+						<div className="space-y-6">
+							<TaskTypesSettings
+								projectId={projectId}
+								canWrite={canManageTasks}
+							/>
+							<CopyConfigSettings
+								projectId={projectId}
+								canWrite={canManageTasks}
+							/>
+						</div>
 					)}
 					{activeSection === "custom-fields" && (
 						<CustomFieldsSettings

@@ -1,6 +1,8 @@
 import { CalendarDays } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { CascadeOption } from "@/lib/project-api";
 import { FieldValue } from "../primitives";
+import { type CascadeValue, CascadingEditor } from "./cascading-editor";
 import { CheckboxEditor } from "./checkbox-editor";
 import { SingleDateEditor } from "./date-editor";
 import { displayDate } from "./helpers";
@@ -18,6 +20,7 @@ export function CustomFieldEditor({
 	rawValue,
 	canEdit,
 	options = [],
+	cascadeOptions = [],
 	users = [],
 	onChange,
 }: {
@@ -30,10 +33,13 @@ export function CustomFieldEditor({
 		| "MultiSelect"
 		| "Url"
 		| "User"
-		| "Label";
+		| "Label"
+		| "Cascading";
 	rawValue: unknown;
 	canEdit: boolean;
 	options?: string[];
+	/** Parent→child option tree for a `Cascading` field. */
+	cascadeOptions?: CascadeOption[];
 	/** Member options for a `User` field's people picker. */
 	users?: UserOption[];
 	onChange?: (value: unknown) => void;
@@ -151,6 +157,28 @@ export function CustomFieldEditor({
 			return (
 				<TagsEditor
 					tags={currentVal}
+					canEdit={canEdit}
+					onChange={(v) => onChange?.(v)}
+				/>
+			);
+		}
+		case "Cascading": {
+			// Stored value is a { parent, child } object; preselect both dropdowns.
+			const obj =
+				rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)
+					? (rawValue as { parent?: unknown; child?: unknown })
+					: null;
+			const currentVal: CascadeValue | null =
+				obj && typeof obj.parent === "string" && obj.parent
+					? {
+							parent: obj.parent,
+							child: typeof obj.child === "string" ? obj.child : "",
+						}
+					: null;
+			return (
+				<CascadingEditor
+					value={currentVal}
+					cascadeOptions={cascadeOptions}
 					canEdit={canEdit}
 					onChange={(v) => onChange?.(v)}
 				/>

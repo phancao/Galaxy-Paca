@@ -577,27 +577,32 @@ func (s *Service) CreateCustomFieldDefinition(ctx context.Context, in taskdom.Cr
 	if opts == nil {
 		opts = []string{}
 	}
-	if err := taskdom.ValidateFieldDefinition(in.FieldType, opts); err != nil {
+	casc := in.CascadeOptions
+	if casc == nil {
+		casc = []taskdom.CascadeOption{}
+	}
+	if err := taskdom.ValidateFieldDefinition(in.FieldType, opts, casc); err != nil {
 		return nil, err
 	}
-	defaultVal, err := taskdom.CoerceDefaultValue(in.FieldType, opts, in.DefaultValue)
+	defaultVal, err := taskdom.CoerceDefaultValue(in.FieldType, opts, casc, in.DefaultValue)
 	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
 	f := &taskdom.CustomFieldDefinition{
-		ID:           uuid.New(),
-		ProjectID:    in.ProjectID,
-		FieldKey:     fieldKey,
-		DisplayName:  displayName,
-		FieldType:    in.FieldType,
-		Options:      opts,
-		IsRequired:   in.IsRequired,
-		DefaultValue: defaultVal,
-		TaskTypeID:   in.TaskTypeID,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:             uuid.New(),
+		ProjectID:      in.ProjectID,
+		FieldKey:       fieldKey,
+		DisplayName:    displayName,
+		FieldType:      in.FieldType,
+		Options:        opts,
+		CascadeOptions: casc,
+		IsRequired:     in.IsRequired,
+		DefaultValue:   defaultVal,
+		TaskTypeID:     in.TaskTypeID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if err := s.repo.CreateCustomFieldDefinition(ctx, f); err != nil {
@@ -630,16 +635,19 @@ func (s *Service) UpdateCustomFieldDefinition(ctx context.Context, projectID, id
 	if in.Options != nil {
 		f.Options = in.Options
 	}
+	if in.CascadeOptions != nil {
+		f.CascadeOptions = in.CascadeOptions
+	}
 	if in.IsRequired != nil {
 		f.IsRequired = *in.IsRequired
 	}
 	// Guardrail: the effective type + options must remain consistent (a
-	// select/multi_select still needs at least one option).
-	if err := taskdom.ValidateFieldDefinition(f.FieldType, f.Options); err != nil {
+	// select/multi_select still needs an option; cascading_select a parent).
+	if err := taskdom.ValidateFieldDefinition(f.FieldType, f.Options, f.CascadeOptions); err != nil {
 		return nil, err
 	}
 	if in.DefaultValue != nil {
-		defaultVal, err := taskdom.CoerceDefaultValue(f.FieldType, f.Options, *in.DefaultValue)
+		defaultVal, err := taskdom.CoerceDefaultValue(f.FieldType, f.Options, f.CascadeOptions, *in.DefaultValue)
 		if err != nil {
 			return nil, err
 		}
@@ -647,7 +655,7 @@ func (s *Service) UpdateCustomFieldDefinition(ctx context.Context, projectID, id
 	} else if f.DefaultValue != nil {
 		// Re-coerce the existing default against a possibly-changed type/options
 		// so a type change never leaves an invalid stored default.
-		defaultVal, err := taskdom.CoerceDefaultValue(f.FieldType, f.Options, f.DefaultValue)
+		defaultVal, err := taskdom.CoerceDefaultValue(f.FieldType, f.Options, f.CascadeOptions, f.DefaultValue)
 		if err != nil {
 			f.DefaultValue = nil
 		} else {
@@ -788,7 +796,8 @@ func (s *Service) CopyConfiguration(ctx context.Context, sourceProjectID, target
 		nf := &taskdom.CustomFieldDefinition{
 			ID: uuid.New(), ProjectID: targetProjectID, FieldKey: sf.FieldKey,
 			DisplayName: sf.DisplayName, FieldType: sf.FieldType, Options: sf.Options,
-			IsRequired: sf.IsRequired, DefaultValue: sf.DefaultValue, TaskTypeID: typeScope,
+			CascadeOptions: sf.CascadeOptions,
+			IsRequired:     sf.IsRequired, DefaultValue: sf.DefaultValue, TaskTypeID: typeScope,
 			CreatedAt: now, UpdatedAt: now,
 		}
 		if err := s.repo.CreateCustomFieldDefinition(ctx, nf); err != nil {
