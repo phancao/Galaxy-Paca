@@ -59,6 +59,9 @@ export const ApiErrorCode = {
 	CustomFieldKeyTaken: "CUSTOM_FIELD_KEY_TAKEN",
 	CustomFieldTypeInvalid: "CUSTOM_FIELD_TYPE_INVALID",
 	CustomFieldNameInvalid: "CUSTOM_FIELD_NAME_INVALID",
+	// Raised when a task is created/updated without a required custom field that
+	// applies to its task type.
+	CustomFieldRequired: "CUSTOM_FIELD_REQUIRED",
 
 	// GitHub integration errors.
 	GitHubIntegrationNotFound: "GITHUB_INTEGRATION_NOT_FOUND",

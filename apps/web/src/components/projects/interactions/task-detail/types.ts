@@ -1,5 +1,10 @@
 import type { Activity, Task } from "@/lib/interaction-api";
-import type { ProjectMember, TaskStatus, TaskType } from "@/lib/project-api";
+import type {
+	CascadeOption,
+	ProjectMember,
+	TaskStatus,
+	TaskType,
+} from "@/lib/project-api";
 
 // ── Extended types (UI-first, wired to API later) ─────────────────────────────
 
@@ -16,9 +21,12 @@ export interface CustomFieldDef {
 		| "MultiSelect"
 		| "Url"
 		| "User"
-		| "Label";
+		| "Label"
+		| "Cascading";
 	required?: boolean;
 	options?: string[];
+	// ADR-040: parent→child option tree for a "Cascading" field.
+	cascade_options?: CascadeOption[];
 	// ADR-040 Phase 2.8: null/undefined → applies to all task types; a type id →
 	// only shown on tasks of that type.
 	task_type_id?: string | null;

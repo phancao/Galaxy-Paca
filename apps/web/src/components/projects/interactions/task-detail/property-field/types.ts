@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { CascadeOption } from "@/lib/project-api";
 
 export type PropertyFieldMode =
 	| "select"
@@ -78,10 +79,13 @@ export interface PropertyFieldProps {
 		| "MultiSelect"
 		| "Url"
 		| "User"
-		| "Label";
+		| "Label"
+		| "Cascading";
 	customRawValue?: unknown;
 	onCustomChange?: (value: unknown) => void;
 	customOptions?: string[];
+	/** Parent→child option tree for a `Cascading` custom field. */
+	customCascadeOptions?: CascadeOption[];
 	/** Member options for a `User` custom field's people picker. */
 	customUsers?: UserOption[];
 

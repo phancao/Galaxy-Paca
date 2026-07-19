@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { ApiErrorCode, getApiErrorCode } from "@/lib/api-error";
 import {
+	type CascadeOption,
 	type CustomFieldDefaultValue,
 	type CustomFieldDefinition,
 	createCustomFieldDefinition,
@@ -53,6 +54,7 @@ const UI_FIELD_TYPES = [
 	"Url",
 	"User",
 	"Label",
+	"Cascading",
 ] as const;
 type UIFieldType = (typeof UI_FIELD_TYPES)[number];
 
@@ -66,6 +68,7 @@ const UI_TO_API_FIELD_TYPE: Record<UIFieldType, FieldType> = {
 	Url: "url",
 	User: "user",
 	Label: "label",
+	Cascading: "cascading_select",
 };
 
 const UI_FIELD_TYPE_LABEL_KEYS = {
@@ -78,6 +81,7 @@ const UI_FIELD_TYPE_LABEL_KEYS = {
 	Url: "settings.customFields.fieldTypes.url",
 	User: "settings.customFields.fieldTypes.user",
 	Label: "settings.customFields.fieldTypes.label",
+	Cascading: "settings.customFields.fieldTypes.cascading",
 } as const satisfies Record<UIFieldType, string>;
 
 const API_TO_UI_FIELD_TYPE_LABEL_KEY = {
@@ -90,6 +94,7 @@ const API_TO_UI_FIELD_TYPE_LABEL_KEY = {
 	url: "settings.customFields.fieldTypes.url",
 	user: "settings.customFields.fieldTypes.user",
 	label: "settings.customFields.fieldTypes.label",
+	cascading_select: "settings.customFields.fieldTypes.cascading",
 } as const satisfies Record<string, string>;
 
 function toUIFieldType(apiType: string, t: TFunction<"projects">): string {
@@ -125,9 +130,11 @@ function coerceDefaultValue(
 ): CustomFieldDefaultValue {
 	if (raw === null || raw === undefined) return null;
 	switch (apiType) {
-		// user (member UUID) and label (free-form tags) carry no configurable default.
+		// user (member UUID), label (free-form tags), and cascading_select
+		// (parent→child object) carry no configurable default.
 		case "user":
 		case "label":
+		case "cascading_select":
 			return null;
 		case "number": {
 			const n = typeof raw === "number" ? raw : Number(raw);
@@ -171,8 +178,13 @@ function DefaultValueControl({
 }) {
 	const inputId = `${idPrefix}-default`;
 
-	// user / label fields have no default-value concept — skip the control entirely.
-	if (apiType === "user" || apiType === "label") return null;
+	// user / label / cascading fields have no default-value concept — skip entirely.
+	if (
+		apiType === "user" ||
+		apiType === "label" ||
+		apiType === "cascading_select"
+	)
+		return null;
 
 	let control: ReactNode;
 	if (apiType === "boolean") {
@@ -307,6 +319,181 @@ function DefaultValueControl({
 	);
 }
 
+// ── Cascading options builder ─────────────────────────────────────────────────
+
+// Trims values, drops empty parents, and drops empty children before submit.
+// The backend enforces the same shape (parent required; child within parent).
+function sanitizeCascadeOptions(opts: CascadeOption[]): CascadeOption[] {
+	return opts
+		.map((p) => ({
+			value: p.value.trim(),
+			children: p.children.map((c) => c.trim()).filter((c) => c !== ""),
+		}))
+		.filter((p) => p.value !== "");
+}
+
+// Two-level parent→child option builder for the `cascading_select` type: a list
+// of parent rows, each carrying its own editable list of child values.
+function CascadeOptionsBuilder({
+	value,
+	onChange,
+	t,
+}: {
+	value: CascadeOption[];
+	onChange: (v: CascadeOption[]) => void;
+	t: TFunction<"projects">;
+}) {
+	const [newParent, setNewParent] = useState("");
+	const [newChild, setNewChild] = useState<Record<number, string>>({});
+
+	const addParent = () => {
+		const v = newParent.trim();
+		if (!v) return;
+		onChange([...value, { value: v, children: [] }]);
+		setNewParent("");
+	};
+	const setParentValue = (i: number, v: string) => {
+		onChange(value.map((p, j) => (j === i ? { ...p, value: v } : p)));
+	};
+	const removeParent = (i: number) => {
+		onChange(value.filter((_, j) => j !== i));
+	};
+	const addChild = (i: number) => {
+		const c = (newChild[i] ?? "").trim();
+		if (!c) return;
+		onChange(
+			value.map((p, j) =>
+				j === i ? { ...p, children: [...p.children, c] } : p,
+			),
+		);
+		setNewChild((prev) => ({ ...prev, [i]: "" }));
+	};
+	const setChildValue = (i: number, ci: number, v: string) => {
+		onChange(
+			value.map((p, j) =>
+				j === i
+					? { ...p, children: p.children.map((c, k) => (k === ci ? v : c)) }
+					: p,
+			),
+		);
+	};
+	const removeChild = (i: number, ci: number) => {
+		onChange(
+			value.map((p, j) =>
+				j === i
+					? { ...p, children: p.children.filter((_, k) => k !== ci) }
+					: p,
+			),
+		);
+	};
+
+	return (
+		<div className="space-y-1.5">
+			<Label>{t("settings.customFields.cascadeOptionsLabel")}</Label>
+			<div className="space-y-2.5">
+				{value.map((parent, i) => (
+					<div
+						key={parent.value + i.toString()}
+						className="space-y-2 rounded-lg border border-border/50 bg-muted/15 p-2.5"
+					>
+						<div className="flex items-center gap-2">
+							<Input
+								value={parent.value}
+								onChange={(e) => setParentValue(i, e.target.value)}
+								placeholder={t(
+									"settings.customFields.cascadeParentPlaceholder",
+								)}
+								className="h-8 text-xs font-medium"
+							/>
+							<button
+								type="button"
+								onClick={() => removeParent(i)}
+								className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+							>
+								<X className="size-3.5" />
+							</button>
+						</div>
+						<div className="space-y-1 border-l border-border/40 pl-3">
+							{parent.children.map((child, ci) => (
+								<div
+									key={child + ci.toString()}
+									className="flex items-center gap-2"
+								>
+									<Input
+										value={child}
+										onChange={(e) => setChildValue(i, ci, e.target.value)}
+										className="h-7 text-xs"
+									/>
+									<button
+										type="button"
+										onClick={() => removeChild(i, ci)}
+										className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+									>
+										<X className="size-3" />
+									</button>
+								</div>
+							))}
+							<div className="flex gap-2">
+								<Input
+									value={newChild[i] ?? ""}
+									onChange={(e) =>
+										setNewChild((prev) => ({ ...prev, [i]: e.target.value }))
+									}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") {
+											e.preventDefault();
+											addChild(i);
+										}
+									}}
+									placeholder={t(
+										"settings.customFields.cascadeChildPlaceholder",
+									)}
+									className="h-7 text-xs"
+								/>
+								<button
+									type="button"
+									disabled={!(newChild[i] ?? "").trim()}
+									onClick={() => addChild(i)}
+									className="flex items-center gap-1 rounded-md bg-muted px-2 text-xs font-medium text-muted-foreground hover:bg-muted/80 disabled:opacity-40 transition-colors"
+								>
+									<Plus className="size-3" />
+									{t("settings.customFields.cascadeAddChild")}
+								</button>
+							</div>
+						</div>
+					</div>
+				))}
+				<div className="flex gap-2">
+					<Input
+						value={newParent}
+						onChange={(e) => setNewParent(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter" && newParent.trim()) {
+								e.preventDefault();
+								addParent();
+							}
+						}}
+						placeholder={t("settings.customFields.cascadeParentPlaceholder")}
+						className="h-8 text-xs"
+					/>
+					<button
+						type="button"
+						disabled={!newParent.trim()}
+						onClick={addParent}
+						className="flex items-center gap-1 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/80 disabled:opacity-40 transition-colors"
+					>
+						<Plus className="size-3" />
+						{t("settings.customFields.cascadeAddParent")}
+					</button>
+				</div>
+			</div>
+			<p className="text-xs text-muted-foreground/60">
+				{t("settings.customFields.cascadeHint")}
+			</p>
+		</div>
+	);
+}
+
 // ── Create dialog ─────────────────────────────────────────────────────────────
 
 function CreateCustomFieldDialog({
@@ -329,6 +516,7 @@ function CreateCustomFieldDialog({
 	const [required, setRequired] = useState(false);
 	const [options, setOptions] = useState<string[]>([]);
 	const [newOption, setNewOption] = useState("");
+	const [cascadeOptions, setCascadeOptions] = useState<CascadeOption[]>([]);
 	const [defaultValue, setDefaultValue] =
 		useState<CustomFieldDefaultValue>(null);
 	// ADR-040 Phase 2.8: "Applies to" scope. ALL_TASK_TYPES → null (all types).
@@ -345,6 +533,7 @@ function CreateCustomFieldDialog({
 		setRequired(false);
 		setOptions([]);
 		setNewOption("");
+		setCascadeOptions([]);
 		setDefaultValue(null);
 		setScopeTypeId(ALL_TASK_TYPES);
 		setError(null);
@@ -363,6 +552,10 @@ function CreateCustomFieldDialog({
 				field_type: apiFieldType,
 				options:
 					fieldType === "Select" || fieldType === "MultiSelect" ? options : [],
+				cascade_options:
+					fieldType === "Cascading"
+						? sanitizeCascadeOptions(cascadeOptions)
+						: undefined,
 				is_required: required,
 				default_value: coerceDefaultValue(apiFieldType, defaultValue, options),
 				task_type_id: scopeTypeId === ALL_TASK_TYPES ? null : scopeTypeId,
@@ -569,6 +762,15 @@ function CreateCustomFieldDialog({
 						</div>
 					)}
 
+					{/* Cascading options builder — only for the Cascading type */}
+					{fieldType === "Cascading" && (
+						<CascadeOptionsBuilder
+							value={cascadeOptions}
+							onChange={setCascadeOptions}
+							t={t}
+						/>
+					)}
+
 					{/* Default value */}
 					<DefaultValueControl
 						apiType={apiFieldType}
@@ -631,7 +833,12 @@ function CreateCustomFieldDialog({
 					</DialogClose>
 					<Button
 						size="sm"
-						disabled={!displayName.trim() || mutation.isPending}
+						disabled={
+							!displayName.trim() ||
+							(fieldType === "Cascading" &&
+								sanitizeCascadeOptions(cascadeOptions).length === 0) ||
+							mutation.isPending
+						}
 						onClick={() => mutation.mutate()}
 					>
 						{mutation.isPending ? (
@@ -666,6 +873,9 @@ function EditCustomFieldDialog({
 	const [options, setOptions] = useState<string[]>(field?.options ?? []);
 	const [required, setRequired] = useState(field?.is_required ?? false);
 	const [newOption, setNewOption] = useState("");
+	const [cascadeOptions, setCascadeOptions] = useState<CascadeOption[]>(
+		field?.cascade_options ?? [],
+	);
 	const [defaultValue, setDefaultValue] = useState<CustomFieldDefaultValue>(
 		field?.default_value ?? null,
 	);
@@ -675,6 +885,7 @@ function EditCustomFieldDialog({
 		setDisplayName(field?.display_name ?? "");
 		setOptions(field?.options ?? []);
 		setRequired(field?.is_required ?? false);
+		setCascadeOptions(field?.cascade_options ?? []);
 		setDefaultValue(field?.default_value ?? null);
 		setError(null);
 		setNewOption("");
@@ -691,6 +902,10 @@ function EditCustomFieldDialog({
 				options:
 					field.field_type === "select" || field.field_type === "multi_select"
 						? options
+						: undefined,
+				cascade_options:
+					field.field_type === "cascading_select"
+						? sanitizeCascadeOptions(cascadeOptions)
 						: undefined,
 				is_required: required,
 				default_value: coerceDefaultValue(
@@ -859,6 +1074,15 @@ function EditCustomFieldDialog({
 						</div>
 					)}
 
+					{/* Cascading options builder — only for the Cascading type */}
+					{field.field_type === "cascading_select" && (
+						<CascadeOptionsBuilder
+							value={cascadeOptions}
+							onChange={setCascadeOptions}
+							t={t}
+						/>
+					)}
+
 					{/* Default value */}
 					<DefaultValueControl
 						apiType={field.field_type}
@@ -921,7 +1145,12 @@ function EditCustomFieldDialog({
 					</DialogClose>
 					<Button
 						size="sm"
-						disabled={!displayName.trim() || mutation.isPending}
+						disabled={
+							!displayName.trim() ||
+							(field.field_type === "cascading_select" &&
+								sanitizeCascadeOptions(cascadeOptions).length === 0) ||
+							mutation.isPending
+						}
 						onClick={() => mutation.mutate()}
 					>
 						{mutation.isPending ? (

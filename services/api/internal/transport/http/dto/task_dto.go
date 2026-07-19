@@ -440,13 +440,14 @@ func TaskFromEntity(t *taskdom.Task) TaskResponse {
 // CreateCustomFieldDefinitionRequest is the body for
 // POST /projects/:projectId/custom-fields.
 type CreateCustomFieldDefinitionRequest struct {
-	FieldKey     string            `json:"field_key" binding:"required"`
-	DisplayName  string            `json:"display_name" binding:"required"`
-	FieldType    taskdom.FieldType `json:"field_type" binding:"required"`
-	Options      []string          `json:"options"`
-	IsRequired   bool              `json:"is_required"`
-	DefaultValue any               `json:"default_value"`
-	TaskTypeID   *uuid.UUID        `json:"task_type_id"`
+	FieldKey       string                  `json:"field_key" binding:"required"`
+	DisplayName    string                  `json:"display_name" binding:"required"`
+	FieldType      taskdom.FieldType       `json:"field_type" binding:"required"`
+	Options        []string                `json:"options"`
+	CascadeOptions []taskdom.CascadeOption `json:"cascade_options"`
+	IsRequired     bool                    `json:"is_required"`
+	DefaultValue   any                     `json:"default_value"`
+	TaskTypeID     *uuid.UUID              `json:"task_type_id"`
 }
 
 // UpdateCustomFieldDefinitionRequest is the body for
@@ -454,27 +455,29 @@ type CreateCustomFieldDefinitionRequest struct {
 // pointer so absent (don't touch) is distinguishable from an explicit null
 // (clear the default).
 type UpdateCustomFieldDefinitionRequest struct {
-	DisplayName  string             `json:"display_name"`
-	FieldType    *taskdom.FieldType `json:"field_type"`
-	Options      []string           `json:"options"`
-	IsRequired   *bool              `json:"is_required"`
-	DefaultValue *json.RawMessage   `json:"default_value"`
+	DisplayName    string                  `json:"display_name"`
+	FieldType      *taskdom.FieldType      `json:"field_type"`
+	Options        []string                `json:"options"`
+	CascadeOptions []taskdom.CascadeOption `json:"cascade_options"`
+	IsRequired     *bool                   `json:"is_required"`
+	DefaultValue   *json.RawMessage        `json:"default_value"`
 }
 
 // CustomFieldDefinitionResponse is the public representation of a custom
 // field definition.
 type CustomFieldDefinitionResponse struct {
-	ID           uuid.UUID         `json:"id"`
-	ProjectID    uuid.UUID         `json:"project_id"`
-	FieldKey     string            `json:"field_key"`
-	DisplayName  string            `json:"display_name"`
-	FieldType    taskdom.FieldType `json:"field_type"`
-	Options      []string          `json:"options"`
-	IsRequired   bool              `json:"is_required"`
-	DefaultValue any               `json:"default_value,omitempty"`
-	TaskTypeID   *uuid.UUID        `json:"task_type_id"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
+	ID             uuid.UUID               `json:"id"`
+	ProjectID      uuid.UUID               `json:"project_id"`
+	FieldKey       string                  `json:"field_key"`
+	DisplayName    string                  `json:"display_name"`
+	FieldType      taskdom.FieldType       `json:"field_type"`
+	Options        []string                `json:"options"`
+	CascadeOptions []taskdom.CascadeOption `json:"cascade_options,omitempty"`
+	IsRequired     bool                    `json:"is_required"`
+	DefaultValue   any                     `json:"default_value,omitempty"`
+	TaskTypeID     *uuid.UUID              `json:"task_type_id"`
+	CreatedAt      time.Time               `json:"created_at"`
+	UpdatedAt      time.Time               `json:"updated_at"`
 }
 
 // CustomFieldDefinitionFromEntity maps a domain CustomFieldDefinition to a DTO.
@@ -484,17 +487,18 @@ func CustomFieldDefinitionFromEntity(f *taskdom.CustomFieldDefinition) CustomFie
 		opts = []string{}
 	}
 	return CustomFieldDefinitionResponse{
-		ID:           f.ID,
-		ProjectID:    f.ProjectID,
-		FieldKey:     f.FieldKey,
-		DisplayName:  f.DisplayName,
-		FieldType:    f.FieldType,
-		Options:      opts,
-		IsRequired:   f.IsRequired,
-		DefaultValue: f.DefaultValue,
-		TaskTypeID:   f.TaskTypeID,
-		CreatedAt:    f.CreatedAt,
-		UpdatedAt:    f.UpdatedAt,
+		ID:             f.ID,
+		ProjectID:      f.ProjectID,
+		FieldKey:       f.FieldKey,
+		DisplayName:    f.DisplayName,
+		FieldType:      f.FieldType,
+		Options:        opts,
+		CascadeOptions: f.CascadeOptions,
+		IsRequired:     f.IsRequired,
+		DefaultValue:   f.DefaultValue,
+		TaskTypeID:     f.TaskTypeID,
+		CreatedAt:      f.CreatedAt,
+		UpdatedAt:      f.UpdatedAt,
 	}
 }
 

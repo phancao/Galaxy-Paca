@@ -496,6 +496,12 @@
 			"defaultValueNone": "Không mặc định",
 			"defaultValueNeedsOptions": "Thêm ít nhất một tùy chọn để đặt giá trị mặc định.",
 			"defaultValuePlaceholder": "Không có mặc định",
+			"cascadeOptionsLabel": "Tùy chọn (cha → con)",
+			"cascadeParentPlaceholder": "Giá trị cha…",
+			"cascadeChildPlaceholder": "Giá trị con…",
+			"cascadeAddParent": "Thêm cha",
+			"cascadeAddChild": "Thêm con",
+			"cascadeHint": "Thêm ít nhất một tùy chọn cha; mỗi cha có thể có các tùy chọn con riêng.",
 			"fieldTypes": {
 				"text": "Văn bản",
 				"number": "Số",
@@ -505,7 +511,8 @@
 				"multiSelect": "Chọn nhiều",
 				"url": "URL",
 				"user": "Người dùng",
-				"label": "Nhãn"
+				"label": "Nhãn",
+				"cascading": "Phân cấp"
 			},
 			"createDialog": {
 				"title": "Tạo trường tùy chỉnh",
@@ -682,6 +689,26 @@
 			"errors": {
 				"createFailed": "Tạo thành phần thất bại. Vui lòng thử lại.",
 				"saveFailed": "Lưu thay đổi thất bại. Vui lòng thử lại."
+			}
+		},
+		"copyConfig": {
+			"title": "Sao chép cấu hình",
+			"description": "Sao chép loại nhiệm vụ, trạng thái, trường tùy chỉnh và quy tắc quy trình từ một dự án khác vào dự án này.",
+			"sourceLabel": "Sao chép từ dự án",
+			"sourcePlaceholder": "Chọn một dự án…",
+			"copyButton": "Sao chép",
+			"hint": "Chỉ thêm những gì còn thiếu ở đây — không bao giờ thay đổi hay xóa cấu hình hiện có.",
+			"noProjects": "Bạn chưa có dự án nào khác để sao chép cấu hình.",
+			"success": "Đã sao chép cấu hình từ “{{project}}”.",
+			"error": "Không thể sao chép cấu hình. Vui lòng thử lại.",
+			"confirm": {
+				"title": "Sao chép cấu hình?",
+				"description": "Sao chép loại nhiệm vụ, trạng thái, trường tùy chỉnh và luật chuyển tiếp quy trình từ “{{project}}” vào dự án này.",
+				"additive": "Chỉ những mục còn thiếu ở đây mới được thêm vào.",
+				"idempotent": "Các mục trùng lặp sẽ được bỏ qua — an toàn khi chạy nhiều lần.",
+				"nonDestructive": "Cấu hình hiện có của bạn không bao giờ bị thay đổi hay xóa.",
+				"cancel": "Hủy",
+				"confirmButton": "Sao chép cấu hình"
 			}
 		}
 	},
@@ -1096,6 +1123,12 @@
 		"backlog": {
 			"title": "Product Backlog",
 			"description": "Tất cả công việc chưa được gán vào sprint nào."
+		},
+		"requiredFields": {
+			"title": "Trường bắt buộc",
+			"description": "“{{title}}” cần điền một vài trường bắt buộc trước khi có thể tạo.",
+			"cancel": "Hủy",
+			"createTask": "Tạo nhiệm vụ"
 		}
 	},
 	"layout": {

@@ -1350,20 +1350,21 @@ func toTaskEntity(r *taskRecord) (*taskdom.Task, error) {
 // --- Custom Field Definitions -----------------------------------------------
 
 type customFieldDefinitionRecord struct {
-	ID           string    `db:"id"`
-	ProjectID    string    `db:"project_id"`
-	FieldKey     string    `db:"field_key"`
-	DisplayName  string    `db:"display_name"`
-	FieldType    string    `db:"field_type"`
-	Options      []byte    `db:"options"`
-	IsRequired   bool      `db:"is_required"`
-	DefaultValue []byte    `db:"default_value"`
-	TaskTypeID   *string   `db:"task_type_id"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	ID             string    `db:"id"`
+	ProjectID      string    `db:"project_id"`
+	FieldKey       string    `db:"field_key"`
+	DisplayName    string    `db:"display_name"`
+	FieldType      string    `db:"field_type"`
+	Options        []byte    `db:"options"`
+	IsRequired     bool      `db:"is_required"`
+	DefaultValue   []byte    `db:"default_value"`
+	TaskTypeID     *string   `db:"task_type_id"`
+	CascadeOptions []byte    `db:"cascade_options"`
+	CreatedAt      time.Time `db:"created_at"`
+	UpdatedAt      time.Time `db:"updated_at"`
 }
 
-const customFieldCols = `id, project_id, field_key, display_name, field_type, options, is_required, default_value, task_type_id, created_at, updated_at`
+const customFieldCols = `id, project_id, field_key, display_name, field_type, options, is_required, default_value, task_type_id, cascade_options, created_at, updated_at`
 
 // ListCustomFieldDefinitions returns all custom field definitions for a project ordered by display_name.
 func (r *TaskRepository) ListCustomFieldDefinitions(ctx context.Context, projectID uuid.UUID) ([]*taskdom.CustomFieldDefinition, error) {
@@ -1405,11 +1406,15 @@ func (r *TaskRepository) CreateCustomFieldDefinition(ctx context.Context, f *tas
 	if err != nil {
 		return err
 	}
+	casc, err := marshalCascadeOptions(f.CascadeOptions)
+	if err != nil {
+		return err
+	}
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO custom_field_definitions (id, project_id, field_key, display_name, field_type, options, is_required, default_value, task_type_id, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+		INSERT INTO custom_field_definitions (id, project_id, field_key, display_name, field_type, options, is_required, default_value, task_type_id, cascade_options, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
 		f.ID.String(), f.ProjectID.String(), f.FieldKey, f.DisplayName,
-		string(f.FieldType), opts, f.IsRequired, def, uuidPtrToStringPtr(f.TaskTypeID), f.CreatedAt, f.UpdatedAt,
+		string(f.FieldType), opts, f.IsRequired, def, uuidPtrToStringPtr(f.TaskTypeID), casc, f.CreatedAt, f.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -1430,10 +1435,14 @@ func (r *TaskRepository) UpdateCustomFieldDefinition(ctx context.Context, f *tas
 	if err != nil {
 		return err
 	}
+	casc, err := marshalCascadeOptions(f.CascadeOptions)
+	if err != nil {
+		return err
+	}
 	_, err = r.db.ExecContext(ctx, `
-		UPDATE custom_field_definitions SET display_name=$1, field_type=$2, options=$3, is_required=$4, default_value=$5, task_type_id=$6, updated_at=$7
-		WHERE id=$8`,
-		f.DisplayName, string(f.FieldType), opts, f.IsRequired, def, uuidPtrToStringPtr(f.TaskTypeID), f.UpdatedAt, f.ID.String(),
+		UPDATE custom_field_definitions SET display_name=$1, field_type=$2, options=$3, is_required=$4, default_value=$5, task_type_id=$6, cascade_options=$7, updated_at=$8
+		WHERE id=$9`,
+		f.DisplayName, string(f.FieldType), opts, f.IsRequired, def, uuidPtrToStringPtr(f.TaskTypeID), casc, f.UpdatedAt, f.ID.String(),
 	)
 	if err != nil {
 		return fmt.Errorf("custom field repo: update: %w", err)
@@ -1513,19 +1522,43 @@ func toCustomFieldEntity(r *customFieldDefinitionRecord) (*taskdom.CustomFieldDe
 		}
 	}
 
+	var cascade []taskdom.CascadeOption
+	if len(r.CascadeOptions) > 0 {
+		if err := json.Unmarshal(r.CascadeOptions, &cascade); err != nil {
+			return nil, fmt.Errorf("custom field repo: unmarshal cascade_options: %w", err)
+		}
+	}
+	if cascade == nil {
+		cascade = []taskdom.CascadeOption{}
+	}
+
 	return &taskdom.CustomFieldDefinition{
-		ID:           id,
-		ProjectID:    pid,
-		FieldKey:     r.FieldKey,
-		DisplayName:  r.DisplayName,
-		FieldType:    taskdom.FieldType(r.FieldType),
-		Options:      opts,
-		IsRequired:   r.IsRequired,
-		DefaultValue: defaultVal,
-		TaskTypeID:   strPtrToUUIDPtr(r.TaskTypeID),
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
+		ID:             id,
+		ProjectID:      pid,
+		FieldKey:       r.FieldKey,
+		DisplayName:    r.DisplayName,
+		FieldType:      taskdom.FieldType(r.FieldType),
+		Options:        opts,
+		CascadeOptions: cascade,
+		IsRequired:     r.IsRequired,
+		DefaultValue:   defaultVal,
+		TaskTypeID:     strPtrToUUIDPtr(r.TaskTypeID),
+		CreatedAt:      r.CreatedAt,
+		UpdatedAt:      r.UpdatedAt,
 	}, nil
+}
+
+// marshalCascadeOptions serializes a cascading_select's option tree to JSONB,
+// or nil (SQL NULL) when empty.
+func marshalCascadeOptions(opts []taskdom.CascadeOption) ([]byte, error) {
+	if len(opts) == 0 {
+		return nil, nil
+	}
+	b, err := json.Marshal(opts)
+	if err != nil {
+		return nil, fmt.Errorf("custom field repo: marshal cascade_options: %w", err)
+	}
+	return b, nil
 }
 
 // marshalDefaultValue serializes a custom field's default value to JSONB, or

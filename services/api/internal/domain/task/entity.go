@@ -75,31 +75,43 @@ const (
 	// FieldTypeLabel stores a free-form array of strings (open vocabulary tags,
 	// unlike multi_select which is constrained to predefined options).
 	FieldTypeLabel FieldType = "label"
+	// FieldTypeCascadingSelect stores a {parent, child} pair chosen from a
+	// two-level option tree (CascadeOptions), Jira-style.
+	FieldTypeCascadingSelect FieldType = "cascading_select"
 )
 
 // ValidFieldTypes is the set of allowed field type values.
 var ValidFieldTypes = map[FieldType]bool{
-	FieldTypeText:        true,
-	FieldTypeNumber:      true,
-	FieldTypeDate:        true,
-	FieldTypeSelect:      true,
-	FieldTypeMultiSelect: true,
-	FieldTypeBoolean:     true,
-	FieldTypeURL:         true,
-	FieldTypeUser:        true,
-	FieldTypeLabel:       true,
+	FieldTypeText:            true,
+	FieldTypeNumber:          true,
+	FieldTypeDate:            true,
+	FieldTypeSelect:          true,
+	FieldTypeMultiSelect:     true,
+	FieldTypeBoolean:         true,
+	FieldTypeURL:             true,
+	FieldTypeUser:            true,
+	FieldTypeLabel:           true,
+	FieldTypeCascadingSelect: true,
+}
+
+// CascadeOption is one parent node of a cascading_select's two-level option
+// tree: a parent value plus its allowed child values.
+type CascadeOption struct {
+	Value    string   `json:"value"`
+	Children []string `json:"children"`
 }
 
 // CustomFieldDefinition is a project-level schema entry that describes one
 // extra field that can be stored in Task.CustomFields under FieldKey.
 type CustomFieldDefinition struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	FieldKey    string
-	DisplayName string
-	FieldType   FieldType
-	Options     []string // populated for select / multi_select types
-	IsRequired  bool
+	ID             uuid.UUID
+	ProjectID      uuid.UUID
+	FieldKey       string
+	DisplayName    string
+	FieldType      FieldType
+	Options        []string        // populated for select / multi_select types
+	CascadeOptions []CascadeOption // populated for cascading_select
+	IsRequired     bool
 	// TaskTypeID scopes the field to a single task type (nil = all types).
 	TaskTypeID *uuid.UUID
 	// DefaultValue is applied to a task's CustomFields when the field is

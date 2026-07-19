@@ -56,6 +56,7 @@ export function PropertyField({
 	customRawValue,
 	onCustomChange,
 	customOptions = [],
+	customCascadeOptions = [],
 	customUsers = [],
 }: PropertyFieldProps) {
 	const { t } = useTranslation("projects");
@@ -194,6 +195,7 @@ export function PropertyField({
 						rawValue={customRawValue}
 						canEdit={canEdit}
 						options={customOptions}
+						cascadeOptions={customCascadeOptions}
 						users={customUsers}
 						onChange={onCustomChange}
 					/>

@@ -30,12 +30,22 @@ func ApplicableCustomFields(defs []*CustomFieldDefinition, taskTypeID *uuid.UUID
 
 // ValidateFieldDefinition enforces structural rules on a custom-field
 // definition itself (independent of any task value): select / multi_select
-// must carry at least one option, otherwise the field can never hold a valid
-// value.
-func ValidateFieldDefinition(ft FieldType, options []string) error {
-	if ft == FieldTypeSelect || ft == FieldTypeMultiSelect {
+// must carry at least one option and cascading_select at least one parent
+// node, otherwise the field can never hold a valid value.
+func ValidateFieldDefinition(ft FieldType, options []string, cascadeOptions []CascadeOption) error {
+	switch ft {
+	case FieldTypeSelect, FieldTypeMultiSelect:
 		if len(options) == 0 {
 			return ErrCustomFieldOptionsInvalid
+		}
+	case FieldTypeCascadingSelect:
+		if len(cascadeOptions) == 0 {
+			return ErrCustomFieldOptionsInvalid
+		}
+		for _, o := range cascadeOptions {
+			if strings.TrimSpace(o.Value) == "" {
+				return ErrCustomFieldOptionsInvalid
+			}
 		}
 	}
 	return nil
@@ -122,11 +132,11 @@ func MissingRequiredField(cf map[string]any, keys []string) (string, bool) {
 // CoerceDefaultValue validates a proposed default value against a field type,
 // returning the normalized value (or nil when no default is set). Used when
 // creating/updating a definition so a stored default is always type-correct.
-func CoerceDefaultValue(ft FieldType, options []string, v any) (any, error) {
+func CoerceDefaultValue(ft FieldType, options []string, cascadeOptions []CascadeOption, v any) (any, error) {
 	if v == nil {
 		return nil, nil
 	}
-	d := &CustomFieldDefinition{FieldType: ft, Options: options, DisplayName: "default"}
+	d := &CustomFieldDefinition{FieldType: ft, Options: options, CascadeOptions: cascadeOptions, DisplayName: "default"}
 	cv, err := coerceFieldValue(d, v)
 	if err != nil {
 		return nil, err
@@ -235,6 +245,36 @@ func coerceFieldValue(d *CustomFieldDefinition, v any) (any, error) {
 			}
 		}
 		return out, nil
+
+	case FieldTypeCascadingSelect:
+		m, ok := v.(map[string]any)
+		if !ok {
+			return nil, fieldValueErr(d, "expected a {parent, child} object")
+		}
+		parent, _ := m["parent"].(string)
+		child, _ := m["child"].(string)
+		parent = strings.TrimSpace(parent)
+		child = strings.TrimSpace(child)
+		if parent == "" {
+			return nil, fieldValueErr(d, "requires a parent value")
+		}
+		var node *CascadeOption
+		for i := range d.CascadeOptions {
+			if d.CascadeOptions[i].Value == parent {
+				node = &d.CascadeOptions[i]
+				break
+			}
+		}
+		if node == nil {
+			return nil, fieldValueErr(d, "parent is not one of the allowed options")
+		}
+		if child != "" && !containsStr(node.Children, child) {
+			return nil, fieldValueErr(d, "child is not allowed under the selected parent")
+		}
+		if child == "" && len(node.Children) > 0 {
+			return nil, fieldValueErr(d, "requires a child value")
+		}
+		return map[string]any{"parent": parent, "child": child}, nil
 
 	default:
 		return v, nil

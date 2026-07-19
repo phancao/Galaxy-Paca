@@ -408,7 +408,20 @@ export type FieldType =
 	// ADR-040 Phase 1: a "user" field stores a project member's UUID string; a
 	// "label" field stores a free-form array of strings (open vocabulary tags).
 	| "user"
-	| "label";
+	| "label"
+	// ADR-040: a "cascading_select" field stores a { parent, child } object,
+	// driven by a two-level parent→child option tree (`cascade_options`).
+	| "cascading_select";
+
+/**
+ * A single parent option in a cascading_select field's two-level option tree
+ * (ADR-040). `value` is the parent option; `children` are the child options
+ * selectable once that parent is chosen (empty → the parent has no children).
+ */
+export interface CascadeOption {
+	value: string;
+	children: string[];
+}
 
 // Permissive value type for a custom field's default (ADR-040 Phase 0).
 // Shape depends on field_type: string (text/url/date/select), number, boolean,
@@ -427,6 +440,9 @@ export interface CustomFieldDefinition {
 	display_name: string;
 	field_type: FieldType;
 	options: string[];
+	// ADR-040: parent→child option tree for `cascading_select` fields; empty /
+	// omitted for all other field types.
+	cascade_options?: CascadeOption[];
 	is_required: boolean;
 	default_value: CustomFieldDefaultValue;
 	// ADR-040 Phase 2.8: scopes a field to a single task type.
@@ -463,6 +479,8 @@ export async function createCustomFieldDefinition(
 		field_key: string;
 		field_type: FieldType;
 		options?: string[];
+		// ADR-040: parent→child option tree for `cascading_select` fields.
+		cascade_options?: CascadeOption[];
 		is_required?: boolean;
 		default_value?: CustomFieldDefaultValue;
 		// ADR-040 Phase 2.8: null / omitted → all task types; a type id → scoped.
@@ -481,6 +499,8 @@ export async function updateCustomFieldDefinition(
 	payload: {
 		display_name?: string;
 		options?: string[];
+		// ADR-040: parent→child option tree for `cascading_select` fields.
+		cascade_options?: CascadeOption[];
 		is_required?: boolean;
 		default_value?: CustomFieldDefaultValue;
 	},
@@ -678,6 +698,25 @@ export async function deleteProjectComponent(
 ): Promise<void> {
 	await apiClient.instance.delete(
 		`/projects/${projectId}/components/${componentId}`,
+	);
+}
+
+// ── Configuration copy (ADR-040 follow-up) ────────────────────────────────────
+
+/**
+ * Copies the source project's task types, statuses, custom fields, and workflow
+ * transitions into `projectId`.
+ *
+ * Additive and idempotent: the backend skips rows that already exist and never
+ * mutates or deletes existing configuration. Safe to run repeatedly.
+ */
+export async function copyProjectConfiguration(
+	projectId: string,
+	sourceProjectId: string,
+): Promise<void> {
+	await apiClient.instance.post<SuccessEnvelope<unknown>>(
+		`/projects/${projectId}/copy-config`,
+		{ source_project_id: sourceProjectId },
 	);
 }
 

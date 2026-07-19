@@ -496,6 +496,12 @@
 			"defaultValueNone": "No default",
 			"defaultValueNeedsOptions": "Add at least one option to set a default.",
 			"defaultValuePlaceholder": "No default",
+			"cascadeOptionsLabel": "Options (parent → child)",
+			"cascadeParentPlaceholder": "Parent value…",
+			"cascadeChildPlaceholder": "Child value…",
+			"cascadeAddParent": "Add parent",
+			"cascadeAddChild": "Add child",
+			"cascadeHint": "Add at least one parent option; each parent can have its own child options.",
 			"fieldTypes": {
 				"text": "Text",
 				"number": "Number",
@@ -505,7 +511,8 @@
 				"multiSelect": "Multi-Select",
 				"url": "URL",
 				"user": "User",
-				"label": "Label"
+				"label": "Label",
+				"cascading": "Cascading"
 			},
 			"createDialog": {
 				"title": "Create custom field",
@@ -682,6 +689,26 @@
 			"errors": {
 				"createFailed": "Failed to create component. Please try again.",
 				"saveFailed": "Failed to save changes. Please try again."
+			}
+		},
+		"copyConfig": {
+			"title": "Copy configuration",
+			"description": "Copy task types, statuses, custom fields, and workflow rules from another project into this one.",
+			"sourceLabel": "Copy from project",
+			"sourcePlaceholder": "Select a project…",
+			"copyButton": "Copy",
+			"hint": "Only adds what's missing here — it never changes or removes your existing configuration.",
+			"noProjects": "You don't have another project to copy configuration from.",
+			"success": "Configuration copied from “{{project}}”.",
+			"error": "Couldn't copy configuration. Please try again.",
+			"confirm": {
+				"title": "Copy configuration?",
+				"description": "Copy task types, statuses, custom fields, and workflow transitions from “{{project}}” into this project.",
+				"additive": "Only items that are missing here get added.",
+				"idempotent": "Duplicates are skipped — safe to run more than once.",
+				"nonDestructive": "Your existing configuration is never changed or removed.",
+				"cancel": "Cancel",
+				"confirmButton": "Copy configuration"
 			}
 		}
 	},
@@ -1096,6 +1123,12 @@
 		"backlog": {
 			"title": "Product Backlog",
 			"description": "All work items not assigned to a sprint."
+		},
+		"requiredFields": {
+			"title": "Required fields",
+			"description": "“{{title}}” needs a few required fields before it can be created.",
+			"cancel": "Cancel",
+			"createTask": "Create task"
 		}
 	},
 	"layout": {

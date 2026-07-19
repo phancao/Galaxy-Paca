@@ -65,7 +65,9 @@ import {
 import type { PluginRegistration } from "@/lib/plugin-api";
 import { RemoteComponent } from "@/lib/plugins/loader";
 import { usePluginRegistry } from "@/lib/plugins/registry";
+import { ApiErrorCode, getApiErrorCode } from "@/lib/api-error";
 import {
+	type CustomFieldDefinition,
 	customFieldsQueryOptions,
 	findEpicType,
 	projectMembersQueryOptions,
@@ -78,6 +80,7 @@ import { BoardView } from "./board-view";
 import { ListView } from "./list-view";
 import { NewViewPopover } from "./new-view-popover";
 import { RenameViewDialog } from "./rename-view-dialog";
+import { RequiredFieldsDialog } from "./required-fields-dialog";
 import { RoadmapView } from "./roadmap-view";
 import { TaskDetailModal } from "./task-detail-modal";
 import { UNASSIGNED_FILTER_ID, ViewSettingsPanel } from "./view-settings-panel";
@@ -1037,6 +1040,26 @@ export function InteractionLayout({
 		[updateStatusMutation, tasks],
 	);
 
+	// When a task type has required custom fields, we collect them up-front via a
+	// dialog instead of letting the title-only quick-add hit CUSTOM_FIELD_REQUIRED.
+	const [requiredPrompt, setRequiredPrompt] = useState<{
+		statusId: string;
+		title: string;
+		taskTypeId: string | null;
+		extraFields?: TaskFieldUpdate;
+		fields: CustomFieldDefinition[];
+	} | null>(null);
+
+	const requiredFieldsForType = useCallback(
+		(taskTypeId: string | null): CustomFieldDefinition[] =>
+			customFields.filter(
+				(f) =>
+					f.is_required &&
+					(f.task_type_id == null || f.task_type_id === taskTypeId),
+			),
+		[customFields],
+	);
+
 	const createTaskMutation = useMutation({
 		mutationFn: async (payload: {
 			title: string;
@@ -1063,6 +1086,22 @@ export function InteractionLayout({
 			return task;
 		},
 		onSuccess: () => qc.invalidateQueries({ queryKey: tasksListQueryKey }),
+		onError: (err, variables) => {
+			// Safety net: if the field definitions changed after they were cached,
+			// the create can still be rejected — open the collect-fields dialog.
+			if (getApiErrorCode(err) === ApiErrorCode.CustomFieldRequired) {
+				const fields = requiredFieldsForType(variables.taskTypeId ?? null);
+				if (fields.length > 0) {
+					setRequiredPrompt({
+						statusId: variables.statusId,
+						title: variables.title,
+						taskTypeId: variables.taskTypeId ?? null,
+						extraFields: variables.extraFields,
+						fields,
+					});
+				}
+			}
+		},
 	});
 
 	const handleCreateTask = async (
@@ -1075,12 +1114,45 @@ export function InteractionLayout({
 		// The creatableTaskTypes list is already filtered by the active view config,
 		// so this naturally handles Epic-only views (e.g. Timeline).
 		const effectiveTaskTypeId = taskTypeId ?? creatableTaskTypes[0]?.id ?? null;
+		// If the chosen type has required custom fields, collect them first so the
+		// API doesn't reject a title-only create with CUSTOM_FIELD_REQUIRED.
+		const required = requiredFieldsForType(effectiveTaskTypeId);
+		if (required.length > 0) {
+			setRequiredPrompt({
+				statusId,
+				title,
+				taskTypeId: effectiveTaskTypeId,
+				extraFields,
+				fields: required,
+			});
+			return;
+		}
 		await createTaskMutation.mutateAsync({
 			title,
 			statusId,
 			taskTypeId: effectiveTaskTypeId,
 			extraFields,
 		});
+	};
+
+	const handleConfirmRequiredFields = (values: Record<string, unknown>) => {
+		if (!requiredPrompt) return;
+		const { statusId, title, taskTypeId, extraFields } = requiredPrompt;
+		createTaskMutation.mutate(
+			{
+				title,
+				statusId,
+				taskTypeId,
+				extraFields: {
+					...(extraFields ?? {}),
+					custom_fields: {
+						...(extraFields?.custom_fields ?? {}),
+						...values,
+					},
+				},
+			},
+			{ onSuccess: () => setRequiredPrompt(null) },
+		);
 	};
 
 	const handleReorderTask = useCallback(
@@ -1675,6 +1747,18 @@ export function InteractionLayout({
 				taskTypes={taskTypes}
 				members={members}
 				canEdit={canEdit}
+			/>
+
+			<RequiredFieldsDialog
+				open={!!requiredPrompt}
+				onOpenChange={(v) => {
+					if (!v) setRequiredPrompt(null);
+				}}
+				taskTitle={requiredPrompt?.title ?? ""}
+				fields={requiredPrompt?.fields ?? []}
+				members={members}
+				isSubmitting={createTaskMutation.isPending}
+				onConfirm={handleConfirmRequiredFields}
 			/>
 		</div>
 	);
