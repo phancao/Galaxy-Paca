@@ -122,4 +122,7 @@ type CustomFieldDefinitionRepository interface {
 	CreateCustomFieldDefinition(ctx context.Context, f *CustomFieldDefinition) error
 	UpdateCustomFieldDefinition(ctx context.Context, f *CustomFieldDefinition) error
 	DeleteCustomFieldDefinition(ctx context.Context, id uuid.UUID) error
+	// ClearCustomFieldValues strips one field_key from every task's
+	// custom_fields JSONB in a project (used on a field type change).
+	ClearCustomFieldValues(ctx context.Context, projectID uuid.UUID, fieldKey string) error
 }

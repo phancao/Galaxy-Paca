@@ -21,11 +21,14 @@ var (
 	ErrStatusReorderInvalid  = errors.New("task status: provided status IDs do not match the project's statuses")
 	ErrStatusInUseByWorkflow = errors.New("task status: still referenced by an automation workflow")
 
-	ErrCustomFieldNotFound    = errors.New("custom field: not found")
-	ErrCustomFieldKeyInvalid  = errors.New("custom field: key is empty or invalid")
-	ErrCustomFieldKeyTaken    = errors.New("custom field: key already in use within project")
-	ErrCustomFieldTypeInvalid = errors.New("custom field: invalid field type")
-	ErrCustomFieldNameInvalid = errors.New("custom field: display name is empty or invalid")
+	ErrCustomFieldNotFound       = errors.New("custom field: not found")
+	ErrCustomFieldKeyInvalid     = errors.New("custom field: key is empty or invalid")
+	ErrCustomFieldKeyTaken       = errors.New("custom field: key already in use within project")
+	ErrCustomFieldTypeInvalid    = errors.New("custom field: invalid field type")
+	ErrCustomFieldNameInvalid    = errors.New("custom field: display name is empty or invalid")
+	ErrCustomFieldOptionsInvalid = errors.New("custom field: select / multi_select requires at least one option")
+	ErrCustomFieldRequired       = errors.New("custom field: a required field is missing")
+	ErrCustomFieldValueInvalid   = errors.New("custom field: value does not match the field type")
 
 	// Task link errors.
 	ErrTaskLinkNotFound     = errors.New("task link: not found")

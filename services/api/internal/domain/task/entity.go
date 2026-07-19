@@ -93,8 +93,12 @@ type CustomFieldDefinition struct {
 	FieldType   FieldType
 	Options     []string // populated for select / multi_select types
 	IsRequired  bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// DefaultValue is applied to a task's CustomFields when the field is
+	// otherwise absent (nil = no default). It is stored as JSONB and is already
+	// coerced to the field's type (string / float64 / bool / []string).
+	DefaultValue any
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // LinkType describes the directional relationship stored in a TaskLink row.

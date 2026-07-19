@@ -357,6 +357,16 @@ func (s *Service) CreateTask(ctx context.Context, in taskdom.CreateTaskInput) (*
 	if cf == nil {
 		cf = map[string]any{}
 	}
+	// Validate/normalize custom fields against the project's definitions:
+	// reject bad types/options, fill defaults, enforce required at creation.
+	cfDefs, err := s.repo.ListCustomFieldDefinitions(ctx, in.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	cf, err = taskdom.ValidateCustomFields(cfDefs, cf, true)
+	if err != nil {
+		return nil, err
+	}
 	tags := in.Tags
 	if tags == nil {
 		tags = []string{}
@@ -462,7 +472,18 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 		t.ReporterID = *in.ReporterID
 	}
 	if in.CustomFields != nil {
-		t.CustomFields = *in.CustomFields
+		cfDefs, err := s.repo.ListCustomFieldDefinitions(ctx, t.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		// enforceAllRequired=false: don't block edits of tasks that predate a
+		// required field; still reject bad values or an explicit clear of a
+		// required field.
+		validated, err := taskdom.ValidateCustomFields(cfDefs, *in.CustomFields, false)
+		if err != nil {
+			return nil, err
+		}
+		t.CustomFields = validated
 	}
 	if in.StartDate != nil {
 		t.StartDate = *in.StartDate
@@ -531,18 +552,26 @@ func (s *Service) CreateCustomFieldDefinition(ctx context.Context, in taskdom.Cr
 	if opts == nil {
 		opts = []string{}
 	}
+	if err := taskdom.ValidateFieldDefinition(in.FieldType, opts); err != nil {
+		return nil, err
+	}
+	defaultVal, err := taskdom.CoerceDefaultValue(in.FieldType, opts, in.DefaultValue)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 	f := &taskdom.CustomFieldDefinition{
-		ID:          uuid.New(),
-		ProjectID:   in.ProjectID,
-		FieldKey:    fieldKey,
-		DisplayName: displayName,
-		FieldType:   in.FieldType,
-		Options:     opts,
-		IsRequired:  in.IsRequired,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:           uuid.New(),
+		ProjectID:    in.ProjectID,
+		FieldKey:     fieldKey,
+		DisplayName:  displayName,
+		FieldType:    in.FieldType,
+		Options:      opts,
+		IsRequired:   in.IsRequired,
+		DefaultValue: defaultVal,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 
 	if err := s.repo.CreateCustomFieldDefinition(ctx, f); err != nil {
@@ -561,6 +590,7 @@ func (s *Service) UpdateCustomFieldDefinition(ctx context.Context, projectID, id
 	if f.ProjectID != projectID {
 		return nil, taskdom.ErrCustomFieldNotFound
 	}
+	oldType := f.FieldType
 
 	if displayName := strings.TrimSpace(in.DisplayName); displayName != "" {
 		f.DisplayName = displayName
@@ -577,10 +607,38 @@ func (s *Service) UpdateCustomFieldDefinition(ctx context.Context, projectID, id
 	if in.IsRequired != nil {
 		f.IsRequired = *in.IsRequired
 	}
+	// Guardrail: the effective type + options must remain consistent (a
+	// select/multi_select still needs at least one option).
+	if err := taskdom.ValidateFieldDefinition(f.FieldType, f.Options); err != nil {
+		return nil, err
+	}
+	if in.DefaultValue != nil {
+		defaultVal, err := taskdom.CoerceDefaultValue(f.FieldType, f.Options, *in.DefaultValue)
+		if err != nil {
+			return nil, err
+		}
+		f.DefaultValue = defaultVal
+	} else if f.DefaultValue != nil {
+		// Re-coerce the existing default against a possibly-changed type/options
+		// so a type change never leaves an invalid stored default.
+		defaultVal, err := taskdom.CoerceDefaultValue(f.FieldType, f.Options, f.DefaultValue)
+		if err != nil {
+			f.DefaultValue = nil
+		} else {
+			f.DefaultValue = defaultVal
+		}
+	}
 	f.UpdatedAt = time.Now()
 
 	if err := s.repo.UpdateCustomFieldDefinition(ctx, f); err != nil {
 		return nil, err
+	}
+	// A type change makes previously-stored values type-incompatible; strip
+	// them so tasks never carry a value that no longer validates.
+	if oldType != f.FieldType {
+		if err := s.repo.ClearCustomFieldValues(ctx, f.ProjectID, f.FieldKey); err != nil {
+			return nil, err
+		}
 	}
 	return f, nil
 }
