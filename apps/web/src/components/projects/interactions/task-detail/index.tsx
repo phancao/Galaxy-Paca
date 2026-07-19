@@ -17,7 +17,9 @@ import {
 	findEpicType,
 	getNormalTaskTypes,
 	isEpicType,
+	projectComponentsQueryOptions,
 	projectQueryOptions,
+	projectVersionsQueryOptions,
 } from "@/lib/project-api";
 import { cleanBlocks, cn } from "@/lib/utils";
 import { getTaskTypeIconComponent } from "../../task-types/task-type-icons";
@@ -30,6 +32,7 @@ import { PropertiesPanel } from "./properties-panel";
 import { SubtasksSection } from "./subtasks-section";
 import { TaskHeader } from "./task-header";
 import { TaskLinksSection } from "./task-links-section";
+import { TimeTrackingSection } from "./time-tracking-section";
 import type { TaskDetailModalProps } from "./types";
 import { WorkflowsSection } from "./workflows-section";
 
@@ -87,6 +90,16 @@ export function TaskDetailModal({
 	// Fetch sprints for sprint name display + assignment
 	const { data: sprints = [] } = useQuery({
 		...sprintsQueryOptions(projectId ?? ""),
+		enabled: !!projectId && (open || mode === "page"),
+	});
+
+	// Fetch versions + components for the fix-version / component pickers (P2.9)
+	const { data: versions = [] } = useQuery({
+		...projectVersionsQueryOptions(projectId ?? ""),
+		enabled: !!projectId && (open || mode === "page"),
+	});
+	const { data: components = [] } = useQuery({
+		...projectComponentsQueryOptions(projectId ?? ""),
 		enabled: !!projectId && (open || mode === "page"),
 	});
 
@@ -373,6 +386,8 @@ export function TaskDetailModal({
 								taskTypes={taskTypes}
 								members={members}
 								sprints={sprints}
+								versions={versions}
+								components={components}
 								projectId={projectId}
 								initialCustomFields={customFieldDefs}
 								canEdit={canEdit}
@@ -383,6 +398,17 @@ export function TaskDetailModal({
 								onNavigateToTask={navigateToTask}
 							/>
 						</div>
+
+						{/* Time tracking / worklogs */}
+						{projectId && (
+							<TimeTrackingSection
+								projectId={projectId}
+								taskId={task.id}
+								estimateMinutes={task.estimate_minutes}
+								members={members}
+								canEdit={canEdit}
+							/>
+						)}
 
 						{/* Description */}
 						<DescriptionSection

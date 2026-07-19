@@ -32,9 +32,14 @@ import {
 	customFieldsQueryOptions,
 	deleteCustomFieldDefinition,
 	type FieldType,
+	type TaskType,
+	taskTypesQueryOptions,
 	updateCustomFieldDefinition,
 } from "@/lib/project-api";
 import { cn } from "@/lib/utils";
+
+// Sentinel value for the "All task types" scope option (task_type_id = null).
+const ALL_TASK_TYPES = "__all__";
 
 // ── Field type utilities ──────────────────────────────────────────────────────
 
@@ -306,10 +311,12 @@ function DefaultValueControl({
 
 function CreateCustomFieldDialog({
 	projectId,
+	taskTypes,
 	open,
 	onOpenChange,
 }: {
 	projectId: string;
+	taskTypes: TaskType[];
 	open: boolean;
 	onOpenChange: (v: boolean) => void;
 }) {
@@ -324,6 +331,8 @@ function CreateCustomFieldDialog({
 	const [newOption, setNewOption] = useState("");
 	const [defaultValue, setDefaultValue] =
 		useState<CustomFieldDefaultValue>(null);
+	// ADR-040 Phase 2.8: "Applies to" scope. ALL_TASK_TYPES → null (all types).
+	const [scopeTypeId, setScopeTypeId] = useState<string>(ALL_TASK_TYPES);
 	const [error, setError] = useState<string | null>(null);
 
 	const apiFieldType = UI_TO_API_FIELD_TYPE[fieldType];
@@ -337,6 +346,7 @@ function CreateCustomFieldDialog({
 		setOptions([]);
 		setNewOption("");
 		setDefaultValue(null);
+		setScopeTypeId(ALL_TASK_TYPES);
 		setError(null);
 	};
 
@@ -355,6 +365,7 @@ function CreateCustomFieldDialog({
 					fieldType === "Select" || fieldType === "MultiSelect" ? options : [],
 				is_required: required,
 				default_value: coerceDefaultValue(apiFieldType, defaultValue, options),
+				task_type_id: scopeTypeId === ALL_TASK_TYPES ? null : scopeTypeId,
 			}),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({
@@ -459,6 +470,41 @@ function CreateCustomFieldDialog({
 								</button>
 							))}
 						</div>
+					</div>
+
+					{/* Applies to — scope the field to a single task type (immutable) */}
+					<div className="space-y-1.5">
+						<Label>{t("settings.customFields.appliesToLabel")}</Label>
+						<div className="flex flex-wrap gap-1.5">
+							<button
+								type="button"
+								onClick={() => setScopeTypeId(ALL_TASK_TYPES)}
+								className={cn(
+									PILL_BASE,
+									scopeTypeId === ALL_TASK_TYPES
+										? PILL_SELECTED
+										: PILL_UNSELECTED,
+								)}
+							>
+								{t("settings.customFields.appliesToAllTypes")}
+							</button>
+							{taskTypes.map((tt) => (
+								<button
+									key={tt.id}
+									type="button"
+									onClick={() => setScopeTypeId(tt.id)}
+									className={cn(
+										PILL_BASE,
+										scopeTypeId === tt.id ? PILL_SELECTED : PILL_UNSELECTED,
+									)}
+								>
+									{tt.name}
+								</button>
+							))}
+						</div>
+						<p className="text-xs text-muted-foreground/60">
+							{t("settings.customFields.appliesToHint")}
+						</p>
 					</div>
 
 					{/* Options editor — only for Select / MultiSelect types */}
@@ -604,11 +650,13 @@ function CreateCustomFieldDialog({
 function EditCustomFieldDialog({
 	projectId,
 	field,
+	taskTypes,
 	open,
 	onOpenChange,
 }: {
 	projectId: string;
 	field: CustomFieldDefinition | null;
+	taskTypes: TaskType[];
 	open: boolean;
 	onOpenChange: (v: boolean) => void;
 }) {
@@ -726,6 +774,26 @@ function EditCustomFieldDialog({
 						</div>
 						<p className="text-xs text-muted-foreground/60">
 							{t("settings.customFields.fieldTypeImmutableHint")}
+						</p>
+					</div>
+
+					{/* Applies to — read-only (scope is immutable after creation) */}
+					<div className="space-y-1.5">
+						<Label>{t("settings.customFields.appliesToLabel")}</Label>
+						<div className="flex flex-wrap gap-1.5">
+							<button
+								type="button"
+								disabled
+								className="rounded-lg border border-primary bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary opacity-60 cursor-not-allowed"
+							>
+								{field.task_type_id
+									? (taskTypes.find((tt) => tt.id === field.task_type_id)
+											?.name ?? field.task_type_id)
+									: t("settings.customFields.appliesToAllTypes")}
+							</button>
+						</div>
+						<p className="text-xs text-muted-foreground/60">
+							{t("settings.customFields.appliesToImmutableHint")}
 						</p>
 					</div>
 
@@ -983,6 +1051,9 @@ export function CustomFieldsSettings({
 	const { data: fields = [], isLoading } = useQuery(
 		customFieldsQueryOptions(projectId),
 	);
+	const { data: taskTypes = [] } = useQuery(taskTypesQueryOptions(projectId));
+	const typeName = (id: string) =>
+		taskTypes.find((tt) => tt.id === id)?.name ?? id;
 	const [createOpen, setCreateOpen] = useState(false);
 	const [editField, setEditField] = useState<CustomFieldDefinition | null>(
 		null,
@@ -1068,6 +1139,9 @@ export function CustomFieldsSettings({
 									{t("settings.customFields.table.type")}
 								</TableHead>
 								<TableHead className="px-5 text-xs font-semibold uppercase tracking-wide">
+									{t("settings.customFields.table.appliesTo")}
+								</TableHead>
+								<TableHead className="px-5 text-xs font-semibold uppercase tracking-wide">
 									{t("settings.customFields.table.required")}
 								</TableHead>
 								{canWrite && <TableHead className="w-20 px-5" />}
@@ -1086,6 +1160,19 @@ export function CustomFieldsSettings({
 										<span className="inline-flex items-center rounded-md border border-border/40 bg-muted/40 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
 											{toUIFieldType(field.field_type, t)}
 										</span>
+									</TableCell>
+									<TableCell className="px-5">
+										{field.task_type_id ? (
+											<span className="inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+												{t("settings.customFields.scopeOnly", {
+													type: typeName(field.task_type_id),
+												})}
+											</span>
+										) : (
+											<span className="text-xs text-muted-foreground/60">
+												{t("settings.customFields.appliesToAllTypes")}
+											</span>
+										)}
 									</TableCell>
 									<TableCell className="px-5">
 										{field.is_required ? (
@@ -1133,6 +1220,7 @@ export function CustomFieldsSettings({
 
 			<CreateCustomFieldDialog
 				projectId={projectId}
+				taskTypes={taskTypes}
 				open={createOpen}
 				onOpenChange={setCreateOpen}
 			/>
@@ -1140,6 +1228,7 @@ export function CustomFieldsSettings({
 			<EditCustomFieldDialog
 				projectId={projectId}
 				field={editField}
+				taskTypes={taskTypes}
 				open={!!editField}
 				onOpenChange={(v) => {
 					if (!v) setEditField(null);

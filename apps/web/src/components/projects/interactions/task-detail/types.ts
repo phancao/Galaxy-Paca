@@ -19,6 +19,9 @@ export interface CustomFieldDef {
 		| "Label";
 	required?: boolean;
 	options?: string[];
+	// ADR-040 Phase 2.8: null/undefined → applies to all task types; a type id →
+	// only shown on tasks of that type.
+	task_type_id?: string | null;
 }
 
 export interface Attachment {

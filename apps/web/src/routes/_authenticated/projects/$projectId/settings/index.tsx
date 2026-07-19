@@ -4,6 +4,8 @@ import {
 	AlertTriangle,
 	GitBranch,
 	LayoutList,
+	Milestone,
+	Package,
 	Plus,
 	Settings,
 	Shield,
@@ -11,12 +13,14 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ComponentsSettings } from "@/components/projects/settings/ComponentsSettings";
 import { CustomFieldsSettings } from "@/components/projects/settings/CustomFieldsSettings";
 import { DangerZone } from "@/components/projects/settings/DangerZone";
 import { GeneralSettings } from "@/components/projects/settings/GeneralSettings";
 import { RolesSettings } from "@/components/projects/settings/RolesSettings";
 import { TaskStatusesSettings } from "@/components/projects/settings/TaskStatusesSettings";
 import { TaskTypesSettings } from "@/components/projects/settings/TaskTypesSettings";
+import { VersionsSettings } from "@/components/projects/settings/VersionsSettings";
 import { WorkflowSettings } from "@/components/projects/settings/WorkflowSettings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { currentUserQueryOptions } from "@/lib/auth-api";
@@ -26,9 +30,11 @@ import {
 	customFieldsQueryOptions,
 	type ProjectMember,
 	type ProjectRole,
+	projectComponentsQueryOptions,
 	projectMembersQueryOptions,
 	projectQueryOptions,
 	projectRolesQueryOptions,
+	projectVersionsQueryOptions,
 	statusTransitionsQueryOptions,
 	taskStatusesQueryOptions,
 	taskTypesQueryOptions,
@@ -46,6 +52,8 @@ export const Route = createFileRoute(
 			queryClient.ensureQueryData(taskTypesQueryOptions(projectId)),
 			queryClient.ensureQueryData(customFieldsQueryOptions(projectId)),
 			queryClient.ensureQueryData(statusTransitionsQueryOptions(projectId)),
+			queryClient.ensureQueryData(projectVersionsQueryOptions(projectId)),
+			queryClient.ensureQueryData(projectComponentsQueryOptions(projectId)),
 		]);
 	},
 	component: SettingsPage,
@@ -79,6 +87,16 @@ const NAV_ITEMS = [
 		id: "workflow",
 		labelKey: "project.settingsPage.nav.workflow",
 		icon: GitBranch,
+	},
+	{
+		id: "versions",
+		labelKey: "project.settingsPage.nav.versions",
+		icon: Milestone,
+	},
+	{
+		id: "components",
+		labelKey: "project.settingsPage.nav.components",
+		icon: Package,
 	},
 	{
 		id: "danger",
@@ -146,6 +164,8 @@ function SettingsPage() {
 		| "task-types"
 		| "custom-fields"
 		| "workflow"
+		| "versions"
+		| "components"
 		| "danger"
 		| string
 	>("general");
@@ -289,6 +309,18 @@ function SettingsPage() {
 						)}
 						{activeSection === "workflow" && (
 							<WorkflowSettings
+								projectId={projectId}
+								canWrite={canManageTasks}
+							/>
+						)}
+						{activeSection === "versions" && (
+							<VersionsSettings
+								projectId={projectId}
+								canWrite={canManageTasks}
+							/>
+						)}
+						{activeSection === "components" && (
+							<ComponentsSettings
 								projectId={projectId}
 								canWrite={canManageTasks}
 							/>
