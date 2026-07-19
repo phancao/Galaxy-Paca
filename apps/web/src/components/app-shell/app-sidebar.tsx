@@ -106,6 +106,13 @@ import { resolvePluginIcon } from "@/lib/plugins/icon-resolver";
 import { usePluginRegistry } from "@/lib/plugins/registry";
 import { projectQueryOptions, projectsQueryOptions } from "@/lib/project-api";
 import { cn } from "@/lib/utils";
+import {
+	createWikiPage,
+	type WikiPage,
+	wikiQueryKeys,
+	wikiSpaceQueryOptions,
+	wikiTreeQueryOptions,
+} from "@/lib/wiki-api";
 import { UserMenu } from "./user-menu";
 
 // ── Docs Tree ─────────────────────────────────────────────────────────────────
@@ -502,6 +509,165 @@ function DocsFolderNode({
 				</div>
 			)}
 		</div>
+	);
+}
+
+/**
+ * ADR-042 runtime switch: when the Wiki integration is live the Documentation
+ * section is backed by the project's Galaxy AI Wiki space; a 503
+ * (WIKI_UNAVAILABLE) falls back to the native docs surface. No build-time
+ * flag — the API decides.
+ */
+function DocsSectionSwitch({ projectId }: { projectId: string }) {
+	const probe = useQuery(wikiSpaceQueryOptions(projectId));
+	if (probe.isSuccess) return <WikiDocsSidebarSection projectId={projectId} />;
+	if (probe.isPending) return null;
+	return <DocsSidebarSection projectId={projectId} />;
+}
+
+/** One node of the Wiki page tree (recursive, links into the embedded view). */
+function WikiPageNode({
+	projectId,
+	page,
+	depth,
+}: {
+	projectId: string;
+	page: WikiPage;
+	depth: number;
+}) {
+	const navigate = useNavigate();
+	const { t } = useTranslation("appShell");
+	return (
+		<>
+			<SidebarMenuItem>
+				<SidebarMenuButton
+					className="h-7 text-[13px]"
+					style={{ paddingLeft: `${12 + depth * 14}px` }}
+					onClick={() =>
+						navigate({
+							to: "/projects/$projectId/docs/wiki",
+							params: { projectId },
+							search: { page: page.url },
+						})
+					}
+				>
+					<FileText className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+					<span className="truncate">{page.title || t("docs.untitled")}</span>
+				</SidebarMenuButton>
+			</SidebarMenuItem>
+			{(page.children ?? []).map((child) => (
+				<WikiPageNode
+					key={child.id}
+					projectId={projectId}
+					page={child}
+					depth={depth + 1}
+				/>
+			))}
+		</>
+	);
+}
+
+/** Documentation section backed by the project's Wiki space (ADR-042). */
+function WikiDocsSidebarSection({ projectId }: { projectId: string }) {
+	const { t } = useTranslation("appShell");
+	const qc = useQueryClient();
+	const navigate = useNavigate();
+	const { hasProjectPermission } = useProjectPermissions(projectId);
+	const canWrite = hasProjectPermission("docs.write");
+	const [collapsed, setCollapsed] = useState(false);
+
+	const { data: tree } = useQuery(wikiTreeQueryOptions(projectId));
+
+	const newPageMutation = useMutation({
+		mutationFn: () => createWikiPage(projectId, t("docs.untitled")),
+		onSuccess: (created) => {
+			qc.invalidateQueries({ queryKey: wikiQueryKeys.tree(projectId) });
+			navigate({
+				to: "/projects/$projectId/docs/wiki",
+				params: { projectId },
+				search: { page: created.url },
+			});
+		},
+	});
+
+	const { state: sidebarState } = useSidebar();
+	if (sidebarState === "collapsed") {
+		return (
+			<SidebarGroup>
+				<SidebarGroupContent>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton tooltip={t("docs.documentation")}>
+								<BookOpen className="size-4" />
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarGroupContent>
+			</SidebarGroup>
+		);
+	}
+
+	return (
+		<SidebarGroup className="px-0">
+			<SidebarGroupLabel
+				className="flex cursor-pointer items-center justify-between hover:text-sidebar-foreground transition-colors px-3"
+				onClick={() => setCollapsed((prev) => !prev)}
+			>
+				<span>{t("docs.documentation")}</span>
+				<ChevronRight
+					className={cn(
+						"size-3.5 transition-transform duration-200 text-sidebar-foreground/40",
+						!collapsed && "rotate-90",
+					)}
+				/>
+			</SidebarGroupLabel>
+
+			{!collapsed && (
+				<SidebarGroupContent>
+					<div className="py-1 space-y-0.5">
+						<SidebarMenu>
+							<SidebarMenuItem>
+								<SidebarMenuButton
+									className="h-7 text-[13px]"
+									onClick={() =>
+										navigate({
+											to: "/projects/$projectId/docs/wiki",
+											params: { projectId },
+											search: {},
+										})
+									}
+								>
+									<BookOpen className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+									<span className="truncate">
+										{t("docs.openSpace", { defaultValue: "Open space" })}
+									</span>
+								</SidebarMenuButton>
+							</SidebarMenuItem>
+							{(tree?.items ?? []).map((page) => (
+								<WikiPageNode
+									key={page.id}
+									projectId={projectId}
+									page={page}
+									depth={0}
+								/>
+							))}
+							{canWrite && (
+								<SidebarMenuItem>
+									<SidebarMenuButton
+										className="h-7 text-[13px] text-sidebar-foreground/60"
+										onClick={() => newPageMutation.mutate()}
+										disabled={newPageMutation.isPending}
+									>
+										<Plus className="size-3.5 shrink-0" />
+										<span>{t("docs.newDocument")}</span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							)}
+						</SidebarMenu>
+					</div>
+				</SidebarGroupContent>
+			)}
+		</SidebarGroup>
 	);
 }
 
@@ -1720,7 +1886,7 @@ export function AppSidebar() {
 							isAnonymous={isAnonymous}
 						/>
 						<SidebarSeparator />
-						<DocsSidebarSection projectId={projectId} />
+						<DocsSectionSwitch projectId={projectId} />
 						<SidebarSeparator />
 						<ExtensionPoint
 							point="sidebar.project.section"

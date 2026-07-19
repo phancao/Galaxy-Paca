@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { listDocuments } from "./doc-api";
 import { listAllTasks } from "./interaction-api";
 import { listProjectMembers, type ProjectMember } from "./project-api";
+import {
+	type WikiPage,
+	wikiSpaceQueryOptions,
+	wikiTreeQueryOptions,
+} from "./wiki-api";
 
 export interface TeamMember {
 	id: string;
@@ -46,6 +51,15 @@ const documentsQueryOptions = (projectId: string) => ({
 	staleTime: 2 * 60 * 1000,
 });
 
+/** Flattens a wiki page tree into mentionable {id, title} entries. */
+function flattenWikiPages(pages: WikiPage[], out: MentionableDocument[] = []) {
+	for (const page of pages) {
+		out.push({ id: page.id, title: page.title });
+		if (page.children?.length) flattenWikiPages(page.children, out);
+	}
+	return out;
+}
+
 export function useMentionData(projectId?: string | null) {
 	const { data: members = [] } = useQuery({
 		...teamMembersQueryOptions(projectId ?? ""),
@@ -57,9 +71,22 @@ export function useMentionData(projectId?: string | null) {
 		enabled: !!projectId,
 	});
 
+	// ADR-042: when the Wiki integration is live, doc mentions suggest the
+	// project's Wiki pages; otherwise fall back to native documents.
+	const wikiProbe = useQuery({
+		...wikiSpaceQueryOptions(projectId ?? ""),
+		enabled: !!projectId,
+	});
+	const wikiEnabled = wikiProbe.isSuccess;
+
+	const { data: wikiTree } = useQuery({
+		...wikiTreeQueryOptions(projectId ?? ""),
+		enabled: !!projectId && wikiEnabled,
+	});
+
 	const { data: documents = [] } = useQuery({
 		...documentsQueryOptions(projectId ?? ""),
-		enabled: !!projectId,
+		enabled: !!projectId && !wikiEnabled && !wikiProbe.isPending,
 	});
 
 	const teamMembers: TeamMember[] = members.map((member: ProjectMember) => ({
@@ -80,10 +107,12 @@ export function useMentionData(projectId?: string | null) {
 			status: task.status_id || undefined,
 		})) ?? [];
 
-	const mentionDocs: MentionableDocument[] = documents.map((doc) => ({
-		id: doc.id,
-		title: doc.title,
-	}));
+	const mentionDocs: MentionableDocument[] = wikiEnabled
+		? flattenWikiPages(wikiTree?.items ?? [])
+		: documents.map((doc) => ({
+				id: doc.id,
+				title: doc.title,
+			}));
 
 	return {
 		teamMembers,

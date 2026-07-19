@@ -51,7 +51,11 @@
     "newSubfolder": "New Subfolder",
     "rename": "Rename",
     "delete": "Delete",
-    "untitled": "Untitled"
+    "untitled": "Untitled",
+    "openSpace": "Open space",
+    "searchWiki": "Search documentation…",
+    "noResults": "No results",
+    "wikiUnavailable": "The Wiki documentation service is not available."
   },
   "notifications": {
     "title": "Notifications",
