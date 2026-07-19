@@ -269,6 +269,13 @@ func Load() (*Config, error) {
 				Role:          env("GALAXY_AI_ROLE", "paca-ai"),
 			}
 		}(),
+		// Wiki-backed Documentation (ADR-042). Empty APIURL/APIToken
+		// disables the surface (routes stay unregistered).
+		Wiki: WikiConfig{
+			APIURL:    env("WIKI_API_URL", ""),
+			APIToken:  env("WIKI_API_TOKEN", ""),
+			PublicURL: env("WIKI_PUBLIC_URL", ""),
+		},
 	}, nil
 }
 

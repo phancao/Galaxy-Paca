@@ -383,6 +383,12 @@ const (
 	CodeWorklogNotFound Code = "WORKLOG_NOT_FOUND"
 	// CodeWorklogMinutesInvalid indicates the worklog minutes value is not a positive integer.
 	CodeWorklogMinutesInvalid Code = "WORKLOG_MINUTES_INVALID"
+
+	// CodeWikiUnavailable indicates the Wiki-backed Documentation integration
+	// (ADR-042) is not configured or the Wiki could not be reached.
+	CodeWikiUnavailable Code = "WIKI_UNAVAILABLE"
+	// CodeWikiLinkNotFound indicates the task↔wiki-page link does not exist.
+	CodeWikiLinkNotFound Code = "WIKI_LINK_NOT_FOUND"
 )
 
 // Error carries a machine-readable Code alongside a human-readable Message.
