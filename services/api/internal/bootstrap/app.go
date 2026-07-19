@@ -37,6 +37,7 @@ import (
 	docsvc "github.com/Paca-AI/api/internal/service/doc"
 	galaxyauthsvc "github.com/Paca-AI/api/internal/service/galaxyauth"
 	globalrolesvc "github.com/Paca-AI/api/internal/service/globalrole"
+	nexussyncsvc "github.com/Paca-AI/api/internal/service/nexussync"
 	notificationsvc "github.com/Paca-AI/api/internal/service/notification"
 	pluginsvc "github.com/Paca-AI/api/internal/service/plugin"
 	projectsvc "github.com/Paca-AI/api/internal/service/project"
@@ -363,6 +364,19 @@ func New(cfg *config.Config) (*App, error) {
 			"resource_scope_prefix", cfg.Security.GalaxyResourceScopePrefix)
 	}
 
+	// Vortex identity-sync webhook receiver (ADR-040): applies user.changed
+	// deprovision/restore pushes from the identity service.  Off unless the
+	// shared webhook secret is configured.
+	var nexusWebhookHandler *handler.NexusWebhookHandler
+	if cfg.Security.VortexWebhookSecret != "" {
+		nexusSyncService := nexussyncsvc.New(userRepo, log)
+		nexusWebhookHandler = handler.NewNexusWebhookHandler(
+			[]byte(cfg.Security.VortexWebhookSecret), nexusSyncService, log)
+		log.Info("Vortex identity-sync webhook enabled (ADR-040)")
+	} else {
+		log.Warn("VORTEX_WEBHOOK_SECRET not set — identity-sync webhook disabled; a user disabled in Vortex keeps local access until token expiry (ADR-040)")
+	}
+
 	deps := router.Deps{
 		TokenManager:         tokenManager,
 		APIKeyAuth:           apiKeyService,
@@ -371,6 +385,7 @@ func New(cfg *config.Config) (*App, error) {
 		Health:               handler.NewHealthHandler(),
 		Auth:                 authHandler,
 		OIDC:                 oidcHandler,
+		NexusWebhook:         nexusWebhookHandler,
 		User:                 handler.NewUserHandler(userService, authService),
 		GlobalRole:           handler.NewGlobalRoleHandler(globalRoleService, authorizer),
 		ProjectVisibilitySvc: projectService,
