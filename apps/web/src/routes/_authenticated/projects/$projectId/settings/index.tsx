@@ -11,7 +11,6 @@ import {
 	Shield,
 	Tag,
 } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ComponentsSettings } from "@/components/projects/settings/ComponentsSettings";
 import { CustomFieldsSettings } from "@/components/projects/settings/CustomFieldsSettings";
@@ -40,9 +39,24 @@ import {
 	taskTypesQueryOptions,
 } from "@/lib/project-api";
 
+type SettingsSearch = {
+	/**
+	 * Which settings section is visible. A kebab-case section id (general,
+	 * roles, task-statuses, task-types, custom-fields, workflow, versions,
+	 * components, danger) or a `plugin:<pluginId>:<component>` tab. Absent means
+	 * "general". Navigation is owned by the project sidebar's collapsible
+	 * "Settings" group, which deep-links each section via this param.
+	 */
+	section?: string;
+};
+
 export const Route = createFileRoute(
 	"/_authenticated/projects/$projectId/settings/",
 )({
+	validateSearch: (search: Record<string, unknown>): SettingsSearch => {
+		const section = search.section;
+		return typeof section === "string" ? { section } : {};
+	},
 	loader: async ({ context: { queryClient }, params: { projectId } }) => {
 		await Promise.all([
 			queryClient.ensureQueryData(projectQueryOptions(projectId)),
@@ -157,18 +171,20 @@ function SettingsPage() {
 		? NAV_ITEMS
 		: NAV_ITEMS.filter((i) => i.id !== "danger");
 
-	const [activeSection, setActiveSection] = useState<
-		| "general"
-		| "roles"
-		| "task-statuses"
-		| "task-types"
-		| "custom-fields"
-		| "workflow"
-		| "versions"
-		| "components"
-		| "danger"
-		| string
-	>("general");
+	// Section navigation now lives in Paca's own left sidebar (the collapsible
+	// "Settings" group). The active section is driven entirely by the URL search
+	// param so each sidebar child can deep-link to it — there is no in-content
+	// sub-rail anymore. Falls back to "general" for a missing/unknown/forbidden
+	// section (e.g. ?section=danger without delete permission).
+	const { section } = Route.useSearch();
+	const pluginTabIds = new Set(
+		pluginTabs.map((reg) => `plugin:${reg.pluginId}:${reg.component}`),
+	);
+	const knownSectionIds = new Set<string>(visibleNavItems.map((i) => i.id));
+	const activeSection: string =
+		section && (knownSectionIds.has(section) || pluginTabIds.has(section))
+			? section
+			: "general";
 
 	return (
 		<div className="flex flex-col min-h-0 flex-1">
@@ -197,148 +213,62 @@ function SettingsPage() {
 				</div>
 			</div>
 
-			{/* Body */}
+			{/* Body — full-width single section; the project sidebar's collapsible
+			    "Settings" group owns section navigation now. */}
 			<div className="flex-1 overflow-y-auto">
-				<div className="max-w-6xl mx-auto w-full px-6 py-8 flex gap-10 items-start">
-					{/* Sidebar nav — hidden on small screens */}
-					<aside className="hidden lg:flex flex-col gap-1 w-48 shrink-0 sticky top-8">
-						<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 px-3 mb-1">
-							{t("project.settingsPage.title")}
-						</p>
-						{visibleNavItems.map(({ id, labelKey, icon: Icon }) => (
-							<button
-								key={id}
-								type="button"
-								onClick={() => setActiveSection(id)}
-								className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left ${
-									activeSection === id
-										? "bg-accent text-foreground"
-										: "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-								} ${id === "danger" ? "mt-2 text-destructive/70 hover:text-destructive hover:bg-destructive/8" : ""}`}
-							>
-								<Icon className="size-3.5 shrink-0" />
-								{t(labelKey)}
-							</button>
-						))}
-						{pluginTabs.length > 0 && (
-							<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 px-3 mt-4 mb-1">
-								{t("project.settingsPage.nav.plugins")}
-							</p>
-						)}
-						{pluginTabs.map((reg) => (
-							<button
+				<div className="max-w-6xl mx-auto w-full px-6 py-8">
+					{activeSection === "general" && (
+						<GeneralSettings projectId={projectId} canEdit={canEditProject} />
+					)}
+					{activeSection === "roles" && (
+						<RolesSettings
+							projectId={projectId}
+							canManageRoles={canManageRoles}
+						/>
+					)}
+					{activeSection === "task-statuses" && (
+						<TaskStatusesSettings
+							projectId={projectId}
+							canWrite={canManageTasks}
+						/>
+					)}
+					{activeSection === "task-types" && (
+						<TaskTypesSettings
+							projectId={projectId}
+							canWrite={canManageTasks}
+						/>
+					)}
+					{activeSection === "custom-fields" && (
+						<CustomFieldsSettings
+							projectId={projectId}
+							canWrite={canManageTasks}
+						/>
+					)}
+					{activeSection === "workflow" && (
+						<WorkflowSettings projectId={projectId} canWrite={canManageTasks} />
+					)}
+					{activeSection === "versions" && (
+						<VersionsSettings projectId={projectId} canWrite={canManageTasks} />
+					)}
+					{activeSection === "components" && (
+						<ComponentsSettings
+							projectId={projectId}
+							canWrite={canManageTasks}
+						/>
+					)}
+					{activeSection === "danger" && canDelete && (
+						<DangerZone projectId={projectId} />
+					)}
+					{/* Plugin settings tabs */}
+					{pluginTabs.map((reg) =>
+						activeSection === `plugin:${reg.pluginId}:${reg.component}` ? (
+							<RemoteComponent
 								key={`${reg.pluginId}:${reg.component}`}
-								type="button"
-								onClick={() =>
-									setActiveSection(`plugin:${reg.pluginId}:${reg.component}`)
-								}
-								className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left ${
-									activeSection === `plugin:${reg.pluginId}:${reg.component}`
-										? "bg-accent text-foreground"
-										: "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-								}`}
-							>
-								{reg.pluginName}
-							</button>
-						))}
-					</aside>
-
-					{/* Content */}
-					<div className="flex-1 min-w-0">
-						{/* Mobile section picker */}
-						<div className="flex gap-1 mb-6 lg:hidden flex-wrap">
-							{visibleNavItems.map(({ id, labelKey, icon: Icon }) => (
-								<button
-									key={id}
-									type="button"
-									onClick={() => setActiveSection(id)}
-									className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-										activeSection === id
-											? "bg-accent text-foreground"
-											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-									}`}
-								>
-									<Icon className="size-3 shrink-0" />
-									{t(labelKey)}
-								</button>
-							))}
-							{pluginTabs.map((reg) => (
-								<button
-									key={`${reg.pluginId}:${reg.component}`}
-									type="button"
-									onClick={() =>
-										setActiveSection(`plugin:${reg.pluginId}:${reg.component}`)
-									}
-									className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-										activeSection === `plugin:${reg.pluginId}:${reg.component}`
-											? "bg-accent text-foreground"
-											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-									}`}
-								>
-									{reg.pluginName}
-								</button>
-							))}
-						</div>
-
-						{activeSection === "general" && (
-							<GeneralSettings projectId={projectId} canEdit={canEditProject} />
-						)}
-						{activeSection === "roles" && (
-							<RolesSettings
-								projectId={projectId}
-								canManageRoles={canManageRoles}
+								registration={reg}
+								componentProps={{ projectId, canEdit: canEditProject }}
 							/>
-						)}
-						{activeSection === "task-statuses" && (
-							<TaskStatusesSettings
-								projectId={projectId}
-								canWrite={canManageTasks}
-							/>
-						)}
-						{activeSection === "task-types" && (
-							<TaskTypesSettings
-								projectId={projectId}
-								canWrite={canManageTasks}
-							/>
-						)}
-						{activeSection === "custom-fields" && (
-							<CustomFieldsSettings
-								projectId={projectId}
-								canWrite={canManageTasks}
-							/>
-						)}
-						{activeSection === "workflow" && (
-							<WorkflowSettings
-								projectId={projectId}
-								canWrite={canManageTasks}
-							/>
-						)}
-						{activeSection === "versions" && (
-							<VersionsSettings
-								projectId={projectId}
-								canWrite={canManageTasks}
-							/>
-						)}
-						{activeSection === "components" && (
-							<ComponentsSettings
-								projectId={projectId}
-								canWrite={canManageTasks}
-							/>
-						)}
-						{activeSection === "danger" && canDelete && (
-							<DangerZone projectId={projectId} />
-						)}
-						{/* Plugin settings tabs */}
-						{pluginTabs.map((reg) =>
-							activeSection === `plugin:${reg.pluginId}:${reg.component}` ? (
-								<RemoteComponent
-									key={`${reg.pluginId}:${reg.component}`}
-									registration={reg}
-									componentProps={{ projectId, canEdit: canEditProject }}
-								/>
-							) : null,
-						)}
-					</div>
+						) : null,
+					)}
 				</div>
 			</div>
 		</div>

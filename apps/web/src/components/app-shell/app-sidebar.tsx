@@ -6,6 +6,7 @@ import {
 	useRouterState,
 } from "@tanstack/react-router";
 import {
+	AlertTriangle,
 	ArrowLeft,
 	BookOpen,
 	ChevronDown,
@@ -16,17 +17,22 @@ import {
 	FolderKanban,
 	FolderOpen,
 	GanttChart,
+	GitBranch,
 	Home,
 	KanbanSquare,
+	LayoutList,
+	Milestone,
 	Monitor,
 	Moon,
 	MoreHorizontal,
+	Package,
 	Pencil,
 	Plus,
 	Puzzle,
 	Settings,
 	Shield,
 	Sun,
+	Tag,
 	Trash2,
 	Users,
 	Workflow,
@@ -878,6 +884,56 @@ const PROJECT_NAV_ITEMS = [
 	{ segment: "settings", icon: Settings, labelKey: "nav.settings" },
 ] as const;
 
+// Project settings sections, mirroring the settings page's own `NAV_ITEMS`
+// (same ids, icons and i18n label keys from the `projects` namespace). Rendered
+// as sub-items under the collapsible "Settings" group so there is no in-content
+// sub-rail. `requiresDelete` mirrors the page's `visibleNavItems` gating: the
+// Danger Zone is only shown to users who can delete the project.
+const SETTINGS_SECTIONS = [
+	{
+		id: "general",
+		labelKey: "project.settingsPage.nav.general",
+		icon: Settings,
+	},
+	{ id: "roles", labelKey: "project.settingsPage.nav.roles", icon: Shield },
+	{
+		id: "task-statuses",
+		labelKey: "project.settingsPage.nav.taskStatuses",
+		icon: LayoutList,
+	},
+	{
+		id: "task-types",
+		labelKey: "project.settingsPage.nav.taskTypes",
+		icon: Tag,
+	},
+	{
+		id: "custom-fields",
+		labelKey: "project.settingsPage.nav.customFields",
+		icon: Plus,
+	},
+	{
+		id: "workflow",
+		labelKey: "project.settingsPage.nav.workflow",
+		icon: GitBranch,
+	},
+	{
+		id: "versions",
+		labelKey: "project.settingsPage.nav.versions",
+		icon: Milestone,
+	},
+	{
+		id: "components",
+		labelKey: "project.settingsPage.nav.components",
+		icon: Package,
+	},
+	{
+		id: "danger",
+		labelKey: "project.settingsPage.nav.dangerZone",
+		icon: AlertTriangle,
+		requiresDelete: true,
+	},
+] as const;
+
 function ProjectNav() {
 	const { t } = useTranslation("appShell");
 	return (
@@ -900,11 +956,102 @@ function ProjectNav() {
 	);
 }
 
-const ANON_HIDDEN_SEGMENTS = new Set([
-	"automation",
-	"team",
-	"settings",
-]);
+const ANON_HIDDEN_SEGMENTS = new Set(["automation", "team", "settings"]);
+
+/**
+ * Collapsible "Settings" group in the project sidebar. Mirrors the
+ * `PluginNavGroup` pattern (Collapsible + SidebarMenuSub, chevron rotates on
+ * `group-data-[open]`, auto-opens when a child route is active): the gear-icon
+ * parent is a pure toggle and each settings section nests as a sub-item that
+ * deep-links to `/projects/:id/settings?section=<id>`. Section visibility
+ * mirrors the settings page — the Danger Zone only appears for users who can
+ * delete the project (global `projects.delete` or the project-scoped role).
+ */
+function SettingsNavGroup({
+	projectId,
+	location,
+}: {
+	projectId: string;
+	location: string;
+}) {
+	const { t } = useTranslation("appShell");
+	const { t: tProjects } = useTranslation("projects");
+	const { hasPermission } = usePermissions();
+	const { hasProjectPermission } = useProjectPermissions(projectId);
+	const currentSection = useRouterState({
+		select: (s) =>
+			(s.location.search as { section?: string }).section ?? "general",
+	});
+
+	const canDelete =
+		hasPermission("projects.delete") || hasProjectPermission("projects.delete");
+	const sections = SETTINGS_SECTIONS.filter(
+		(section) =>
+			!("requiresDelete" in section && section.requiresDelete) || canDelete,
+	);
+
+	const settingsPath = `/projects/${projectId}/settings`;
+	const onSettings =
+		location === settingsPath || location.startsWith(`${settingsPath}/`);
+
+	const [open, setOpen] = useState(onSettings);
+	// Auto-open when the user navigates into settings from elsewhere (the
+	// sidebar persists across route changes, so initial state alone isn't enough).
+	useEffect(() => {
+		if (onSettings) setOpen(true);
+	}, [onSettings]);
+
+	return (
+		<Collapsible open={open} onOpenChange={setOpen} className="group/setnav">
+			<SidebarMenuItem>
+				<CollapsibleTrigger
+					render={
+						<SidebarMenuButton
+							tooltip={t("nav.settings")}
+							className={cn(
+								"transition-all duration-150",
+								onSettings
+									? "text-primary font-medium"
+									: "hover:bg-sidebar-accent/60",
+							)}
+						/>
+					}
+				>
+					<Settings className="size-4" />
+					<span>{t("nav.settings")}</span>
+					<ChevronRight className="ml-auto size-4 transition-transform duration-150 group-data-[open]/setnav:rotate-90" />
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<SidebarMenuSub>
+						{sections.map(({ id, labelKey, icon: Icon }) => {
+							const isActive = onSettings && currentSection === id;
+							return (
+								<SidebarMenuSubItem key={id}>
+									<SidebarMenuSubButton
+										isActive={isActive}
+										render={
+											<Link
+												to="/projects/$projectId/settings"
+												params={{ projectId }}
+												search={{ section: id }}
+											/>
+										}
+										className={cn(
+											isActive ? "bg-primary/10 text-primary font-medium" : "",
+										)}
+									>
+										<Icon className="size-4" />
+										<span>{tProjects(labelKey)}</span>
+									</SidebarMenuSubButton>
+								</SidebarMenuSubItem>
+							);
+						})}
+					</SidebarMenuSub>
+				</CollapsibleContent>
+			</SidebarMenuItem>
+		</Collapsible>
+	);
+}
 
 function ProjectNavItems({
 	projectId,
@@ -961,7 +1108,11 @@ function ProjectNavItems({
 				<SidebarGroupContent>
 					<SidebarMenu>
 						{PROJECT_NAV_ITEMS.filter(
-							(item) => !isAnonymous || !ANON_HIDDEN_SEGMENTS.has(item.segment),
+							(item) =>
+								// Settings is rendered as a collapsible group (below) instead
+								// of a flat item, so its sections nest in the sidebar.
+								item.segment !== "settings" &&
+								(!isAnonymous || !ANON_HIDDEN_SEGMENTS.has(item.segment)),
 						).map(({ segment, icon: Icon, labelKey }) => {
 							const href = segment
 								? `/projects/${projectId}/${segment}`
@@ -989,6 +1140,9 @@ function ProjectNavItems({
 								</SidebarMenuItem>
 							);
 						})}
+						{(!isAnonymous || !ANON_HIDDEN_SEGMENTS.has("settings")) && (
+							<SettingsNavGroup projectId={projectId} location={location} />
+						)}
 					</SidebarMenu>
 				</SidebarGroupContent>
 			)}
@@ -1093,17 +1247,14 @@ function PluginNavGroup({
 						{items.map((item) => {
 							const Icon = resolvePluginIcon(item.icon);
 							const to = pluginNavItemPath(projectId, item);
-							const isActive =
-								location === to || location.startsWith(`${to}/`);
+							const isActive = location === to || location.startsWith(`${to}/`);
 							return (
 								<SidebarMenuSubItem key={`${item.pluginId}:${item.slug}`}>
 									<SidebarMenuSubButton
 										isActive={isActive}
 										render={<Link to={to} />}
 										className={cn(
-											isActive
-												? "bg-primary/10 text-primary font-medium"
-												: "",
+											isActive ? "bg-primary/10 text-primary font-medium" : "",
 										)}
 									>
 										<Icon className="size-4" />
