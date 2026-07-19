@@ -29,6 +29,7 @@ type fakeTaskRepo struct {
 	statuses             map[uuid.UUID]*taskdom.TaskStatus
 	tasks                map[uuid.UUID]*taskdom.Task
 	customFields         map[uuid.UUID]*taskdom.CustomFieldDefinition
+	statusTransitions    map[uuid.UUID]*taskdom.StatusTransition
 	counters             map[uuid.UUID]int64 // project-scoped task number counters
 	findDefaultTypeErr   error               // injected error for FindDefaultTaskType
 	findDefaultStatusErr error               // injected error for FindDefaultTaskStatus
@@ -1874,6 +1875,103 @@ func (r *fakeTaskRepo) DeleteCustomFieldDefinition(_ context.Context, id uuid.UU
 
 func (r *fakeTaskRepo) ClearCustomFieldValues(_ context.Context, _ uuid.UUID, _ string) error {
 	return nil
+}
+
+func (r *fakeTaskRepo) ListStatusTransitions(_ context.Context, projectID uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []*taskdom.StatusTransition
+	for _, t := range r.statusTransitions {
+		if t.ProjectID == projectID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeTaskRepo) CreateStatusTransition(_ context.Context, t *taskdom.StatusTransition) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.statusTransitions == nil {
+		r.statusTransitions = map[uuid.UUID]*taskdom.StatusTransition{}
+	}
+	r.statusTransitions[t.ID] = t
+	return nil
+}
+
+func (r *fakeTaskRepo) DeleteStatusTransition(_ context.Context, _, id uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.statusTransitions, id)
+	return nil
+}
+
+func seedTaskWithStatus(t *testing.T, repo *fakeTaskRepo, projectID uuid.UUID, status uuid.UUID) *taskdom.Task {
+	t.Helper()
+	task := &taskdom.Task{
+		ID:           uuid.New(),
+		ProjectID:    projectID,
+		StatusID:     &status,
+		CustomFields: map[string]any{},
+		Tags:         []string{},
+	}
+	if err := repo.CreateTask(context.Background(), task); err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+	return task
+}
+
+func updateStatus(svc taskdom.Service, projectID, taskID, status uuid.UUID) error {
+	sp := &status
+	_, err := svc.UpdateTask(context.Background(), projectID, taskID, taskdom.UpdateTaskInput{StatusID: &sp})
+	return err
+}
+
+func TestUpdateTask_WorkflowTransitions(t *testing.T) {
+	ctx := context.Background()
+	projectID := uuid.New()
+	statusA, statusB, statusC := uuid.New(), uuid.New(), uuid.New()
+
+	// No transitions defined → free movement.
+	repo := newFakeTaskRepo()
+	svc := tasksvc.New(repo)
+	task := seedTaskWithStatus(t, repo, projectID, statusA)
+	if err := updateStatus(svc, projectID, task.ID, statusC); err != nil {
+		t.Fatalf("free movement should be allowed with no workflow, got %v", err)
+	}
+
+	// With a rule A→B: A→B allowed, A→C denied.
+	repo = newFakeTaskRepo()
+	svc = tasksvc.New(repo)
+	task = seedTaskWithStatus(t, repo, projectID, statusA)
+	_ = repo.CreateStatusTransition(ctx, &taskdom.StatusTransition{
+		ID: uuid.New(), ProjectID: projectID, FromStatusID: &statusA, ToStatusID: statusB, RequiredFields: []string{},
+	})
+	if err := updateStatus(svc, projectID, task.ID, statusC); err != taskdom.ErrTransitionNotAllowed {
+		t.Fatalf("A→C should be denied, got %v", err)
+	}
+	if err := updateStatus(svc, projectID, task.ID, statusB); err != nil {
+		t.Fatalf("A→B should be allowed, got %v", err)
+	}
+}
+
+func TestUpdateTask_TransitionRequiredField(t *testing.T) {
+	ctx := context.Background()
+	projectID := uuid.New()
+	statusA, statusB := uuid.New(), uuid.New()
+
+	repo := newFakeTaskRepo()
+	svc := tasksvc.New(repo)
+	task := seedTaskWithStatus(t, repo, projectID, statusA)
+	_ = repo.CreateStatusTransition(ctx, &taskdom.StatusTransition{
+		ID: uuid.New(), ProjectID: projectID, FromStatusID: &statusA, ToStatusID: statusB,
+		RequiredFields: []string{"resolution"},
+	})
+
+	// Transition without the required field set → rejected.
+	if err := updateStatus(svc, projectID, task.ID, statusB); err == nil {
+		t.Fatalf("expected required-field rejection, got nil")
+	}
 }
 
 // --- TaskLinkRepository stubs -----------------------------------------------

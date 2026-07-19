@@ -3,6 +3,7 @@ package tasksvc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -413,6 +414,7 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 	if t.ProjectID != projectID {
 		return nil, taskdom.ErrTaskNotFound
 	}
+	oldStatusID := t.StatusID
 
 	if title := strings.TrimSpace(in.Title); title != "" {
 		t.Title = title
@@ -494,6 +496,13 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 	if in.Tags != nil {
 		t.Tags = *in.Tags
 	}
+
+	// Enforce the project's workflow (opt-in) on any status change, using the
+	// task's resulting custom fields for required-field checks.
+	if err := s.enforceStatusTransition(ctx, t.ProjectID, oldStatusID, t.StatusID, t.TaskTypeID, t.CustomFields); err != nil {
+		return nil, err
+	}
+
 	t.UpdatedAt = time.Now()
 
 	if err := s.repo.UpdateTask(ctx, t); err != nil {
@@ -654,4 +663,89 @@ func (s *Service) DeleteCustomFieldDefinition(ctx context.Context, projectID, id
 		return taskdom.ErrCustomFieldNotFound
 	}
 	return s.repo.DeleteCustomFieldDefinition(ctx, id)
+}
+
+// --- Status Transitions (workflow engine, ADR-040) --------------------------
+
+// ListStatusTransitions returns all workflow transition rules for a project.
+func (s *Service) ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*taskdom.StatusTransition, error) {
+	return s.repo.ListStatusTransitions(ctx, projectID)
+}
+
+// CreateStatusTransition declares one allowed workflow transition.
+func (s *Service) CreateStatusTransition(ctx context.Context, in taskdom.CreateStatusTransitionInput) (*taskdom.StatusTransition, error) {
+	if in.ToStatusID == uuid.Nil {
+		return nil, taskdom.ErrTransitionInvalid
+	}
+	// A same-from/to rule is meaningless (staying put is always allowed).
+	if in.FromStatusID != nil && *in.FromStatusID == in.ToStatusID {
+		return nil, taskdom.ErrTransitionInvalid
+	}
+	rf := in.RequiredFields
+	if rf == nil {
+		rf = []string{}
+	}
+	t := &taskdom.StatusTransition{
+		ID:             uuid.New(),
+		ProjectID:      in.ProjectID,
+		TaskTypeID:     in.TaskTypeID,
+		FromStatusID:   in.FromStatusID,
+		ToStatusID:     in.ToStatusID,
+		RequiredFields: rf,
+		CreatedAt:      time.Now(),
+	}
+	if err := s.repo.CreateStatusTransition(ctx, t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// DeleteStatusTransition removes a transition rule, verifying project ownership.
+func (s *Service) DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error {
+	return s.repo.DeleteStatusTransition(ctx, projectID, id)
+}
+
+// enforceStatusTransition checks that moving a task from oldStatus to newStatus
+// is permitted by the project's workflow. No-op when the project has no
+// transition rules (free movement), the status is unchanged, or the task had no
+// prior status (initial assignment). When a matching rule lists required
+// fields, each must be non-empty on the task.
+func (s *Service) enforceStatusTransition(ctx context.Context, projectID uuid.UUID, oldStatus, newStatus, typeID *uuid.UUID, cf map[string]any) error {
+	if newStatus == nil {
+		return nil
+	}
+	if oldStatus != nil && *oldStatus == *newStatus {
+		return nil
+	}
+	transitions, err := s.repo.ListStatusTransitions(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if len(transitions) == 0 {
+		return nil // no workflow configured → free movement (backward compatible)
+	}
+	if oldStatus == nil {
+		return nil // initial status assignment is always allowed
+	}
+	var matched *taskdom.StatusTransition
+	for _, tr := range transitions {
+		if tr.ToStatusID != *newStatus {
+			continue
+		}
+		if tr.FromStatusID != nil && *tr.FromStatusID != *oldStatus {
+			continue
+		}
+		if tr.TaskTypeID != nil && (typeID == nil || *tr.TaskTypeID != *typeID) {
+			continue
+		}
+		matched = tr
+		break
+	}
+	if matched == nil {
+		return taskdom.ErrTransitionNotAllowed
+	}
+	if key, missing := taskdom.MissingRequiredField(cf, matched.RequiredFields); missing {
+		return fmt.Errorf("%w: %s", taskdom.ErrTransitionRequiredField, key)
+	}
+	return nil
 }

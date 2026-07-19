@@ -487,6 +487,11 @@
 			"addOption": "Adicionar",
 			"requiredLabel": "Obrigatório",
 			"requiredHint": "Os usuários devem preencher este campo ao criar ou editar uma tarefa.",
+			"defaultValueLabel": "Valor padrão",
+			"defaultValueHint": "Opcional. Preenche este valor em novas tarefas. Deixe vazio para nenhum padrão.",
+			"defaultValueNone": "Sem padrão",
+			"defaultValueNeedsOptions": "Adicione pelo menos uma opção para definir um padrão.",
+			"defaultValuePlaceholder": "Sem padrão",
 			"fieldTypes": {
 				"text": "Texto",
 				"number": "Número",

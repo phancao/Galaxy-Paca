@@ -15,6 +15,8 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+	type CustomFieldFilter,
+	type CustomFieldFilterOp,
 	type FilterConfig,
 	type FilterEntry,
 	type InteractionView,
@@ -727,6 +729,217 @@ function TaskTypeFilterSection({
 	);
 }
 
+// ── Custom-field filter ───────────────────────────────────────────────────────
+
+/** Operators offered for a custom field, keyed by its type. */
+function opsForFieldType(
+	fieldType: CustomFieldDefinition["field_type"],
+): CustomFieldFilterOp[] {
+	if (fieldType === "multi_select" || fieldType === "label") {
+		return ["contains", "set", "unset"];
+	}
+	if (fieldType === "boolean") return ["eq", "set", "unset"];
+	// text / number / date / url / select / user
+	return ["eq", "neq", "set", "unset"];
+}
+
+const CF_OP_LABEL_KEY = {
+	eq: "layout.viewSettings.customFieldFilter.ops.eq",
+	neq: "layout.viewSettings.customFieldFilter.ops.neq",
+	contains: "layout.viewSettings.customFieldFilter.ops.contains",
+	set: "layout.viewSettings.customFieldFilter.ops.set",
+	unset: "layout.viewSettings.customFieldFilter.ops.unset",
+} as const satisfies Record<CustomFieldFilterOp, string>;
+
+function CustomFieldFilterSection({
+	customFields,
+	filters,
+	onChange,
+}: {
+	customFields: CustomFieldDefinition[];
+	filters: CustomFieldFilter[];
+	onChange: (filters: CustomFieldFilter[]) => void;
+}) {
+	const { t } = useTranslation("projects");
+
+	if (customFields.length === 0) {
+		return (
+			<p className="px-3 pb-2 text-xs text-muted-foreground/50">
+				{t("layout.viewSettings.customFieldFilter.noCustomFields")}
+			</p>
+		);
+	}
+
+	const fieldOptions = customFields.map((cf) => ({
+		key: cf.field_key,
+		label: cf.display_name,
+	}));
+
+	const patch = (index: number, next: Partial<CustomFieldFilter>) => {
+		onChange(filters.map((f, i) => (i === index ? { ...f, ...next } : f)));
+	};
+
+	const remove = (index: number) => {
+		onChange(filters.filter((_, i) => i !== index));
+	};
+
+	const add = () => {
+		const cf = customFields[0];
+		const op = opsForFieldType(cf.field_type)[0];
+		onChange([...filters, { field_key: cf.field_key, op }]);
+	};
+
+	return (
+		<div className="px-3 pb-3 space-y-2">
+			{filters.map((filter, index) => {
+				const cf = customFields.find((c) => c.field_key === filter.field_key);
+				const ops: CustomFieldFilterOp[] = cf
+					? opsForFieldType(cf.field_type)
+					: ["eq", "set", "unset"];
+				const opOptions = ops.map((op) => ({
+					key: op,
+					label: t(CF_OP_LABEL_KEY[op]),
+				}));
+				const needsValue = filter.op !== "set" && filter.op !== "unset";
+
+				return (
+					<div
+						// biome-ignore lint/suspicious/noArrayIndexKey: filters are positional and can repeat a field
+						key={index}
+						className="space-y-1.5 rounded-lg border border-border/25 bg-muted/15 p-2"
+					>
+						<div className="flex items-center gap-1.5">
+							<DynamicSelect
+								value={filter.field_key}
+								options={fieldOptions}
+								onChange={(v) => {
+									if (!v) return;
+									const nextCf = customFields.find((c) => c.field_key === v);
+									const nextOp = nextCf
+										? opsForFieldType(nextCf.field_type)[0]
+										: "eq";
+									// Field changed → reset operator/value to sane defaults.
+									patch(index, {
+										field_key: v,
+										op: nextOp,
+										value: undefined,
+									});
+								}}
+							/>
+							<button
+								type="button"
+								onClick={() => remove(index)}
+								aria-label={t("layout.viewSettings.customFieldFilter.remove")}
+								title={t("layout.viewSettings.customFieldFilter.remove")}
+								className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted/60 hover:text-destructive"
+							>
+								<span aria-hidden className="text-sm leading-none">
+									×
+								</span>
+							</button>
+						</div>
+						<div className="flex items-center gap-1.5">
+							<DynamicSelect
+								value={filter.op}
+								options={opOptions}
+								onChange={(v) => {
+									if (!v) return;
+									const nextOp = v as CustomFieldFilterOp;
+									patch(index, {
+										op: nextOp,
+										value:
+											nextOp === "set" || nextOp === "unset"
+												? undefined
+												: filter.value,
+									});
+								}}
+							/>
+							{needsValue && cf ? (
+								<CustomFieldValueInput
+									field={cf}
+									value={filter.value}
+									onChange={(value) => patch(index, { value })}
+								/>
+							) : (
+								<div className="flex-1" />
+							)}
+						</div>
+					</div>
+				);
+			})}
+			<button
+				type="button"
+				onClick={add}
+				className="inline-flex items-center gap-1 rounded-md border border-dashed border-border/40 px-2 py-1 text-xs font-medium text-muted-foreground/70 transition-colors hover:border-border/70 hover:text-foreground"
+			>
+				<span aria-hidden>+</span>
+				{t("layout.viewSettings.customFieldFilter.addFilter")}
+			</button>
+		</div>
+	);
+}
+
+function CustomFieldValueInput({
+	field,
+	value,
+	onChange,
+}: {
+	field: CustomFieldDefinition;
+	value: string | number | boolean | undefined;
+	onChange: (value: string | number | boolean | undefined) => void;
+}) {
+	const { t } = useTranslation("projects");
+
+	// select / multi_select → dropdown of predefined options.
+	if (
+		(field.field_type === "select" || field.field_type === "multi_select") &&
+		field.options.length > 0
+	) {
+		return (
+			<DynamicSelect
+				value={value == null ? undefined : String(value)}
+				options={field.options.map((o) => ({ key: o, label: o }))}
+				onChange={(v) => onChange(v)}
+			/>
+		);
+	}
+
+	// boolean → true / false pills.
+	if (field.field_type === "boolean") {
+		return (
+			<div className="flex flex-1 items-center gap-1.5">
+				<FilterPill selected={value === true} onClick={() => onChange(true)}>
+					{t("layout.viewSettings.customFieldFilter.true")}
+				</FilterPill>
+				<FilterPill selected={value === false} onClick={() => onChange(false)}>
+					{t("layout.viewSettings.customFieldFilter.false")}
+				</FilterPill>
+			</div>
+		);
+	}
+
+	// text / number / date / url / label / user → free input.
+	const inputType =
+		field.field_type === "number"
+			? "number"
+			: field.field_type === "date"
+				? "date"
+				: field.field_type === "url"
+					? "url"
+					: "text";
+	return (
+		<input
+			type={inputType}
+			value={value == null ? "" : String(value)}
+			onChange={(e) =>
+				onChange(e.target.value === "" ? undefined : e.target.value)
+			}
+			placeholder={t("layout.viewSettings.customFieldFilter.valuePlaceholder")}
+			className="flex-1 min-w-0 rounded-md border border-border/30 bg-background px-2 py-1 text-xs outline-none transition-all hover:border-border/50 focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+		/>
+	);
+}
+
 // ── Collapsible filter group ──────────────────────────────────────────────────
 
 function CollapsibleFilter({
@@ -837,6 +1050,8 @@ export function ViewSettingsPanel({
 		if (!next.statuses) delete next.statuses;
 		if (!next.assignees) delete next.assignees;
 		if (!next.task_types) delete next.task_types;
+		if (!next.custom_fields || next.custom_fields.length === 0)
+			delete next.custom_fields;
 		update({ filters: Object.keys(next).length > 0 ? next : {} });
 	};
 
@@ -882,13 +1097,15 @@ export function ViewSettingsPanel({
 	const filterAssigneeIds = filterConfigToIds(draft.filters?.assignees);
 	const { allNormal: filterTaskTypeAllNormal, selectedIds: filterTaskTypeIds } =
 		taskTypeConfigToUI(draft.filters?.task_types);
+	const filterCustomFields = draft.filters?.custom_fields ?? [];
 
 	const filterBadge =
 		filterSprintIds.length +
 		filterStatusIds.length +
 		filterAssigneeIds.length +
 		filterTaskTypeIds.length +
-		(filterTaskTypeAllNormal ? 1 : 0);
+		(filterTaskTypeAllNormal ? 1 : 0) +
+		filterCustomFields.length;
 	const hasSavedFilters = filterBadge > 0;
 
 	return (
@@ -1111,6 +1328,22 @@ export function ViewSettingsPanel({
 															)
 														: filterTaskTypeIds,
 												),
+											})
+										}
+									/>
+								</CollapsibleFilter>
+
+								<CollapsibleFilter
+									label={t("layout.viewSettings.customFieldsLabel")}
+									badge={filterCustomFields.length}
+									defaultOpen={filterCustomFields.length > 0}
+								>
+									<CustomFieldFilterSection
+										customFields={customFields}
+										filters={filterCustomFields}
+										onChange={(next) =>
+											updateFilters({
+												custom_fields: next.length > 0 ? next : undefined,
 											})
 										}
 									/>

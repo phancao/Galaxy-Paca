@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import { Check, Edit2, Loader2, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { ApiErrorCode, getApiErrorCode } from "@/lib/api-error";
 import {
+	type CustomFieldDefaultValue,
 	type CustomFieldDefinition,
 	createCustomFieldDefinition,
 	customFieldsQueryOptions,
@@ -45,6 +46,8 @@ const UI_FIELD_TYPES = [
 	"Select",
 	"MultiSelect",
 	"Url",
+	"User",
+	"Label",
 ] as const;
 type UIFieldType = (typeof UI_FIELD_TYPES)[number];
 
@@ -56,6 +59,8 @@ const UI_TO_API_FIELD_TYPE: Record<UIFieldType, FieldType> = {
 	Select: "select",
 	MultiSelect: "multi_select",
 	Url: "url",
+	User: "user",
+	Label: "label",
 };
 
 const UI_FIELD_TYPE_LABEL_KEYS = {
@@ -66,6 +71,8 @@ const UI_FIELD_TYPE_LABEL_KEYS = {
 	Select: "settings.customFields.fieldTypes.select",
 	MultiSelect: "settings.customFields.fieldTypes.multiSelect",
 	Url: "settings.customFields.fieldTypes.url",
+	User: "settings.customFields.fieldTypes.user",
+	Label: "settings.customFields.fieldTypes.label",
 } as const satisfies Record<UIFieldType, string>;
 
 const API_TO_UI_FIELD_TYPE_LABEL_KEY = {
@@ -76,6 +83,8 @@ const API_TO_UI_FIELD_TYPE_LABEL_KEY = {
 	select: "settings.customFields.fieldTypes.select",
 	multi_select: "settings.customFields.fieldTypes.multiSelect",
 	url: "settings.customFields.fieldTypes.url",
+	user: "settings.customFields.fieldTypes.user",
+	label: "settings.customFields.fieldTypes.label",
 } as const satisfies Record<string, string>;
 
 function toUIFieldType(apiType: string, t: TFunction<"projects">): string {
@@ -93,6 +102,204 @@ function slugify(s: string): string {
 		.replace(/[^a-z0-9_]/g, "")
 		.replace(/_+/g, "_")
 		.slice(0, 64);
+}
+
+// ── Default value control ─────────────────────────────────────────────────────
+
+const PILL_BASE =
+	"rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors";
+const PILL_SELECTED = "border-primary bg-primary/10 text-primary";
+const PILL_UNSELECTED =
+	"border-border/60 text-muted-foreground hover:border-border hover:bg-muted/50";
+
+// Coerce the raw form value into the JS type the backend expects, or null.
+function coerceDefaultValue(
+	apiType: FieldType,
+	raw: CustomFieldDefaultValue,
+	options: string[],
+): CustomFieldDefaultValue {
+	if (raw === null || raw === undefined) return null;
+	switch (apiType) {
+		// user (member UUID) and label (free-form tags) carry no configurable default.
+		case "user":
+		case "label":
+			return null;
+		case "number": {
+			const n = typeof raw === "number" ? raw : Number(raw);
+			return typeof raw === "string" && raw.trim() === ""
+				? null
+				: Number.isFinite(n)
+					? n
+					: null;
+		}
+		case "boolean":
+			return typeof raw === "boolean" ? raw : null;
+		case "select":
+			return typeof raw === "string" && options.includes(raw) ? raw : null;
+		case "multi_select": {
+			const arr = Array.isArray(raw)
+				? raw.filter((o) => options.includes(o))
+				: [];
+			return arr.length > 0 ? arr : null;
+		}
+		default: {
+			// text, url, date
+			return typeof raw === "string" && raw.trim() !== "" ? raw : null;
+		}
+	}
+}
+
+function DefaultValueControl({
+	apiType,
+	options,
+	value,
+	onChange,
+	t,
+	idPrefix,
+}: {
+	apiType: FieldType;
+	options: string[];
+	value: CustomFieldDefaultValue;
+	onChange: (v: CustomFieldDefaultValue) => void;
+	t: TFunction<"projects">;
+	idPrefix: string;
+}) {
+	const inputId = `${idPrefix}-default`;
+
+	// user / label fields have no default-value concept — skip the control entirely.
+	if (apiType === "user" || apiType === "label") return null;
+
+	let control: ReactNode;
+	if (apiType === "boolean") {
+		const choices: {
+			key: string;
+			val: CustomFieldDefaultValue;
+			label: string;
+		}[] = [
+			{
+				key: "none",
+				val: null,
+				label: t("settings.customFields.defaultValueNone"),
+			},
+			{ key: "true", val: true, label: t("settings.customFields.yes") },
+			{ key: "false", val: false, label: t("settings.customFields.no") },
+		];
+		control = (
+			<div className="flex flex-wrap gap-1.5">
+				{choices.map((c) => (
+					<button
+						key={c.key}
+						type="button"
+						onClick={() => onChange(c.val)}
+						className={cn(
+							PILL_BASE,
+							value === c.val ? PILL_SELECTED : PILL_UNSELECTED,
+						)}
+					>
+						{c.label}
+					</button>
+				))}
+			</div>
+		);
+	} else if (apiType === "select") {
+		control =
+			options.length === 0 ? (
+				<p className="text-xs text-muted-foreground/60">
+					{t("settings.customFields.defaultValueNeedsOptions")}
+				</p>
+			) : (
+				<div className="flex flex-wrap gap-1.5">
+					<button
+						type="button"
+						onClick={() => onChange(null)}
+						className={cn(
+							PILL_BASE,
+							value == null ? PILL_SELECTED : PILL_UNSELECTED,
+						)}
+					>
+						{t("settings.customFields.defaultValueNone")}
+					</button>
+					{options.map((opt) => (
+						<button
+							key={opt}
+							type="button"
+							onClick={() => onChange(opt)}
+							className={cn(
+								PILL_BASE,
+								value === opt ? PILL_SELECTED : PILL_UNSELECTED,
+							)}
+						>
+							{opt}
+						</button>
+					))}
+				</div>
+			);
+	} else if (apiType === "multi_select") {
+		const selected = Array.isArray(value) ? value : [];
+		control =
+			options.length === 0 ? (
+				<p className="text-xs text-muted-foreground/60">
+					{t("settings.customFields.defaultValueNeedsOptions")}
+				</p>
+			) : (
+				<div className="flex flex-wrap gap-1.5">
+					{options.map((opt) => {
+						const isOn = selected.includes(opt);
+						return (
+							<button
+								key={opt}
+								type="button"
+								onClick={() =>
+									onChange(
+										isOn
+											? selected.filter((o) => o !== opt)
+											: [...selected, opt],
+									)
+								}
+								className={cn(
+									PILL_BASE,
+									isOn ? PILL_SELECTED : PILL_UNSELECTED,
+								)}
+							>
+								{opt}
+							</button>
+						);
+					})}
+				</div>
+			);
+	} else {
+		const inputType =
+			apiType === "url"
+				? "url"
+				: apiType === "date"
+					? "date"
+					: apiType === "number"
+						? "number"
+						: "text";
+		control = (
+			<Input
+				id={inputId}
+				type={inputType}
+				value={value == null ? "" : String(value)}
+				onChange={(e) =>
+					onChange(e.target.value === "" ? null : e.target.value)
+				}
+				placeholder={t("settings.customFields.defaultValuePlaceholder")}
+			/>
+		);
+	}
+
+	return (
+		<div className="space-y-1.5">
+			<Label htmlFor={inputId}>
+				{t("settings.customFields.defaultValueLabel")}
+			</Label>
+			{control}
+			<p className="text-xs text-muted-foreground/60">
+				{t("settings.customFields.defaultValueHint")}
+			</p>
+		</div>
+	);
 }
 
 // ── Create dialog ─────────────────────────────────────────────────────────────
@@ -115,7 +322,11 @@ function CreateCustomFieldDialog({
 	const [required, setRequired] = useState(false);
 	const [options, setOptions] = useState<string[]>([]);
 	const [newOption, setNewOption] = useState("");
+	const [defaultValue, setDefaultValue] =
+		useState<CustomFieldDefaultValue>(null);
 	const [error, setError] = useState<string | null>(null);
+
+	const apiFieldType = UI_TO_API_FIELD_TYPE[fieldType];
 
 	const reset = () => {
 		setDisplayName("");
@@ -125,6 +336,7 @@ function CreateCustomFieldDialog({
 		setRequired(false);
 		setOptions([]);
 		setNewOption("");
+		setDefaultValue(null);
 		setError(null);
 	};
 
@@ -138,10 +350,11 @@ function CreateCustomFieldDialog({
 			createCustomFieldDefinition(projectId, {
 				display_name: displayName.trim(),
 				field_key: fieldKey || slugify(displayName),
-				field_type: UI_TO_API_FIELD_TYPE[fieldType],
+				field_type: apiFieldType,
 				options:
 					fieldType === "Select" || fieldType === "MultiSelect" ? options : [],
 				is_required: required,
+				default_value: coerceDefaultValue(apiFieldType, defaultValue, options),
 			}),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({
@@ -230,7 +443,11 @@ function CreateCustomFieldDialog({
 								<button
 									key={ft}
 									type="button"
-									onClick={() => setFieldType(ft)}
+									onClick={() => {
+										setFieldType(ft);
+										// Default value semantics change with the type — clear it.
+										setDefaultValue(null);
+									}}
 									className={cn(
 										"rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
 										fieldType === ft
@@ -305,6 +522,16 @@ function CreateCustomFieldDialog({
 							</div>
 						</div>
 					)}
+
+					{/* Default value */}
+					<DefaultValueControl
+						apiType={apiFieldType}
+						options={options}
+						value={defaultValue}
+						onChange={setDefaultValue}
+						t={t}
+						idPrefix="cf-create"
+					/>
 
 					{/* Required toggle */}
 					<div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-4 py-3">
@@ -391,12 +618,16 @@ function EditCustomFieldDialog({
 	const [options, setOptions] = useState<string[]>(field?.options ?? []);
 	const [required, setRequired] = useState(field?.is_required ?? false);
 	const [newOption, setNewOption] = useState("");
+	const [defaultValue, setDefaultValue] = useState<CustomFieldDefaultValue>(
+		field?.default_value ?? null,
+	);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		setDisplayName(field?.display_name ?? "");
 		setOptions(field?.options ?? []);
 		setRequired(field?.is_required ?? false);
+		setDefaultValue(field?.default_value ?? null);
 		setError(null);
 		setNewOption("");
 	}, [field]);
@@ -414,6 +645,11 @@ function EditCustomFieldDialog({
 						? options
 						: undefined,
 				is_required: required,
+				default_value: coerceDefaultValue(
+					field.field_type,
+					defaultValue,
+					options,
+				),
 			});
 		},
 		onSuccess: () => {
@@ -554,6 +790,16 @@ function EditCustomFieldDialog({
 							</div>
 						</div>
 					)}
+
+					{/* Default value */}
+					<DefaultValueControl
+						apiType={field.field_type}
+						options={options}
+						value={defaultValue}
+						onChange={setDefaultValue}
+						t={t}
+						idPrefix="cf-edit"
+					/>
 
 					{/* Required toggle */}
 					<div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-4 py-3">

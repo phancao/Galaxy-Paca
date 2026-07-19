@@ -10,6 +10,7 @@
 				"taskStatuses": "Task Statuses",
 				"taskTypes": "Task Types",
 				"customFields": "Custom Fields",
+				"workflow": "Workflow",
 				"dangerZone": "Danger Zone",
 				"plugins": "Plugins"
 			}
@@ -487,6 +488,11 @@
 			"addOption": "Add",
 			"requiredLabel": "Required",
 			"requiredHint": "Users must fill this field when creating or editing a task.",
+			"defaultValueLabel": "Default value",
+			"defaultValueHint": "Optional. Pre-fills this value on new tasks. Leave empty for no default.",
+			"defaultValueNone": "No default",
+			"defaultValueNeedsOptions": "Add at least one option to set a default.",
+			"defaultValuePlaceholder": "No default",
 			"fieldTypes": {
 				"text": "Text",
 				"number": "Number",
@@ -494,7 +500,9 @@
 				"checkbox": "Checkbox",
 				"select": "Select",
 				"multiSelect": "Multi-Select",
-				"url": "URL"
+				"url": "URL",
+				"user": "User",
+				"label": "Label"
 			},
 			"createDialog": {
 				"title": "Create custom field",
@@ -521,6 +529,38 @@
 				"confirmTextSuffix": "? Task data stored in this field will be lost. This action cannot be undone.",
 				"deleteFailed": "Failed to delete field. Please try again.",
 				"deleteField": "Delete field"
+			}
+		},
+		"workflow": {
+			"title": "Workflow",
+			"description": "Restrict which status changes are allowed and require fields before a task can move.",
+			"freeMovementNote": "No transitions defined — task status can move freely between any statuses. Add a rule to start enforcing an allowed workflow.",
+			"addTransition": "Add transition",
+			"anyStatus": "Any status",
+			"allTypes": "All types",
+			"fromLabel": "From",
+			"toLabel": "To",
+			"taskTypeLabel": "Task type",
+			"requiredFieldsLabel": "Required fields",
+			"requiredFieldsHint": "Custom fields that must be set before the task can move to this status.",
+			"noRequiredFields": "None",
+			"selectToStatus": "Select a destination status…",
+			"add": "Add",
+			"adding": "Adding…",
+			"deleteTransition": "Delete transition",
+			"table": {
+				"transition": "Transition",
+				"taskType": "Task type",
+				"requiredFields": "Required fields"
+			},
+			"empty": {
+				"title": "No workflow rules",
+				"description": "Status can move freely. Add a transition to enforce an allowed workflow."
+			},
+			"errors": {
+				"createFailed": "Failed to add transition. Please try again.",
+				"deleteFailed": "Failed to delete transition. Please try again.",
+				"duplicate": "A matching transition rule already exists."
 			}
 		},
 		"dangerZone": {
@@ -962,6 +1002,7 @@
 			"statusesLabel": "Statuses",
 			"assigneesLabel": "Assignees",
 			"taskTypesLabel": "Task types",
+			"customFieldsLabel": "Custom fields",
 			"reset": "Reset",
 			"saving": "Saving…",
 			"save": "Save",
@@ -985,6 +1026,22 @@
 				"allNormalTypesDynamic": "All normal types (dynamic)",
 				"systemTypes": "System types",
 				"noTaskTypes": "No task types"
+			},
+			"customFieldFilter": {
+				"noCustomFields": "No custom fields defined",
+				"addFilter": "Add filter",
+				"remove": "Remove filter",
+				"valuePlaceholder": "Value",
+				"selectOption": "Select…",
+				"true": "True",
+				"false": "False",
+				"ops": {
+					"eq": "is",
+					"neq": "is not",
+					"contains": "contains",
+					"set": "is set",
+					"unset": "is empty"
+				}
 			}
 		},
 		"roadmap": {

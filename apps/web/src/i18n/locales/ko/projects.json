@@ -487,6 +487,11 @@
 			"addOption": "추가",
 			"requiredLabel": "필수",
 			"requiredHint": "사용자는 작업을 생성하거나 수정할 때 이 필드를 입력해야 합니다.",
+			"defaultValueLabel": "기본값",
+			"defaultValueHint": "선택 사항. 새 작업에 이 값을 미리 입력합니다. 기본값이 없으면 비워 두세요.",
+			"defaultValueNone": "기본값 없음",
+			"defaultValueNeedsOptions": "기본값을 설정하려면 옵션을 하나 이상 추가하세요.",
+			"defaultValuePlaceholder": "기본값 없음",
 			"fieldTypes": {
 				"text": "텍스트",
 				"number": "숫자",

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import {
 	AlertTriangle,
+	GitBranch,
 	LayoutList,
 	Plus,
 	Settings,
@@ -16,6 +17,7 @@ import { GeneralSettings } from "@/components/projects/settings/GeneralSettings"
 import { RolesSettings } from "@/components/projects/settings/RolesSettings";
 import { TaskStatusesSettings } from "@/components/projects/settings/TaskStatusesSettings";
 import { TaskTypesSettings } from "@/components/projects/settings/TaskTypesSettings";
+import { WorkflowSettings } from "@/components/projects/settings/WorkflowSettings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { currentUserQueryOptions } from "@/lib/auth-api";
 import { RemoteComponent } from "@/lib/plugins/loader";
@@ -27,6 +29,7 @@ import {
 	projectMembersQueryOptions,
 	projectQueryOptions,
 	projectRolesQueryOptions,
+	statusTransitionsQueryOptions,
 	taskStatusesQueryOptions,
 	taskTypesQueryOptions,
 } from "@/lib/project-api";
@@ -42,6 +45,7 @@ export const Route = createFileRoute(
 			queryClient.ensureQueryData(taskStatusesQueryOptions(projectId)),
 			queryClient.ensureQueryData(taskTypesQueryOptions(projectId)),
 			queryClient.ensureQueryData(customFieldsQueryOptions(projectId)),
+			queryClient.ensureQueryData(statusTransitionsQueryOptions(projectId)),
 		]);
 	},
 	component: SettingsPage,
@@ -70,6 +74,11 @@ const NAV_ITEMS = [
 		id: "custom-fields",
 		labelKey: "project.settingsPage.nav.customFields",
 		icon: Plus,
+	},
+	{
+		id: "workflow",
+		labelKey: "project.settingsPage.nav.workflow",
+		icon: GitBranch,
 	},
 	{
 		id: "danger",
@@ -136,6 +145,7 @@ function SettingsPage() {
 		| "task-statuses"
 		| "task-types"
 		| "custom-fields"
+		| "workflow"
 		| "danger"
 		| string
 	>("general");
@@ -273,6 +283,12 @@ function SettingsPage() {
 						)}
 						{activeSection === "custom-fields" && (
 							<CustomFieldsSettings
+								projectId={projectId}
+								canWrite={canManageTasks}
+							/>
+						)}
+						{activeSection === "workflow" && (
+							<WorkflowSettings
 								projectId={projectId}
 								canWrite={canManageTasks}
 							/>

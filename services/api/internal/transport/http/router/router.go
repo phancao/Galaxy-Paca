@@ -429,6 +429,18 @@ func New(deps Deps) http.Handler {
 						Delete("/{fieldId}", deps.Task.DeleteCustomFieldDefinition)
 				})
 
+				// Workflow status transitions (ADR-040)
+				r.Route("/status-transitions", func(r chi.Router) {
+					r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+						httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+						httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionTasksRead}},
+					)).Get("/", deps.Task.ListStatusTransitions)
+					r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+						Post("/", deps.Task.CreateStatusTransition)
+					r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+						Delete("/{transitionId}", deps.Task.DeleteStatusTransition)
+				})
+
 				// Documentation
 				r.Route("/docs", func(r chi.Router) {
 					// Folders

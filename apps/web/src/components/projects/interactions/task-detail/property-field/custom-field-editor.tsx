@@ -7,15 +7,18 @@ import { displayDate } from "./helpers";
 import { MultiSelectEditor } from "./multi-select-editor";
 import { NumberEditor } from "./number-editor";
 import { SelectEditor } from "./select-editor";
+import { TagsEditor } from "./tags-editor";
 import { TextEditor } from "./text-editor";
-import type { SelectOption } from "./types";
+import type { SelectOption, UserOption } from "./types";
 import { UrlEditor } from "./url-editor";
+import { UserEditor } from "./user-editor";
 
 export function CustomFieldEditor({
 	customType,
 	rawValue,
 	canEdit,
 	options = [],
+	users = [],
 	onChange,
 }: {
 	customType:
@@ -25,10 +28,14 @@ export function CustomFieldEditor({
 		| "Checkbox"
 		| "Select"
 		| "MultiSelect"
-		| "Url";
+		| "Url"
+		| "User"
+		| "Label";
 	rawValue: unknown;
 	canEdit: boolean;
 	options?: string[];
+	/** Member options for a `User` field's people picker. */
+	users?: UserOption[];
 	onChange?: (value: unknown) => void;
 }) {
 	const { t } = useTranslation("projects");
@@ -121,5 +128,33 @@ export function CustomFieldEditor({
 					onChange={(v) => onChange?.(v)}
 				/>
 			);
+		case "User": {
+			// Stored value is the member's UUID string; reuse the assignee picker.
+			const currentId = rawValue != null ? String(rawValue) : null;
+			const selected = users.find((u) => u.value === currentId) ?? null;
+			return (
+				<UserEditor
+					userValue={selected}
+					users={users}
+					canEdit={canEdit}
+					onChange={(v) => onChange?.(v)}
+				/>
+			);
+		}
+		case "Label": {
+			// Free-form tags stored as string[] (open vocabulary, unlike MultiSelect).
+			const currentVal = Array.isArray(rawValue)
+				? rawValue.filter((v): v is string => typeof v === "string")
+				: typeof rawValue === "string" && rawValue
+					? [rawValue]
+					: [];
+			return (
+				<TagsEditor
+					tags={currentVal}
+					canEdit={canEdit}
+					onChange={(v) => onChange?.(v)}
+				/>
+			);
+		}
 	}
 }

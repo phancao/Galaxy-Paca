@@ -487,6 +487,11 @@
 			"addOption": "追加",
 			"requiredLabel": "必須",
 			"requiredHint": "タスクの作成・編集時にユーザーはこのフィールドを入力する必要があります。",
+			"defaultValueLabel": "デフォルト値",
+			"defaultValueHint": "任意。新しいタスクにこの値を初期設定します。デフォルトが不要な場合は空欄のままにします。",
+			"defaultValueNone": "デフォルトなし",
+			"defaultValueNeedsOptions": "デフォルトを設定するには、少なくとも1つの選択肢を追加してください。",
+			"defaultValuePlaceholder": "デフォルトなし",
 			"fieldTypes": {
 				"text": "テキスト",
 				"number": "数値",

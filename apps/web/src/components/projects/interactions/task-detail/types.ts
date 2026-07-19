@@ -14,7 +14,9 @@ export interface CustomFieldDef {
 		| "Checkbox"
 		| "Select"
 		| "MultiSelect"
-		| "Url";
+		| "Url"
+		| "User"
+		| "Label";
 	required?: boolean;
 	options?: string[];
 }

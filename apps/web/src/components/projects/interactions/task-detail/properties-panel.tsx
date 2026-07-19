@@ -460,6 +460,7 @@ export function PropertiesPanel({
 							});
 						}}
 						customOptions={cf.options}
+						customUsers={memberUserOptions}
 						canEdit={canEdit}
 					/>
 				))}

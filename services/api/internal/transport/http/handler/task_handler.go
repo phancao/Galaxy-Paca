@@ -459,6 +459,26 @@ func (h *TaskHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	if raw := strings.TrimSpace(r.URL.Query().Get("search")); raw != "" {
 		filter.Search = &raw
 	}
+	// Custom-field filters: repeatable `cf=<field_key>:<op>[:<value>]` params,
+	// e.g. cf=severity:eq:high, cf=labels:contains:urgent, cf=owner:set.
+	for _, raw := range r.URL.Query()["cf"] {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		parts := strings.SplitN(raw, ":", 3)
+		cf := taskdom.CustomFieldFilter{Key: strings.TrimSpace(parts[0])}
+		if cf.Key == "" {
+			continue
+		}
+		if len(parts) >= 2 {
+			cf.Op = strings.TrimSpace(parts[1])
+		}
+		if len(parts) >= 3 {
+			cf.Value = parts[2]
+		}
+		filter.CustomFields = append(filter.CustomFields, cf)
+	}
 	if cursorRaw := r.URL.Query().Get("cursor"); cursorRaw != "" {
 		filter.CursorAfter = &cursorRaw
 	}
@@ -1151,6 +1171,73 @@ func (h *TaskHandler) DeleteCustomFieldDefinition(w http.ResponseWriter, r *http
 		return
 	}
 	presenter.OK(w, r, map[string]any{"message": "custom field deleted"})
+}
+
+// ListStatusTransitions handles GET /projects/:projectId/status-transitions.
+func (h *TaskHandler) ListStatusTransitions(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	list, err := h.svc.ListStatusTransitions(r.Context(), projectID)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	out := make([]dto.TaskStatusTransitionResponse, 0, len(list))
+	for _, t := range list {
+		out = append(out, dto.TaskStatusTransitionFromEntity(t))
+	}
+	presenter.OK(w, r, out)
+}
+
+// CreateStatusTransition handles POST /projects/:projectId/status-transitions.
+func (h *TaskHandler) CreateStatusTransition(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	var req dto.CreateTaskStatusTransitionRequest
+	if !middleware.BindJSON(w, r, &req) {
+		return
+	}
+	if req.ToStatusID == uuid.Nil {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "to_status_id is required"))
+		return
+	}
+	t, err := h.svc.CreateStatusTransition(r.Context(), taskdom.CreateStatusTransitionInput{
+		ProjectID:      projectID,
+		TaskTypeID:     req.TaskTypeID,
+		FromStatusID:   req.FromStatusID,
+		ToStatusID:     req.ToStatusID,
+		RequiredFields: req.RequiredFields,
+	})
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.Created(w, r, dto.TaskStatusTransitionFromEntity(t))
+}
+
+// DeleteStatusTransition handles DELETE /projects/:projectId/status-transitions/:transitionId.
+func (h *TaskHandler) DeleteStatusTransition(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "transitionId"))
+	if err != nil {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "invalid transition id"))
+		return
+	}
+	if err := h.svc.DeleteStatusTransition(r.Context(), projectID, id); err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.OK(w, r, map[string]any{"message": "transition deleted"})
 }
 
 func parseCustomFieldID(r *http.Request) (uuid.UUID, error) {

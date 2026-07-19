@@ -94,6 +94,22 @@ export interface FilterConfig {
 }
 
 /**
+ * Custom-field filter operators (ADR-040 Phase 1.5).
+ * - `eq` / `neq`  → scalar (in)equality (text/number/boolean/date/select)
+ * - `contains`    → multi_select / label array membership
+ * - `set` / `unset` → field has / has no value (no `value` needed)
+ */
+export type CustomFieldFilterOp = "eq" | "neq" | "contains" | "set" | "unset";
+
+/** One predicate over a task's custom_fields, persisted in a view's config. */
+export interface CustomFieldFilter {
+	field_key: string;
+	op: CustomFieldFilterOp;
+	/** Compared value; omitted/ignored for `set` and `unset`. */
+	value?: string | number | boolean;
+}
+
+/**
  * Per-view filter configuration stored in the database.
  * Each dimension uses an optional FilterConfig selector; absent means no filter
  * (include everything) for that dimension.
@@ -103,6 +119,32 @@ export interface ViewFilters {
 	statuses?: FilterConfig;
 	assignees?: FilterConfig;
 	sprints?: FilterConfig;
+	/** ADR-040 Phase 1.5: predicates over task custom-field values. */
+	custom_fields?: CustomFieldFilter[];
+}
+
+/**
+ * Serialises custom-field filters into the repeatable `cf` query params the
+ * task list endpoint expects: `cf=<field_key>:<op>[:<value>]`. `set`/`unset`
+ * carry no value; other ops omit the value segment when it is empty.
+ */
+export function serializeCustomFieldFilters(
+	filters: CustomFieldFilter[] | undefined,
+): string[] {
+	if (!filters || filters.length === 0) return [];
+	const out: string[] = [];
+	for (const f of filters) {
+		const key = f.field_key.trim();
+		if (!key) continue;
+		if (f.op === "set" || f.op === "unset") {
+			out.push(`${key}:${f.op}`);
+			continue;
+		}
+		const value = f.value == null ? "" : String(f.value);
+		if (value === "") continue; // an eq/neq/contains filter needs a value
+		out.push(`${key}:${f.op}:${value}`);
+	}
+	return out;
 }
 
 export interface ViewConfig {
@@ -427,10 +469,13 @@ export interface ListTasksOptions {
 	viewId?: string;
 	/** Free-text search matched server-side against title and "#<task_number>". */
 	search?: string;
+	/** Custom-field predicates, pre-serialized as `<field_key>:<op>[:<value>]`
+	 *  strings and sent as repeatable `cf` query params. */
+	cf?: string[];
 }
 
 function buildTaskQueryParams(opts: ListTasksOptions = {}) {
-	const params: Record<string, string | number | boolean> = {};
+	const params: Record<string, string | number | boolean | string[]> = {};
 	params.page_size = opts.pageSize ?? 20;
 	if (opts.cursor) params.cursor = opts.cursor;
 	if (opts.sprintId === null) params.sprint_id = "null";
@@ -465,6 +510,7 @@ function buildTaskQueryParams(opts: ListTasksOptions = {}) {
 		params.view_id = opts.viewId;
 	}
 	if (opts.search?.trim()) params.search = opts.search.trim();
+	if (opts.cf && opts.cf.length > 0) params.cf = opts.cf;
 	return params;
 }
 
@@ -475,7 +521,11 @@ export async function listAllTasks(
 	const params = buildTaskQueryParams(opts);
 	const { data } = await apiClient.instance.get<
 		SuccessEnvelope<TaskListResult>
-	>(`/projects/${projectId}/tasks`, { params });
+	>(`/projects/${projectId}/tasks`, {
+		params,
+		// Repeat `cf` as `cf=a&cf=b` (no brackets) — the shape the backend parses.
+		paramsSerializer: { indexes: null },
+	});
 	return data.data;
 }
 

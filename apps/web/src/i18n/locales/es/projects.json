@@ -487,6 +487,11 @@
 			"addOption": "Añadir",
 			"requiredLabel": "Obligatorio",
 			"requiredHint": "Los usuarios deben completar este campo al crear o editar una tarea.",
+			"defaultValueLabel": "Valor predeterminado",
+			"defaultValueHint": "Opcional. Rellena este valor en las tareas nuevas. Déjalo vacío para no tener un valor predeterminado.",
+			"defaultValueNone": "Sin valor predeterminado",
+			"defaultValueNeedsOptions": "Añade al menos una opción para establecer un valor predeterminado.",
+			"defaultValuePlaceholder": "Sin valor predeterminado",
 			"fieldTypes": {
 				"text": "Texto",
 				"number": "Número",

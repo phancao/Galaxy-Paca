@@ -483,6 +483,47 @@ func CustomFieldDefinitionFromEntity(f *taskdom.CustomFieldDefinition) CustomFie
 	}
 }
 
+// --- Status Transition DTOs (workflow, ADR-040) ----------------------------
+
+// CreateTaskStatusTransitionRequest is the body for
+// POST /projects/:projectId/status-transitions. (Distinct from the automation
+// workflow's per-DAG StatusTransition hint.)
+type CreateTaskStatusTransitionRequest struct {
+	TaskTypeID     *uuid.UUID `json:"task_type_id"`
+	FromStatusID   *uuid.UUID `json:"from_status_id"`
+	ToStatusID     uuid.UUID  `json:"to_status_id" binding:"required"`
+	RequiredFields []string   `json:"required_fields"`
+}
+
+// TaskStatusTransitionResponse is the public representation of a workflow
+// transition rule.
+type TaskStatusTransitionResponse struct {
+	ID             uuid.UUID  `json:"id"`
+	ProjectID      uuid.UUID  `json:"project_id"`
+	TaskTypeID     *uuid.UUID `json:"task_type_id"`
+	FromStatusID   *uuid.UUID `json:"from_status_id"`
+	ToStatusID     uuid.UUID  `json:"to_status_id"`
+	RequiredFields []string   `json:"required_fields"`
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+// TaskStatusTransitionFromEntity maps a domain StatusTransition to a DTO.
+func TaskStatusTransitionFromEntity(t *taskdom.StatusTransition) TaskStatusTransitionResponse {
+	rf := t.RequiredFields
+	if rf == nil {
+		rf = []string{}
+	}
+	return TaskStatusTransitionResponse{
+		ID:             t.ID,
+		ProjectID:      t.ProjectID,
+		TaskTypeID:     t.TaskTypeID,
+		FromStatusID:   t.FromStatusID,
+		ToStatusID:     t.ToStatusID,
+		RequiredFields: rf,
+		CreatedAt:      t.CreatedAt,
+	}
+}
+
 // --- Activity / Comment DTOs -----------------------------------------------
 
 // ActivityResponse is the public representation of a task activity entry.

@@ -76,10 +76,14 @@ export interface PropertyFieldProps {
 		| "Checkbox"
 		| "Select"
 		| "MultiSelect"
-		| "Url";
+		| "Url"
+		| "User"
+		| "Label";
 	customRawValue?: unknown;
 	onCustomChange?: (value: unknown) => void;
 	customOptions?: string[];
+	/** Member options for a `User` custom field's people picker. */
+	customUsers?: UserOption[];
 
 	hidden?: boolean;
 	linkIcon?: ReactNode;
