@@ -48,6 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/hooks/use-permissions";
 import { getUsers, type User } from "@/lib/admin-api";
 import { currentUserQueryOptions } from "@/lib/auth-api";
+import { hasPermission as checkRolePermission } from "@/lib/permissions";
 import {
 	addProjectMember,
 	type ProjectMember,
@@ -590,11 +591,16 @@ function TeamPage() {
 		(m) => m.user_id === currentUser?.id,
 	);
 	const myRole = roles.find((r) => r.id === myMembership?.project_role_id);
-	const hasProjectMembersWrite = Boolean(
-		(myRole?.permissions as Record<string, boolean> | undefined)?.[
-			"project.members.write"
-		],
-	);
+	// Admin roles grant via wildcard ("project.members.*"), which a raw literal
+	// lookup misses — run the role's granted keys through the wildcard-aware
+	// checker (matches settings/index.tsx).
+	const rolePerms = myRole?.permissions as Record<string, boolean> | undefined;
+	const hasProjectMembersWrite = rolePerms
+		? checkRolePermission(
+				Object.keys(rolePerms).filter((k) => rolePerms[k]),
+				"project.members.write",
+			)
+		: false;
 	const canManageMembers =
 		hasPermission("project.members.write") || hasProjectMembersWrite;
 

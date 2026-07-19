@@ -26,7 +26,7 @@ var (
 	ErrCustomFieldKeyTaken       = errors.New("custom field: key already in use within project")
 	ErrCustomFieldTypeInvalid    = errors.New("custom field: invalid field type")
 	ErrCustomFieldNameInvalid    = errors.New("custom field: display name is empty or invalid")
-	ErrCustomFieldOptionsInvalid = errors.New("custom field: select / multi_select requires at least one option")
+	ErrCustomFieldOptionsInvalid = errors.New("custom field: select / multi_select requires at least one option, and cascading_select requires at least one parent with children")
 	ErrCustomFieldRequired       = errors.New("custom field: a required field is missing")
 	ErrCustomFieldValueInvalid   = errors.New("custom field: value does not match the field type")
 

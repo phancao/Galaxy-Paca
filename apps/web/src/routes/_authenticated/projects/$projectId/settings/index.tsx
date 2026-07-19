@@ -24,6 +24,7 @@ import { VersionsSettings } from "@/components/projects/settings/VersionsSetting
 import { WorkflowSettings } from "@/components/projects/settings/WorkflowSettings";
 import { usePermissions } from "@/hooks/use-permissions";
 import { currentUserQueryOptions } from "@/lib/auth-api";
+import { hasPermission as checkRolePermission } from "@/lib/permissions";
 import { RemoteComponent } from "@/lib/plugins/loader";
 import { usePluginRegistry } from "@/lib/plugins/registry";
 import {
@@ -137,31 +138,25 @@ function SettingsPage() {
 	const myRole = (roles as ProjectRole[]).find(
 		(r) => r.id === myMembership?.project_role_id,
 	);
-	const hasProjectDelete = Boolean(
-		(myRole?.permissions as Record<string, boolean> | undefined)?.[
-			"projects.delete"
-		],
-	);
-	const hasProjectWrite = Boolean(
-		(myRole?.permissions as Record<string, boolean> | undefined)?.[
-			"projects.write"
-		],
-	);
-	const hasProjectRolesWrite = Boolean(
-		(myRole?.permissions as Record<string, boolean> | undefined)?.[
-			"project.roles.write"
-		],
-	);
-	const canDelete = hasPermission("projects.delete") || hasProjectDelete;
-	const canEditProject = hasPermission("projects.write") || hasProjectWrite;
+	// The project role stores grants as a permission map that may hold wildcard
+	// keys ("tasks.*", "projects.*", or a global "*") — the highest built-in
+	// role (Admin) uses wildcards. A raw `permissions["tasks.write"]` lookup
+	// misses those, so run the role's granted keys through the same
+	// wildcard-aware checker the platform permissions use.
+	const roleGrants = (permission: string): boolean => {
+		const perms = myRole?.permissions as Record<string, boolean> | undefined;
+		if (!perms) return false;
+		const granted = Object.keys(perms).filter((k) => perms[k]);
+		return checkRolePermission(granted, permission);
+	};
+	const canDelete =
+		hasPermission("projects.delete") || roleGrants("projects.delete");
+	const canEditProject =
+		hasPermission("projects.write") || roleGrants("projects.write");
 	const canManageRoles =
-		hasPermission("project.roles.write") || hasProjectRolesWrite;
-	const hasTasksWrite = Boolean(
-		(myRole?.permissions as Record<string, boolean> | undefined)?.[
-			"tasks.write"
-		],
-	);
-	const canManageTasks = hasPermission("tasks.write") || hasTasksWrite;
+		hasPermission("project.roles.write") || roleGrants("project.roles.write");
+	const canManageTasks =
+		hasPermission("tasks.write") || roleGrants("tasks.write");
 
 	const { getRegistrations } = usePluginRegistry();
 	const pluginTabs = getRegistrations("project.settings.tab").filter(
