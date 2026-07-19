@@ -1,0 +1,9 @@
+# Vendored SDD Coordination Server (from Galaxy-SDD-Monitor central/). Build
+# context is this dir; keep it lean and never ship secrets or build output.
+**/node_modules/
+**/dist/
+**/.env
+**/.env.*
+central/docker-compose*.yml
+data/
+.git/

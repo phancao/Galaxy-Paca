@@ -1,0 +1,249 @@
+/**
+ * @file index.css
+ * @description Global styles and Tailwind CSS configuration for the application.
+ * @author Son Nguyen <hoangson091104@gmail.com>
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+ * Galaxy SDD — dual-theme tokens.
+ *
+ * Both themes resolve through CSS variables so existing Tailwind classes
+ * like `bg-surface-2`, `text-fg`, `border-border` just work in light or
+ * dark. Default = LIGHT to match the portal canvas; `.dark` on <html>
+ * flips to the original deep-surface palette.
+ *
+ * Light values match the portal hero (#f5f8fc family + Galaxy brand
+ * primary/teal). Dark values are the original SDD template surfaces
+ * (#06060a → #2a2a3d) — operators who prefer dark just toggle the
+ * theme button.
+ * =======================================================================*/
+:root {
+  /* Light surface scale — near-white → cool-gray, matches portal */
+  --surface-0: #ffffff;
+  --surface-1: #f5f8fc;
+  --surface-2: #f0f4f8;
+  --surface-3: #ffffff;
+  --surface-4: #f8fafc;
+  --surface-5: #eef2f6;
+
+  --border: #e2e8f0;
+  --border-light: #cbd5e1;
+
+  /* Galaxy brand pair — strong on light bg, no lifting needed */
+  --accent: #14B795;
+  --accent-hover: #0f9678;
+  --accent-muted: rgba(20, 183, 149, 0.12);
+
+  --fg: #0f172a;
+  --fg-muted: #475569;
+  --fg-subtle: #94a3b8;
+
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --scrollbar-track: #f5f8fc;
+}
+
+.dark {
+  --surface-0: #06060a;
+  --surface-1: #0c0c14;
+  --surface-2: #13131e;
+  --surface-3: #1a1a28;
+  --surface-4: #222233;
+  --surface-5: #2a2a3d;
+
+  --border: #2a2a3d;
+  --border-light: #363650;
+
+  /* Brand pair lifted for legibility on the dark canvas */
+  --accent: #14B795;
+  --accent-hover: #4fd9bc;
+  --accent-muted: rgba(20, 183, 149, 0.18);
+
+  --fg: #e4e4ed;
+  --fg-muted: #a0a0b0;
+  --fg-subtle: #6b7280;
+
+  --scrollbar-thumb: #2a2a3d;
+  --scrollbar-thumb-hover: #363650;
+  --scrollbar-track: #0c0c14;
+}
+
+@layer base {
+  html, body {
+    background: var(--surface-1);
+    color: var(--fg);
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  ::selection {
+    /* Galaxy brand accent (Xanh Ngọc) — works on both themes */
+    background: rgba(20, 183, 149, 0.3);
+    color: var(--fg);
+  }
+
+  ::-webkit-calendar-picker-indicator {
+    /* Light theme: keep the native icon. Dark theme inverts via the
+       block below so the calendar glyph stays visible on dark surfaces. */
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s, filter 0.2s;
+  }
+  .dark ::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+  }
+
+  ::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
+  .time-input-custom::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface-3 border border-border rounded-xl;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-border-light hover:bg-surface-4;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors duration-150;
+  }
+
+  .btn-ghost {
+    /* Switched gray-400/200 → fg-muted/fg so the button text flips with
+       the theme (was previously hard-coded for the dark template). */
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-sm text-fg-muted hover:text-fg hover:bg-surface-4 rounded-lg transition-colors duration-150;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border whitespace-nowrap shrink-0;
+  }
+
+  .input {
+    /* text-gray-200/placeholder-gray-500 → fg/fg-subtle so input copy stays
+       legible on the light surface without losing dark-mode contrast. */
+    @apply bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm text-fg placeholder:text-fg-subtle focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors;
+  }
+}
+
+@layer utilities {
+  /* Hide the scrollbar on horizontally scrollable strips (e.g. the Settings
+     TOC) where chevron affordances replace it. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* =========================================================================
+ * Light-mode contrast bridge.
+ *
+ * The fork's ~1400 component class usages were authored for a dark canvas
+ * (text-gray-100/200/300, text-slate-100, text-emerald-300, text-white,
+ * bg-gray-800 …) — i.e. LIGHT text + DARK fills meant to sit on a dark
+ * background. On the new light canvas they render near-white on white,
+ * which read as the washed-out "mờ" UI. Rather than rewrite every
+ * component, remap those literal dark-theme utilities to readable
+ * Galaxy-brand values whenever we are NOT in dark mode. Dark mode keeps
+ * the originals untouched.
+ *
+ * Mapping: bright text → ink (--fg); mid text → muted; accents → brand
+ * teal / Xanh Đậm; dark fills → light surfaces.
+ * =======================================================================*/
+/* FLAT selectors only — the build's PostCSS has no nesting plugin, so
+   `html:not(.dark) { .x {} }` fails. One descendant selector per rule. */
+/* primary text (was bright-on-dark) → ink */
+html:not(.dark) .text-white,
+html:not(.dark) .text-gray-100, html:not(.dark) .text-gray-200,
+html:not(.dark) .text-slate-100, html:not(.dark) .text-slate-200,
+html:not(.dark) .text-zinc-100, html:not(.dark) .text-zinc-200,
+html:not(.dark) .text-neutral-100, html:not(.dark) .text-neutral-200 {
+  color: var(--fg) !important;
+}
+/* secondary text */
+html:not(.dark) .text-gray-300, html:not(.dark) .text-gray-400,
+html:not(.dark) .text-slate-300, html:not(.dark) .text-slate-400,
+html:not(.dark) .text-zinc-300, html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-neutral-300, html:not(.dark) .text-neutral-400,
+html:not(.dark) .text-gray-500, html:not(.dark) .text-slate-500,
+html:not(.dark) .text-zinc-500, html:not(.dark) .text-neutral-500 {
+  color: var(--fg-muted) !important;
+}
+/* accent text (success/teal family) → Galaxy Xanh Ngọc, darkened for AA */
+html:not(.dark) .text-emerald-100, html:not(.dark) .text-emerald-200,
+html:not(.dark) .text-emerald-300, html:not(.dark) .text-emerald-400,
+html:not(.dark) .text-emerald-500, html:not(.dark) .text-green-300,
+html:not(.dark) .text-green-400, html:not(.dark) .text-teal-300,
+html:not(.dark) .text-teal-400 {
+  color: #0f9678 !important;
+}
+/* informational blue / indigo → Galaxy Xanh Đậm */
+html:not(.dark) .text-blue-300, html:not(.dark) .text-blue-400,
+html:not(.dark) .text-indigo-300, html:not(.dark) .text-indigo-400,
+html:not(.dark) .text-sky-300, html:not(.dark) .text-sky-400 {
+  color: var(--brand) !important;
+}
+html:not(.dark) .text-amber-300, html:not(.dark) .text-amber-400,
+html:not(.dark) .text-yellow-300, html:not(.dark) .text-yellow-400 {
+  color: #b45309 !important;
+}
+html:not(.dark) .text-red-300, html:not(.dark) .text-red-400,
+html:not(.dark) .text-rose-300, html:not(.dark) .text-rose-400 {
+  color: #dc2626 !important;
+}
+/* dark fills used as cards/pills → light surfaces */
+html:not(.dark) .bg-gray-900, html:not(.dark) .bg-slate-900,
+html:not(.dark) .bg-zinc-900, html:not(.dark) .bg-neutral-900 { background-color: var(--surface-1) !important; }
+html:not(.dark) .bg-gray-800, html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-zinc-800, html:not(.dark) .bg-neutral-800 { background-color: var(--surface-2) !important; }
+html:not(.dark) .bg-gray-700, html:not(.dark) .bg-slate-700,
+html:not(.dark) .bg-zinc-700, html:not(.dark) .bg-neutral-700 { background-color: var(--surface-4) !important; }
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
