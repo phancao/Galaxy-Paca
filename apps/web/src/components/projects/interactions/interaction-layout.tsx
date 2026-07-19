@@ -50,6 +50,7 @@ import {
 	reorderViewsByContext,
 	resolveFilterConfig,
 	resolveTaskTypeFilter,
+	serializeCustomFieldFilters,
 	sprintsQueryOptions,
 	type Task,
 	type TaskListResult,
@@ -582,6 +583,7 @@ export function InteractionLayout({
 			assignee_ids,
 			assignee_null,
 			task_type_ids,
+			cf: serializeCustomFieldFilters(activeViewConfig?.filters?.custom_fields),
 		};
 	}, [
 		activeViewConfig?.filters,
@@ -645,6 +647,7 @@ export function InteractionLayout({
 			sortBy: activeViewConfig?.sort_by,
 			viewId: effectiveViewId,
 			search: debouncedSearchQuery || undefined,
+			cf: apiFilters.cf,
 		}),
 		[
 			context,
@@ -724,6 +727,7 @@ export function InteractionLayout({
 			sortBy: activeViewConfig?.sort_by,
 			viewId: effectiveViewId,
 			search: debouncedSearchQuery || undefined,
+			cf: apiFilters.cf,
 		}),
 		[
 			context,

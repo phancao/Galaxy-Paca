@@ -404,7 +404,21 @@ export type FieldType =
 	| "select"
 	| "multi_select"
 	| "boolean"
-	| "url";
+	| "url"
+	// ADR-040 Phase 1: a "user" field stores a project member's UUID string; a
+	// "label" field stores a free-form array of strings (open vocabulary tags).
+	| "user"
+	| "label";
+
+// Permissive value type for a custom field's default (ADR-040 Phase 0).
+// Shape depends on field_type: string (text/url/date/select), number, boolean,
+// or string[] (multi_select). `null` means "no default".
+export type CustomFieldDefaultValue =
+	| string
+	| number
+	| boolean
+	| string[]
+	| null;
 
 export interface CustomFieldDefinition {
 	id: string;
@@ -414,6 +428,7 @@ export interface CustomFieldDefinition {
 	field_type: FieldType;
 	options: string[];
 	is_required: boolean;
+	default_value: CustomFieldDefaultValue;
 	created_at: string;
 	updated_at: string;
 }
@@ -445,6 +460,7 @@ export async function createCustomFieldDefinition(
 		field_type: FieldType;
 		options?: string[];
 		is_required?: boolean;
+		default_value?: CustomFieldDefaultValue;
 	},
 ): Promise<CustomFieldDefinition> {
 	const { data } = await apiClient.instance.post<
@@ -460,6 +476,7 @@ export async function updateCustomFieldDefinition(
 		display_name?: string;
 		options?: string[];
 		is_required?: boolean;
+		default_value?: CustomFieldDefaultValue;
 	},
 ): Promise<CustomFieldDefinition> {
 	const { data } = await apiClient.instance.patch<
@@ -474,6 +491,61 @@ export async function deleteCustomFieldDefinition(
 ): Promise<void> {
 	await apiClient.instance.delete(
 		`/projects/${projectId}/custom-fields/${fieldId}`,
+	);
+}
+
+// ── Workflow Status Transitions (ADR-040 Phase 1) ────────────────────────────
+
+/**
+ * A single allowed status transition rule for a project.
+ *
+ * - `task_type_id` null   → applies to every task type.
+ * - `from_status_id` null → allowed from ANY source status.
+ * - `required_fields`     → custom-field keys that must be set for the move.
+ *
+ * A project with ZERO transition rows allows free status movement; enforcement
+ * only kicks in once at least one rule exists.
+ */
+export interface StatusTransition {
+	id: string;
+	project_id: string;
+	task_type_id: string | null;
+	from_status_id: string | null;
+	to_status_id: string;
+	required_fields: string[];
+	created_at: string;
+}
+
+export async function listStatusTransitions(
+	projectId: string,
+): Promise<StatusTransition[]> {
+	const { data } = await apiClient.instance.get<
+		SuccessEnvelope<StatusTransition[]>
+	>(`/projects/${projectId}/status-transitions`);
+	return data.data;
+}
+
+export async function createStatusTransition(
+	projectId: string,
+	payload: {
+		task_type_id?: string | null;
+		from_status_id?: string | null;
+		to_status_id: string;
+		required_fields?: string[];
+	},
+): Promise<StatusTransition> {
+	const { data } = await apiClient.instance.post<
+		SuccessEnvelope<StatusTransition>
+	>(`/projects/${projectId}/status-transitions`, payload);
+	return data.data;
+}
+
+export async function deleteStatusTransition(
+	projectId: string,
+	transitionId: string,
+): Promise<void> {
+	await apiClient.instance.delete(
+		`/projects/${projectId}/status-transitions/${transitionId}`,
 	);
 }
 
@@ -528,4 +600,10 @@ export const customFieldsQueryOptions = (projectId: string) =>
 	queryOptions({
 		queryKey: ["projects", projectId, "custom-fields"],
 		queryFn: () => listCustomFieldDefinitions(projectId),
+	});
+
+export const statusTransitionsQueryOptions = (projectId: string) =>
+	queryOptions({
+		queryKey: ["projects", projectId, "status-transitions"],
+		queryFn: () => listStatusTransitions(projectId),
 	});

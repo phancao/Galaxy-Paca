@@ -10,6 +10,7 @@
 				"taskStatuses": "Trạng thái nhiệm vụ",
 				"taskTypes": "Loại nhiệm vụ",
 				"customFields": "Trường tùy chỉnh",
+				"workflow": "Quy trình",
 				"dangerZone": "Khu vực nguy hiểm",
 				"plugins": "Plugin"
 			}
@@ -487,6 +488,11 @@
 			"addOption": "Thêm",
 			"requiredLabel": "Bắt buộc",
 			"requiredHint": "Người dùng phải điền trường này khi tạo hoặc chỉnh sửa nhiệm vụ.",
+			"defaultValueLabel": "Giá trị mặc định",
+			"defaultValueHint": "Tùy chọn. Điền sẵn giá trị này cho công việc mới. Để trống nếu không có mặc định.",
+			"defaultValueNone": "Không mặc định",
+			"defaultValueNeedsOptions": "Thêm ít nhất một tùy chọn để đặt giá trị mặc định.",
+			"defaultValuePlaceholder": "Không có mặc định",
 			"fieldTypes": {
 				"text": "Văn bản",
 				"number": "Số",
@@ -494,7 +500,9 @@
 				"checkbox": "Checkbox",
 				"select": "Chọn",
 				"multiSelect": "Chọn nhiều",
-				"url": "URL"
+				"url": "URL",
+				"user": "Người dùng",
+				"label": "Nhãn"
 			},
 			"createDialog": {
 				"title": "Tạo trường tùy chỉnh",
@@ -521,6 +529,38 @@
 				"confirmTextSuffix": "? Dữ liệu nhiệm vụ lưu trong trường này sẽ bị mất. Hành động này không thể hoàn tác.",
 				"deleteFailed": "Xóa trường thất bại. Vui lòng thử lại.",
 				"deleteField": "Xóa trường"
+			}
+		},
+		"workflow": {
+			"title": "Quy trình",
+			"description": "Giới hạn những thay đổi trạng thái được phép và yêu cầu điền trường trước khi nhiệm vụ chuyển trạng thái.",
+			"freeMovementNote": "Chưa có luật chuyển tiếp — trạng thái nhiệm vụ có thể chuyển tự do giữa mọi trạng thái. Thêm một luật để bắt đầu áp dụng quy trình cho phép.",
+			"addTransition": "Thêm luật chuyển tiếp",
+			"anyStatus": "Bất kỳ trạng thái",
+			"allTypes": "Tất cả loại",
+			"fromLabel": "Từ",
+			"toLabel": "Đến",
+			"taskTypeLabel": "Loại nhiệm vụ",
+			"requiredFieldsLabel": "Trường bắt buộc",
+			"requiredFieldsHint": "Các trường tùy chỉnh phải được điền trước khi nhiệm vụ chuyển sang trạng thái này.",
+			"noRequiredFields": "Không",
+			"selectToStatus": "Chọn trạng thái đích…",
+			"add": "Thêm",
+			"adding": "Đang thêm…",
+			"deleteTransition": "Xóa luật chuyển tiếp",
+			"table": {
+				"transition": "Chuyển tiếp",
+				"taskType": "Loại nhiệm vụ",
+				"requiredFields": "Trường bắt buộc"
+			},
+			"empty": {
+				"title": "Chưa có luật quy trình",
+				"description": "Trạng thái có thể chuyển tự do. Thêm một luật chuyển tiếp để áp dụng quy trình cho phép."
+			},
+			"errors": {
+				"createFailed": "Thêm luật chuyển tiếp thất bại. Vui lòng thử lại.",
+				"deleteFailed": "Xóa luật chuyển tiếp thất bại. Vui lòng thử lại.",
+				"duplicate": "Đã tồn tại một luật chuyển tiếp trùng khớp."
 			}
 		},
 		"dangerZone": {
@@ -962,6 +1002,7 @@
 			"statusesLabel": "Trạng thái",
 			"assigneesLabel": "Người được giao",
 			"taskTypesLabel": "Loại nhiệm vụ",
+			"customFieldsLabel": "Trường tùy chỉnh",
 			"reset": "Đặt lại",
 			"saving": "Đang lưu…",
 			"save": "Lưu",
@@ -985,6 +1026,22 @@
 				"allNormalTypesDynamic": "Tất cả loại thông thường (động)",
 				"systemTypes": "Loại hệ thống",
 				"noTaskTypes": "Không có loại nhiệm vụ"
+			},
+			"customFieldFilter": {
+				"noCustomFields": "Chưa có trường tùy chỉnh nào",
+				"addFilter": "Thêm bộ lọc",
+				"remove": "Xóa bộ lọc",
+				"valuePlaceholder": "Giá trị",
+				"selectOption": "Chọn…",
+				"true": "Đúng",
+				"false": "Sai",
+				"ops": {
+					"eq": "là",
+					"neq": "không phải là",
+					"contains": "chứa",
+					"set": "đã điền",
+					"unset": "để trống"
+				}
 			}
 		},
 		"roadmap": {

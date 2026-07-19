@@ -487,6 +487,11 @@
 			"addOption": "添加",
 			"requiredLabel": "必填",
 			"requiredHint": "用户在创建或编辑任务时必须填写此字段。",
+			"defaultValueLabel": "默认值",
+			"defaultValueHint": "可选。新任务将预填此值。留空表示无默认值。",
+			"defaultValueNone": "无默认值",
+			"defaultValueNeedsOptions": "请至少添加一个选项以设置默认值。",
+			"defaultValuePlaceholder": "无默认值",
 			"fieldTypes": {
 				"text": "文本",
 				"number": "数字",
