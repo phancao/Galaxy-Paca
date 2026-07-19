@@ -12,9 +12,14 @@ package nexussync
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
@@ -60,11 +65,15 @@ const (
 type Service struct {
 	users UserStore
 	log   *slog.Logger
+	// confirmActive reports whether the Vortex identity service still lists the
+	// given user id as active. Defaulted to confirmVortexUserActive; kept as a
+	// field so tests can stub it. Gates reactivation (ADR-040 audit #3).
+	confirmActive func(ctx context.Context, userID string) (bool, error)
 }
 
 // New returns a configured nexussync Service.
 func New(users UserStore, log *slog.Logger) *Service {
-	return &Service{users: users, log: log}
+	return &Service{users: users, log: log, confirmActive: confirmVortexUserActive}
 }
 
 // ApplyUserChanged converges the local mirror on a verified user.changed
@@ -150,6 +159,17 @@ func (s *Service) restore(ctx context.Context, evt UserChanged) (Outcome, error)
 	if u.DeletedAt == nil {
 		return OutcomeNoChange, nil
 	}
+	// Reactivation is the dangerous direction (ADR-040 audit #3): confirm identity
+	// itself still reports this subject active before clearing deleted_at, so a
+	// forged/stale user.changed{status:active} can't resurrect a user an admin
+	// disabled. Fail-safe: any error / non-active status leaves the user
+	// deprovisioned (the reconcile backstop heals a genuine reactivation).
+	active, cerr := s.confirmActive(ctx, evt.UserID)
+	if cerr != nil || !active {
+		s.log.Info("nexussync: restore declined — reactivation unconfirmed by identity",
+			"user_id", u.ID, "vortex_user_id", evt.UserID, "confirm_error", cerr)
+		return OutcomeNoChange, nil
+	}
 	if err := s.users.Restore(ctx, u.ID); err != nil {
 		return "", fmt.Errorf("nexussync: restore user %s: %w", u.ID, err)
 	}
@@ -174,4 +194,76 @@ func (s *Service) resolve(ctx context.Context, evt UserChanged) (*userdom.User, 
 		return nil, userdom.ErrNotFound
 	}
 	return s.users.FindByEmail(ctx, evt.Email)
+}
+
+// confirmVortexUserActive is the default reactivation read-back (ADR-040 audit
+// #3): it asks the Vortex identity service whether userID is still active via
+// GET /internal/users?ids=<id> authenticated with X-Service-Secret. It reuses
+// the same GALAXY_* identity env Paca already reads for its AI proxy (with the
+// platform-standard fallbacks), so no new wiring is required. Fail-safe: a
+// missing secret, transport error, non-200, or unknown id all return
+// (false, err|nil) — never true unless identity explicitly confirms "active".
+func confirmVortexUserActive(ctx context.Context, userID string) (bool, error) {
+	if userID == "" {
+		return false, nil
+	}
+	base := firstNonEmpty(
+		os.Getenv("GALAXY_IDENTITY_URL"),
+		os.Getenv("VORTEX_IDENTITY_URL"),
+		os.Getenv("NEXUS_IDENTITY_URL"),
+	)
+	if base == "" {
+		base = "http://nexus-identity:8086"
+	}
+	base = strings.TrimRight(base, "/")
+	secret := firstNonEmpty(
+		os.Getenv("GALAXY_INTERNAL_SERVICE_SECRET"),
+		os.Getenv("INTERNAL_SERVICE_SECRET"),
+	)
+	if secret == "" {
+		return false, nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/internal/users", nil)
+	if err != nil {
+		return false, err
+	}
+	q := req.URL.Query()
+	q.Set("ids", userID)
+	req.URL.RawQuery = q.Encode()
+	req.Header.Set("X-Service-Secret", secret)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("identity /internal/users status %d", resp.StatusCode)
+	}
+
+	var rows []struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		return false, err
+	}
+	for _, row := range rows {
+		if row.ID == userID {
+			return strings.EqualFold(strings.TrimSpace(row.Status), "active"), nil
+		}
+	}
+	return false, nil
+}
+
+// firstNonEmpty returns the first non-empty string in vals, or "".
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

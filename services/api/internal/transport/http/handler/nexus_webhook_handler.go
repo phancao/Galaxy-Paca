@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/Paca-AI/api/internal/apierr"
@@ -30,7 +31,42 @@ const (
 	// nexusMaxBodyBytes bounds the webhook body read; identity events are a
 	// few hundred bytes, so 1 MiB is generous.
 	nexusMaxBodyBytes = 1 << 20
+	// nexusReplayTTL is the ADR-040 §audit-#1 replay window: an event `_id`
+	// already applied within this window is dropped as a duplicate.
+	nexusReplayTTL = 10 * time.Minute
 )
+
+// replayCache is a small in-process TTL set of applied event ids (ADR-040
+// audit #1 replay guard). Best-effort per-instance; a missed dedup across a
+// restart is healed by the periodic reconcile. Fail-open — an empty id is never
+// treated as a replay so a pre-nonce sender keeps working.
+type replayCache struct {
+	mu   sync.Mutex
+	seen map[string]time.Time
+}
+
+func newReplayCache() *replayCache { return &replayCache{seen: make(map[string]time.Time)} }
+
+// seenRecently records id and reports whether it was already present within the
+// TTL. Prunes expired ids on access.
+func (rc *replayCache) seenRecently(id string) bool {
+	if id == "" {
+		return false
+	}
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	now := time.Now()
+	for k, exp := range rc.seen {
+		if now.After(exp) {
+			delete(rc.seen, k)
+		}
+	}
+	if _, ok := rc.seen[id]; ok {
+		return true
+	}
+	rc.seen[id] = now.Add(nexusReplayTTL)
+	return false
+}
 
 // UserChangeApplier applies a verified user.changed event to the local user
 // mirror.  Satisfied by nexussync.Service.
@@ -45,13 +81,14 @@ type NexusWebhookHandler struct {
 	secret []byte
 	sync   UserChangeApplier
 	log    *slog.Logger
+	replay *replayCache
 }
 
 // NewNexusWebhookHandler returns a NexusWebhookHandler.  secret is the shared
 // webhook secret (VORTEX_WEBHOOK_SECRET, fallback NEXUS_WEBHOOK_SECRET); the
 // caller must not construct the handler with an empty secret.
 func NewNexusWebhookHandler(secret []byte, sync UserChangeApplier, log *slog.Logger) *NexusWebhookHandler {
-	return &NexusWebhookHandler{secret: secret, sync: sync, log: log}
+	return &NexusWebhookHandler{secret: secret, sync: sync, log: log, replay: newReplayCache()}
 }
 
 // Handle handles POST /v1/nexus/webhook (ADR-040 §3.3): it verifies the HMAC
@@ -74,9 +111,16 @@ func (h *NexusWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	var event struct {
 		Type string `json:"type"`
+		ID   string `json:"_id"`
 	}
 	if err := json.Unmarshal(body, &event); err != nil || event.Type == "" {
 		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "malformed webhook payload"))
+		return
+	}
+
+	// ADR-040 replay guard: silently ack a duplicate event id (fail-open if absent).
+	if h.replay.seenRecently(event.ID) {
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"deduped": event.ID})
 		return
 	}
 
