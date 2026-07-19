@@ -460,6 +460,16 @@ func New(deps Deps) http.Handler {
 				r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
 					Post("/copy-config", deps.Task.CopyProjectConfiguration)
 
+				// Project-wide worklog listing (time-tracking reports / efficiency
+				// dashboard) — every worklog across the project's tasks, filterable
+				// by ?from&to&member_id. Read-gated like task listing.
+				if deps.Worklog != nil {
+					r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+						httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+						httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionTasksRead}},
+					)).Get("/worklogs", deps.Worklog.ListProjectWorklogs)
+				}
+
 				// Workflow status transitions (ADR-040)
 				r.Route("/status-transitions", func(r chi.Router) {
 					r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,

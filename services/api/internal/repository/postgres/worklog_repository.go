@@ -47,6 +47,40 @@ func (r *WorklogRepository) ListWorklogs(ctx context.Context, taskID uuid.UUID) 
 	return out, nil
 }
 
+// ListProjectWorklogs returns all worklogs across a project's tasks matching the
+// filter, ordered by logged_at ascending. It joins task_worklogs to tasks to
+// scope by project and to honor the optional date-range / member constraints.
+func (r *WorklogRepository) ListProjectWorklogs(ctx context.Context, projectID uuid.UUID, filter worklogdom.WorklogFilter) ([]*worklogdom.Worklog, error) {
+	query := `SELECT w.id, w.task_id, w.member_id, w.minutes, w.note, w.logged_at, w.created_at
+	          FROM task_worklogs w
+	          JOIN tasks t ON t.id = w.task_id
+	          WHERE t.project_id = $1`
+	args := []any{projectID.String()}
+	if filter.From != nil {
+		args = append(args, *filter.From)
+		query += fmt.Sprintf(" AND w.logged_at >= $%d", len(args))
+	}
+	if filter.To != nil {
+		args = append(args, *filter.To)
+		query += fmt.Sprintf(" AND w.logged_at <= $%d", len(args))
+	}
+	if filter.MemberID != nil {
+		args = append(args, filter.MemberID.String())
+		query += fmt.Sprintf(" AND w.member_id = $%d", len(args))
+	}
+	query += " ORDER BY w.logged_at ASC, w.created_at ASC"
+
+	var records []worklogRecord
+	if err := r.db.SelectContext(ctx, &records, query, args...); err != nil {
+		return nil, fmt.Errorf("worklog repo: list by project: %w", err)
+	}
+	out := make([]*worklogdom.Worklog, 0, len(records))
+	for i := range records {
+		out = append(out, toWorklogEntity(&records[i]))
+	}
+	return out, nil
+}
+
 // FindWorklogByID returns the worklog with the given ID.
 func (r *WorklogRepository) FindWorklogByID(ctx context.Context, id uuid.UUID) (*worklogdom.Worklog, error) {
 	var rec worklogRecord

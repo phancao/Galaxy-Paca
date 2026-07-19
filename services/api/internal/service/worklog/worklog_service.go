@@ -32,6 +32,13 @@ func (s *Service) ListWorklogs(ctx context.Context, projectID, taskID uuid.UUID)
 	return s.repo.ListWorklogs(ctx, taskID)
 }
 
+// ListProjectWorklogs returns every worklog across the project's tasks matching
+// filter. The project scope is enforced by the query's join, so no per-task
+// ownership check is needed; the route already gates on project tasks.read.
+func (s *Service) ListProjectWorklogs(ctx context.Context, projectID uuid.UUID, filter worklogdom.WorklogFilter) ([]*worklogdom.Worklog, error) {
+	return s.repo.ListProjectWorklogs(ctx, projectID, filter)
+}
+
 // CreateWorklog logs work against a task, verifying it belongs to projectID.
 func (s *Service) CreateWorklog(ctx context.Context, in worklogdom.CreateWorklogInput) (*worklogdom.Worklog, error) {
 	if in.Minutes <= 0 {
