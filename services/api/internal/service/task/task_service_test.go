@@ -1974,6 +1974,52 @@ func TestUpdateTask_TransitionRequiredField(t *testing.T) {
 	}
 }
 
+// A workflow scoped to one task type (e.g. only Stories go through review) must
+// not freeze tasks of other types that have no rule of their own.
+func TestUpdateTask_TypeScopedWorkflowLeavesOtherTypesFree(t *testing.T) {
+	ctx := context.Background()
+	projectID := uuid.New()
+	statusA, statusB, statusC := uuid.New(), uuid.New(), uuid.New()
+	typeStory, typeBug := uuid.New(), uuid.New()
+
+	repo := newFakeTaskRepo()
+	svc := tasksvc.New(repo)
+
+	// Story-scoped rule: Stories may go A→B (and only A→B).
+	_ = repo.CreateStatusTransition(ctx, &taskdom.StatusTransition{
+		ID: uuid.New(), ProjectID: projectID, TaskTypeID: &typeStory,
+		FromStatusID: &statusA, ToStatusID: statusB, RequiredFields: []string{},
+	})
+
+	// A Bug (a type with no rule of its own) must still move freely — the
+	// Story-scoped workflow must not freeze it.
+	bug := &taskdom.Task{
+		ID: uuid.New(), ProjectID: projectID, TaskTypeID: &typeBug,
+		StatusID: &statusA, CustomFields: map[string]any{}, Tags: []string{},
+	}
+	if err := repo.CreateTask(ctx, bug); err != nil {
+		t.Fatalf("seed bug: %v", err)
+	}
+	if err := updateStatus(svc, projectID, bug.ID, statusC); err != nil {
+		t.Fatalf("a type with no workflow rule should move freely, got %v", err)
+	}
+
+	// The Story-scoped rule is still enforced for Stories.
+	story := &taskdom.Task{
+		ID: uuid.New(), ProjectID: projectID, TaskTypeID: &typeStory,
+		StatusID: &statusA, CustomFields: map[string]any{}, Tags: []string{},
+	}
+	if err := repo.CreateTask(ctx, story); err != nil {
+		t.Fatalf("seed story: %v", err)
+	}
+	if err := updateStatus(svc, projectID, story.ID, statusC); err != taskdom.ErrTransitionNotAllowed {
+		t.Fatalf("story A→C should be denied by its workflow, got %v", err)
+	}
+	if err := updateStatus(svc, projectID, story.ID, statusB); err != nil {
+		t.Fatalf("story A→B should be allowed, got %v", err)
+	}
+}
+
 // --- TaskLinkRepository stubs -----------------------------------------------
 
 func (r *fakeTaskRepo) ListTaskLinks(_ context.Context, _ uuid.UUID) ([]*taskdom.TaskLink, error) {

@@ -1028,7 +1028,7 @@ func (r *TaskRepository) CreateTask(ctx context.Context, t *taskdom.Task) error 
 		return fmt.Errorf("task repo: marshal tags: %w", err)
 	}
 
-	return WithTx(ctx, r.db, func(tx *sqlx.Tx) error {
+	return translateTaskReference(WithTx(ctx, r.db, func(tx *sqlx.Tx) error {
 		// Atomically increment the per-project counter and retrieve its new value.
 		var counter taskCounterRecord
 		if err := tx.GetContext(ctx, &counter, `
@@ -1064,7 +1064,7 @@ func (r *TaskRepository) CreateTask(ctx context.Context, t *taskdom.Task) error 
 			return err
 		}
 		return nil
-	})
+	}))
 }
 
 // UpdateTask persists changes to an existing task.
@@ -1081,7 +1081,7 @@ func (r *TaskRepository) UpdateTask(ctx context.Context, t *taskdom.Task) error 
 	if err != nil {
 		return fmt.Errorf("task repo: marshal tags: %w", err)
 	}
-	return WithTx(ctx, r.db, func(tx *sqlx.Tx) error {
+	return translateTaskReference(WithTx(ctx, r.db, func(tx *sqlx.Tx) error {
 		_, err := tx.ExecContext(ctx, `
 			UPDATE tasks SET
 			  task_type_id=$1, status_id=$2, sprint_id=$3, parent_task_id=$4,
@@ -1105,7 +1105,7 @@ func (r *TaskRepository) UpdateTask(ctx context.Context, t *taskdom.Task) error 
 			return err
 		}
 		return nil
-	})
+	}))
 }
 
 // syncTaskAssignees reconciles task_assignees with wantIDs by removing only
