@@ -190,9 +190,16 @@ type Task struct {
 	StartDate    *time.Time
 	DueDate      *time.Time
 	Tags         []string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	DeletedAt    *time.Time
+	// EstimateMinutes is the original time estimate (ADR-040). The logged total
+	// (sum of task_worklogs) is served by the worklogs endpoint, not stored here.
+	EstimateMinutes *int
+	// VersionID (fixVersion) and ComponentID associate the task with a project
+	// release / component.
+	VersionID   *uuid.UUID
+	ComponentID *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 	// ViewPosition is a transient field populated only when ListTasks is called
 	// with a view_position sort (i.e. view_id provided + manual sort). It is not
 	// persisted in the tasks table.

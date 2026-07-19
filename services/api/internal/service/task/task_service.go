@@ -381,24 +381,27 @@ func (s *Service) CreateTask(ctx context.Context, in taskdom.CreateTaskInput) (*
 
 	now := time.Now()
 	t := &taskdom.Task{
-		ID:           uuid.New(),
-		ProjectID:    in.ProjectID,
-		TaskTypeID:   taskTypeID,
-		StatusID:     statusID,
-		SprintID:     in.SprintID,
-		ParentTaskID: in.ParentTaskID,
-		Title:        title,
-		Description:  in.Description,
-		Importance:   in.Importance,
-		StoryPoints:  in.StoryPoints,
-		AssigneeIDs:  assigneeIDs,
-		ReporterID:   in.ReporterID,
-		CustomFields: cf,
-		StartDate:    in.StartDate,
-		DueDate:      in.DueDate,
-		Tags:         tags,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:              uuid.New(),
+		ProjectID:       in.ProjectID,
+		TaskTypeID:      taskTypeID,
+		StatusID:        statusID,
+		SprintID:        in.SprintID,
+		ParentTaskID:    in.ParentTaskID,
+		Title:           title,
+		Description:     in.Description,
+		Importance:      in.Importance,
+		StoryPoints:     in.StoryPoints,
+		AssigneeIDs:     assigneeIDs,
+		ReporterID:      in.ReporterID,
+		CustomFields:    cf,
+		StartDate:       in.StartDate,
+		DueDate:         in.DueDate,
+		Tags:            tags,
+		EstimateMinutes: in.EstimateMinutes,
+		VersionID:       in.VersionID,
+		ComponentID:     in.ComponentID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	if err := s.repo.CreateTask(ctx, t); err != nil {
@@ -498,6 +501,15 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 	}
 	if in.Tags != nil {
 		t.Tags = *in.Tags
+	}
+	if in.EstimateMinutes != nil {
+		t.EstimateMinutes = *in.EstimateMinutes
+	}
+	if in.VersionID != nil {
+		t.VersionID = *in.VersionID
+	}
+	if in.ComponentID != nil {
+		t.ComponentID = *in.ComponentID
 	}
 
 	// Enforce the project's workflow (opt-in) on any status change, using the

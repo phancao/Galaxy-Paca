@@ -12,6 +12,7 @@ import (
 	apikeydom "github.com/Paca-AI/api/internal/domain/apikey"
 	attachmentdom "github.com/Paca-AI/api/internal/domain/attachment"
 	domainauth "github.com/Paca-AI/api/internal/domain/auth"
+	componentdom "github.com/Paca-AI/api/internal/domain/component"
 	docdom "github.com/Paca-AI/api/internal/domain/doc"
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	notificationdom "github.com/Paca-AI/api/internal/domain/notification"
@@ -20,7 +21,9 @@ import (
 	sprintdom "github.com/Paca-AI/api/internal/domain/sprint"
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
+	versiondom "github.com/Paca-AI/api/internal/domain/version"
 	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
+	worklogdom "github.com/Paca-AI/api/internal/domain/worklog"
 	"github.com/Paca-AI/api/internal/transport/http/httpx"
 )
 
@@ -231,6 +234,24 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusConflict, apierr.CodeTaskLinkDuplicate
 	case errors.Is(err, taskdom.ErrTaskLinkCrossProject):
 		return http.StatusBadRequest, apierr.CodeTaskLinkCrossProject
+	case errors.Is(err, versiondom.ErrVersionNotFound):
+		return http.StatusNotFound, apierr.CodeVersionNotFound
+	case errors.Is(err, versiondom.ErrVersionNameInvalid):
+		return http.StatusBadRequest, apierr.CodeVersionNameInvalid
+	case errors.Is(err, versiondom.ErrVersionNameTaken):
+		return http.StatusConflict, apierr.CodeVersionNameTaken
+	case errors.Is(err, componentdom.ErrComponentNotFound):
+		return http.StatusNotFound, apierr.CodeComponentNotFound
+	case errors.Is(err, componentdom.ErrComponentNameInvalid):
+		return http.StatusBadRequest, apierr.CodeComponentNameInvalid
+	case errors.Is(err, componentdom.ErrComponentNameTaken):
+		return http.StatusConflict, apierr.CodeComponentNameTaken
+	case errors.Is(err, worklogdom.ErrWorklogNotFound):
+		return http.StatusNotFound, apierr.CodeWorklogNotFound
+	case errors.Is(err, worklogdom.ErrWorklogMinutesInvalid):
+		return http.StatusBadRequest, apierr.CodeWorklogMinutesInvalid
+	case errors.Is(err, worklogdom.ErrWorklogTaskNotInProject):
+		return http.StatusNotFound, apierr.CodeTaskNotFound
 	case errors.Is(err, docdom.ErrDocNotFound):
 		return http.StatusNotFound, apierr.CodeDocNotFound
 	case errors.Is(err, docdom.ErrDocTitleInvalid):
