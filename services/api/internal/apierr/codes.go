@@ -130,6 +130,20 @@ const (
 	CodeCustomFieldTypeInvalid Code = "CUSTOM_FIELD_TYPE_INVALID"
 	// CodeCustomFieldNameInvalid indicates an empty or invalid display name.
 	CodeCustomFieldNameInvalid Code = "CUSTOM_FIELD_NAME_INVALID"
+	// CodeCustomFieldOptionsInvalid indicates select/multi_select needs options.
+	CodeCustomFieldOptionsInvalid Code = "CUSTOM_FIELD_OPTIONS_INVALID"
+	// CodeCustomFieldValueInvalid indicates a task value does not match its field type.
+	CodeCustomFieldValueInvalid Code = "CUSTOM_FIELD_VALUE_INVALID"
+	// CodeCustomFieldRequired indicates a required custom field is missing.
+	CodeCustomFieldRequired Code = "CUSTOM_FIELD_REQUIRED"
+	// CodeTransitionNotAllowed indicates a status change the workflow forbids.
+	CodeTransitionNotAllowed Code = "TRANSITION_NOT_ALLOWED"
+	// CodeTransitionRequiredField indicates a field required to transition is missing.
+	CodeTransitionRequiredField Code = "TRANSITION_REQUIRED_FIELD"
+	// CodeTransitionInvalid indicates an invalid transition rule.
+	CodeTransitionInvalid Code = "TRANSITION_INVALID"
+	// CodeTransitionNotFound indicates the transition rule does not exist.
+	CodeTransitionNotFound Code = "TRANSITION_NOT_FOUND"
 
 	// CodeFileNotFound indicates the requested file record does not exist.
 	CodeFileNotFound Code = "FILE_NOT_FOUND"
