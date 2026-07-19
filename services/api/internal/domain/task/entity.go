@@ -100,6 +100,8 @@ type CustomFieldDefinition struct {
 	FieldType   FieldType
 	Options     []string // populated for select / multi_select types
 	IsRequired  bool
+	// TaskTypeID scopes the field to a single task type (nil = all types).
+	TaskTypeID *uuid.UUID
 	// DefaultValue is applied to a task's CustomFields when the field is
 	// otherwise absent (nil = no default). It is stored as JSONB and is already
 	// coerced to the field's type (string / float64 / bool / []string).

@@ -1340,11 +1340,12 @@ type customFieldDefinitionRecord struct {
 	Options      []byte    `db:"options"`
 	IsRequired   bool      `db:"is_required"`
 	DefaultValue []byte    `db:"default_value"`
+	TaskTypeID   *string   `db:"task_type_id"`
 	CreatedAt    time.Time `db:"created_at"`
 	UpdatedAt    time.Time `db:"updated_at"`
 }
 
-const customFieldCols = `id, project_id, field_key, display_name, field_type, options, is_required, default_value, created_at, updated_at`
+const customFieldCols = `id, project_id, field_key, display_name, field_type, options, is_required, default_value, task_type_id, created_at, updated_at`
 
 // ListCustomFieldDefinitions returns all custom field definitions for a project ordered by display_name.
 func (r *TaskRepository) ListCustomFieldDefinitions(ctx context.Context, projectID uuid.UUID) ([]*taskdom.CustomFieldDefinition, error) {
@@ -1387,10 +1388,10 @@ func (r *TaskRepository) CreateCustomFieldDefinition(ctx context.Context, f *tas
 		return err
 	}
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO custom_field_definitions (id, project_id, field_key, display_name, field_type, options, is_required, default_value, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		INSERT INTO custom_field_definitions (id, project_id, field_key, display_name, field_type, options, is_required, default_value, task_type_id, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
 		f.ID.String(), f.ProjectID.String(), f.FieldKey, f.DisplayName,
-		string(f.FieldType), opts, f.IsRequired, def, f.CreatedAt, f.UpdatedAt,
+		string(f.FieldType), opts, f.IsRequired, def, uuidPtrToStringPtr(f.TaskTypeID), f.CreatedAt, f.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -1412,9 +1413,9 @@ func (r *TaskRepository) UpdateCustomFieldDefinition(ctx context.Context, f *tas
 		return err
 	}
 	_, err = r.db.ExecContext(ctx, `
-		UPDATE custom_field_definitions SET display_name=$1, field_type=$2, options=$3, is_required=$4, default_value=$5, updated_at=$6
-		WHERE id=$7`,
-		f.DisplayName, string(f.FieldType), opts, f.IsRequired, def, f.UpdatedAt, f.ID.String(),
+		UPDATE custom_field_definitions SET display_name=$1, field_type=$2, options=$3, is_required=$4, default_value=$5, task_type_id=$6, updated_at=$7
+		WHERE id=$8`,
+		f.DisplayName, string(f.FieldType), opts, f.IsRequired, def, uuidPtrToStringPtr(f.TaskTypeID), f.UpdatedAt, f.ID.String(),
 	)
 	if err != nil {
 		return fmt.Errorf("custom field repo: update: %w", err)
@@ -1503,6 +1504,7 @@ func toCustomFieldEntity(r *customFieldDefinitionRecord) (*taskdom.CustomFieldDe
 		Options:      opts,
 		IsRequired:   r.IsRequired,
 		DefaultValue: defaultVal,
+		TaskTypeID:   strPtrToUUIDPtr(r.TaskTypeID),
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,
 	}, nil

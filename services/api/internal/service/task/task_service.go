@@ -358,12 +358,14 @@ func (s *Service) CreateTask(ctx context.Context, in taskdom.CreateTaskInput) (*
 	if cf == nil {
 		cf = map[string]any{}
 	}
-	// Validate/normalize custom fields against the project's definitions:
-	// reject bad types/options, fill defaults, enforce required at creation.
+	// Validate/normalize custom fields against the definitions applicable to
+	// this task's type: reject bad types/options, fill defaults, enforce
+	// required at creation.
 	cfDefs, err := s.repo.ListCustomFieldDefinitions(ctx, in.ProjectID)
 	if err != nil {
 		return nil, err
 	}
+	cfDefs = taskdom.ApplicableCustomFields(cfDefs, taskTypeID)
 	cf, err = taskdom.ValidateCustomFields(cfDefs, cf, true)
 	if err != nil {
 		return nil, err
@@ -478,6 +480,7 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 		if err != nil {
 			return nil, err
 		}
+		cfDefs = taskdom.ApplicableCustomFields(cfDefs, t.TaskTypeID)
 		// enforceAllRequired=false: don't block edits of tasks that predate a
 		// required field; still reject bad values or an explicit clear of a
 		// required field.
@@ -579,6 +582,7 @@ func (s *Service) CreateCustomFieldDefinition(ctx context.Context, in taskdom.Cr
 		Options:      opts,
 		IsRequired:   in.IsRequired,
 		DefaultValue: defaultVal,
+		TaskTypeID:   in.TaskTypeID,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}

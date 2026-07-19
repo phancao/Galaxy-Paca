@@ -434,6 +434,7 @@ type CreateCustomFieldDefinitionRequest struct {
 	Options      []string          `json:"options"`
 	IsRequired   bool              `json:"is_required"`
 	DefaultValue any               `json:"default_value"`
+	TaskTypeID   *uuid.UUID        `json:"task_type_id"`
 }
 
 // UpdateCustomFieldDefinitionRequest is the body for
@@ -459,6 +460,7 @@ type CustomFieldDefinitionResponse struct {
 	Options      []string          `json:"options"`
 	IsRequired   bool              `json:"is_required"`
 	DefaultValue any               `json:"default_value,omitempty"`
+	TaskTypeID   *uuid.UUID        `json:"task_type_id"`
 	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time         `json:"updated_at"`
 }
@@ -478,6 +480,7 @@ func CustomFieldDefinitionFromEntity(f *taskdom.CustomFieldDefinition) CustomFie
 		Options:      opts,
 		IsRequired:   f.IsRequired,
 		DefaultValue: f.DefaultValue,
+		TaskTypeID:   f.TaskTypeID,
 		CreatedAt:    f.CreatedAt,
 		UpdatedAt:    f.UpdatedAt,
 	}

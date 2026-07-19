@@ -1105,6 +1105,7 @@ func (h *TaskHandler) CreateCustomFieldDefinition(w http.ResponseWriter, r *http
 		Options:      req.Options,
 		IsRequired:   req.IsRequired,
 		DefaultValue: req.DefaultValue,
+		TaskTypeID:   req.TaskTypeID,
 	})
 	if err != nil {
 		presenter.Error(w, r, err)

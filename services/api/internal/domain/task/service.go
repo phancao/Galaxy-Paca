@@ -216,6 +216,9 @@ type CreateCustomFieldDefinitionInput struct {
 	Options      []string
 	IsRequired   bool
 	DefaultValue any
+	// TaskTypeID scopes the field to a single task type (nil = all types).
+	// Set at creation; immutable afterward (like FieldKey).
+	TaskTypeID *uuid.UUID
 }
 
 // UpdateCustomFieldDefinitionInput carries mutable custom field definition
