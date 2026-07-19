@@ -206,13 +206,39 @@ func (r *ProjectRepository) Update(ctx context.Context, p *projectdom.Project) e
 
 // Delete soft-deletes a project by setting deleted_at.
 func (r *ProjectRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	result, err := r.db.ExecContext(ctx, `UPDATE projects SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`, time.Now(), id.String())
+	// Soft-delete the project AND cascade the soft-delete to its tasks and
+	// members. The FK is ON DELETE CASCADE, but that only fires on a HARD
+	// delete — a soft delete (deleted_at) left tasks/members live:
+	//   • project_members stayed deleted_at IS NULL → ghost members (empty
+	//     username) in every ListMembers.
+	//   • tasks stayed live, so their prefix-numbered keys (e.g. ABC-1) lingered;
+	//     since FindByTaskIDPrefix ignores deleted projects, a NEW project could
+	//     reuse the freed prefix and mint its own ABC-1 → two live ABC-1s.
+	// Cascading the soft-delete removes the orphans and lets task queries (which
+	// filter tasks.deleted_at) exclude the old keys, so a reused prefix is safe.
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("project repo: delete begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := time.Now()
+	result, err := tx.ExecContext(ctx, `UPDATE projects SET deleted_at = $1 WHERE id = $2 AND deleted_at IS NULL`, now, id.String())
 	if err != nil {
 		return fmt.Errorf("project repo: delete: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
 		return projectdom.ErrNotFound
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE tasks SET deleted_at = $1, updated_at = $1 WHERE project_id = $2 AND deleted_at IS NULL`, now, id.String()); err != nil {
+		return fmt.Errorf("project repo: delete cascade tasks: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE project_members SET deleted_at = $1 WHERE project_id = $2 AND deleted_at IS NULL`, now, id.String()); err != nil {
+		return fmt.Errorf("project repo: delete cascade members: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("project repo: delete commit: %w", err)
 	}
 	return nil
 }
