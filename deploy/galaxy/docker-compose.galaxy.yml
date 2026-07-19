@@ -348,8 +348,79 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
 
+  # ── SDD Coordination Server (moved into Paca — was standalone `central`) ──────
+  # Vendored under services/sdd-server/ (Galaxy-SDD-Monitor central/ + client/ +
+  # server/lib). Paca's SDD Fleet plugin reads it via sdd-proxy → sdd-server:4830.
+  # Fresh DB — history from the old standalone deployment is NOT migrated.
+  sdd-server-postgres:
+    image: postgres:16-alpine
+    container_name: sdd-server-postgres
+    environment:
+      POSTGRES_USER: ${SDD_PG_USER:-sdd}
+      POSTGRES_PASSWORD: ${SDD_PG_PASSWORD:-sdd_local_pw}
+      POSTGRES_DB: ${SDD_PG_DB:-sdd}
+    volumes:
+      - paca_sdd_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${SDD_PG_USER:-sdd}", "-d", "${SDD_PG_DB:-sdd}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [paca-sdd-internal]
+    restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 256m
+
+  sdd-server:
+    build:
+      # context = vendored source; central/Dockerfile reuses central/+client/+server/lib
+      context: ../../services/sdd-server
+      dockerfile: central/Dockerfile
+      args:
+        VITE_BASE_PATH: /sdd-server
+    image: galaxy-local/sdd-server:latest
+    container_name: sdd-server
+    environment:
+      NODE_ENV: production
+      PORT: "4830"
+      SDD_SERVE_SPA: "off"
+      # Fresh DB — schema auto-applied by db.init() on start. Connects as the
+      # superuser role (sdd); the non-super sdd_app hardening is out-of-band.
+      PGHOST: sdd-server-postgres
+      PGPORT: "5432"
+      PGUSER: ${SDD_PG_USER:-sdd}
+      PGPASSWORD: ${SDD_PG_PASSWORD:-sdd_local_pw}
+      PGDATABASE: ${SDD_PG_DB:-sdd}
+      # Auth: HS256 delegation (ingest) + RS256 OIDC/service tokens via Vortex JWKS.
+      JWT_SECRET: ${JWT_SECRET:-}
+      NEXUS_JWKS_URL: ${NEXUS_JWKS_URL:-http://nexus-identity:8086/.well-known/jwks.json}
+      # Paca bridge: mirrors SDD tasks into Paca. API key from .env.galaxy (never committed).
+      PACA_BRIDGE_ENABLED: ${SDD_PACA_BRIDGE_ENABLED:-true}
+      PACA_BASE_URL: ${SDD_PACA_BASE_URL:-http://paca-gateway:80}
+      PACA_API_KEY: ${SDD_PACA_API_KEY:-}
+      PACA_BRIDGE_POLL_MS: ${SDD_PACA_BRIDGE_POLL_MS:-30000}
+      # OTel off for the vendored deploy (no preloaded package in this image build).
+      NODE_OPTIONS: ""
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
+    depends_on:
+      sdd-server-postgres:
+        condition: service_healthy
+    networks:
+      galaxy_network:
+        aliases:
+          - sdd-server
+      paca-sdd-internal: {}
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+
 networks:
   galaxy_network:
     external: true
   agentops-redis-net:
     external: true
+  paca-sdd-internal:
+    driver: bridge
+
+volumes:
+  paca_sdd_pg:

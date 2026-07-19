@@ -1,0 +1,22 @@
+{
+  "name": "galaxy-sdd-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Galaxy SDD Coordination Server — central, multi-machine, online ingest + coordination for Spec-Driven Development across a team.",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test __tests__/*.test.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}

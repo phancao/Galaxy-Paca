@@ -1,0 +1,140 @@
+{
+  "$comment": "Galaxy Spec-Driven Development classification rules. External config so the business rules are not hardcoded in JS. Edit this file (or override via SDD_RULES_PATH) to adapt phases, commands, lifecycle tools, governance-level rules and shared-core globs to your repo.",
+
+  "phases": [
+    { "key": "intake", "label": "Intake", "owner": "Product Owner", "gate": "go / no-go" },
+    {
+      "key": "bizspec",
+      "label": "Biz Spec & UX",
+      "owner": "BA",
+      "gate": "approve Biz Spec + UI/UX"
+    },
+    {
+      "key": "architecture",
+      "label": "Architecture",
+      "owner": "SA / Tech Lead",
+      "gate": "approve architecture"
+    },
+    {
+      "key": "techspec",
+      "label": "Tech Spec & Plan",
+      "owner": "SA / Developer",
+      "gate": "approve plan"
+    },
+    { "key": "build", "label": "Build", "owner": "Developer + AI", "gate": "per-task review" },
+    { "key": "verify", "label": "Verify", "owner": "QA", "gate": "verify must pass" },
+    {
+      "key": "release",
+      "label": "Release",
+      "owner": "SA / Tech Lead",
+      "gate": "human signs release"
+    },
+    {
+      "key": "operate",
+      "label": "Operate",
+      "owner": "SA / Developer",
+      "gate": "feedback to Intake"
+    }
+  ],
+
+  "commandPhase": [
+    { "match": "/brainstorm", "phase": "bizspec" },
+    { "match": "/specify", "phase": "bizspec" },
+    { "match": "/clarify", "phase": "bizspec" },
+    { "match": "/architect", "phase": "architecture" },
+    { "match": "/write-plan", "phase": "techspec" },
+    { "match": "/plan", "phase": "techspec" },
+    { "match": "/tasks", "phase": "techspec" },
+    { "match": "/execute-plan", "phase": "build" },
+    { "match": "/implement", "phase": "build" },
+    { "match": "/verify", "phase": "verify" },
+    { "match": "/release", "phase": "release" }
+  ],
+
+  "lifecycleTools": [
+    { "match": "wiki_publish_spec_version", "lifecycle": "publish" },
+    { "match": "wiki_diff_versions", "lifecycle": "diff" },
+    { "match": "wiki_list_spec_versions", "lifecycle": "list" },
+    { "match": "spec-changelog", "lifecycle": "changelog" },
+    { "match": "spec_changelog", "lifecycle": "changelog" }
+  ],
+
+  "toolPhase": [
+    { "match": "wiki_publish_spec_version", "phase": "techspec" },
+    { "match": "wiki_diff_versions", "phase": "techspec" }
+  ],
+
+  "commandPhasePatterns": [
+    {
+      "regex": "(^|\\s)(npm|pnpm|yarn|pytest|vitest|jest|go test|cargo test|npm run test|npm test)\\b",
+      "phase": "verify"
+    },
+    {
+      "regex": "\\b(argocd|kargo|kubectl apply|helm upgrade|docker compose up|docker-compose up)\\b",
+      "phase": "release"
+    },
+    {
+      "regex": "git\\s+(push|merge)\\b[^\\n]*\\b(origin\\s+)?(main|master|production|prod)\\b",
+      "phase": "release"
+    },
+    {
+      "regex": "\\bgh\\s+pr\\s+merge\\b",
+      "phase": "release"
+    }
+  ],
+
+  "readOnlyTools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "LS",
+    "NotebookRead",
+    "WebFetch",
+    "WebSearch",
+    "wiki_read_page",
+    "wiki_search",
+    "wiki_list_spec_versions",
+    "wiki_diff_versions",
+    "wiki_neighborhood",
+    "wiki_backlinks",
+    "wiki_list_collections",
+    "wiki_revisions_since"
+  ],
+
+  "level4CommandPatterns": [
+    "git\\s+push\\b[^\\n]*\\b(origin\\s+)?(main|master|production|prod)\\b",
+    "git\\s+merge\\b[^\\n]*\\b(main|master)\\b",
+    "\\bgh\\s+pr\\s+merge\\b",
+    "\\b(argocd\\s+app\\s+sync|kargo\\s+promote)\\b",
+    "\\bkubectl\\s+apply\\b[^\\n]*\\b(prod|production)\\b",
+    "\\bhelm\\s+upgrade\\b[^\\n]*\\b(prod|production)\\b",
+    "\\bdocker\\s+compose\\s+up\\b[^\\n]*-d"
+  ],
+
+  "level3Indicators": {
+    "lifecycleTools": ["wiki_publish_spec_version"],
+    "commandPatterns": [
+      "\\b(prisma\\s+migrate|alembic\\s+upgrade|knex\\s+migrate|rails\\s+db:migrate)\\b",
+      "ALTER\\s+TABLE",
+      "DROP\\s+TABLE"
+    ]
+  },
+
+  "sharedCoreGlobs": [
+    "**/shared/**",
+    "**/core/**",
+    "**/common/**",
+    "**/contracts/**",
+    "**/*.proto",
+    "**/openapi*.json",
+    "**/openapi*.yaml",
+    "**/openapi*.yml",
+    "**/schema.prisma",
+    "**/migrations/**",
+    "**/*schema*",
+    "**/identity/**",
+    "**/gateway/**",
+    "**/db.js",
+    "**/db.ts"
+  ]
+}

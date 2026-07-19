@@ -1,0 +1,367 @@
+{
+  "title": "Settings",
+  "subtitle": "Manage pricing, notifications, data, and hooks",
+  "exportData": "Export Data",
+  "acrossSessions": "Across all tracked sessions",
+  "basedOnUsage": "Based on per-model token usage",
+  "tabby": {
+    "title": "Tabby companion",
+    "description": "A floating cat that reacts to your live sessions.",
+    "enable": "Show Tabby",
+    "enableDesc": "Display the corner companion across the dashboard (⌘B to open)"
+  },
+  "pricing": {
+    "title": "Model Pricing",
+    "description": "Rates per million tokens (USD). Use % as wildcard in patterns.",
+    "resetConfirm": "Confirm Reset",
+    "resetDefaults": "Reset Defaults",
+    "resetResult": "Reset to {{count}} default rules",
+    "addModel": "Add Model",
+    "pattern": "Pattern",
+    "patternPlaceholder": "claude-opus-4%",
+    "namePlaceholder": "Claude Opus 4",
+    "validationRequired": "Pattern and display name are required",
+    "lastUpdated": "Last updated: ",
+    "tooltip": {
+      "title": "How model pricing works",
+      "howItWorks": "How it works",
+      "howItWorksBody": "When a session reports usage, the dashboard finds the first pricing rule whose pattern matches the model id and multiplies (input tokens / 1M) and (output tokens / 1M) by the rates below to compute cost. Rules are evaluated top-to-bottom — the first match wins.",
+      "patternsTitle": "Pattern syntax",
+      "patternsBody": "Patterns are SQL-style globs. % is a wildcard that matches any characters. For example: claude-opus-4-7% matches every model id that starts with claude-opus-4-7 (e.g. claude-opus-4-7, claude-opus-4-7-20260101). claude-%-haiku matches any haiku variant. An exact id like claude-sonnet-4-6 only matches itself.",
+      "manualUpdates": "You must update prices manually",
+      "manualUpdatesBody": "Anthropic publishes pricing changes on their website — there is no live feed. When a new model launches or rates change, edit the matching rule (or add a new one above the catch-all) so newly recorded sessions are costed correctly. Already-stored sessions keep the price that was applied at ingest time.",
+      "apiPricing": "Reference only — API rates",
+      "apiPricingBody": "These are pay-as-you-go API rates. If you use Claude Code on a subscription plan (Pro, Max, Team, or Enterprise), your actual cost is a flat monthly fee, not per-token — so these figures will usually be higher than what you really pay. Treat the costs here as a usage estimate for reference, not a bill."
+    },
+    "cacheWrite5m": "Cache Write (5m)",
+    "cacheWrite1h": "Cache Write (1h)",
+    "fastInput": "Fast Input",
+    "fastOutput": "Fast Output"
+  },
+  "claudeHome": {
+    "title": "CLAUDE_HOME",
+    "description": "Root directory for Claude Code session data. Changing this updates the scan path for transcripts and imports immediately.",
+    "save": "Save",
+    "saving": "Saving...",
+    "current": "Current:",
+    "placeholder": "/path/to/claude-home",
+    "saveFailed": "Failed to update CLAUDE_HOME"
+  },
+  "hooks": {
+    "title": "Hook Configuration",
+    "description": "Claude Code hooks forward events to the dashboard in real time.",
+    "allInstalled": "All hooks installed",
+    "incomplete": "Hooks incomplete",
+    "reinstall": "Reinstall Hooks",
+    "success": "Hooks installed successfully",
+    "failed": "Hook installation failed"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Browser notifications for important events. Requires permission.",
+    "enable": "Enable Browser Notifications",
+    "granted": "Permission granted",
+    "blocked": "Permission blocked",
+    "required": "Permission required",
+    "notifyWhen": "Notify me when...",
+    "newSession": "New session starts",
+    "sessionComplete": "Session completes",
+    "sessionError": "Session errors",
+    "subagentSpawned": "Subagent spawned",
+    "testTitle": "Agent Monitor",
+    "testBody": "Notifications are working!",
+    "sendTest": "Send Test Notification",
+    "disabledInfo": "Notifications are disabled - enable to get alerts for session events"
+  },
+  "import": {
+    "title": "Import History",
+    "description": "Bring existing Claude Code sessions into the dashboard. Token counts, per-model cost, compactions, subagents, tool uses, and turn durations are reconstructed from the original JSONL transcripts — identical to how live sessions are captured.",
+    "accuracyNote": "Re-running is safe. Sessions are deduplicated by session ID, and compaction baselines ensure token totals never double-count.",
+    "supportedFiles": "Supported inputs: .jsonl, .meta.json, .zip, .tar, .tar.gz, .tgz, .gz",
+    "instructions": "How to gather your history",
+    "stepLocate": "1. Locate your Claude Code history",
+    "stepLocateBody": "Every Claude Code session is stored as a JSONL transcript under the projects folder. Each subfolder is named after the working directory where the session started (slashes replaced with dashes).",
+    "stepArchive": "2. Bundle it for transfer (optional)",
+    "stepArchiveBody": "To move history from another machine, archive the whole folder first, then copy it over (AirDrop, scp, USB, cloud storage):",
+    "stepChoose": "3. Pick an import mode below",
+    "stepChooseBody": "Rescan the default location, point at any folder you've extracted history into, or upload files/archives directly.",
+    "stepVerify": "4. Verify tokens and cost",
+    "stepVerifyBody": "After import, open Analytics → Cost to confirm the breakdown. Re-importing the same session is always safe.",
+    "defaultLocation": "Default location on this machine",
+    "locationFound": "Folder found",
+    "locationMissing": "Folder not found",
+    "projectsLabel": "projects",
+    "jsonlLabel": "JSONL files",
+    "modeRescan": "Rescan default folder",
+    "modeRescanDesc": "Re-read ~/.claude/projects and import anything new.",
+    "modeFolder": "Scan a folder",
+    "modeFolderDesc": "Scan any directory on this machine for JSONL transcripts (walks subfolders).",
+    "modeUpload": "Upload files",
+    "modeUploadDesc": "Drop JSONL files or an archive (.zip / .tar.gz) directly into the browser.",
+    "folderPlaceholder": "/absolute/path/to/claude-history",
+    "folderHelper": "Absolute path. Tilde (~) is expanded. Subfolders are scanned recursively.",
+    "runRescan": "Rescan Now",
+    "runScan": "Scan Folder",
+    "runUpload": "Upload & Import",
+    "dropzoneHint": "Drag files here or click to select",
+    "dropzoneSub": "Accepts .jsonl, .meta.json, .zip, .tar, .tar.gz, .tgz, .gz",
+    "filesSelected": "{{count}} file(s) selected",
+    "clearSelection": "Clear",
+    "copy": "Copy",
+    "copied": "Copied",
+    "progress": {
+      "scan": "Scanning directory...",
+      "extract": "Extracting archives ({{processed}}/{{total}})...",
+      "parse": "Parsing transcripts ({{processed}}/{{total}})...",
+      "complete": "Import complete",
+      "error": "Import failed"
+    },
+    "result": {
+      "imported": "Imported: {{count}}",
+      "backfilled": "Enriched existing: {{count}}",
+      "skipped": "Already up to date: {{count}}",
+      "errors": "Errors: {{count}}",
+      "filesScanned": "Files scanned: {{count}}",
+      "title": "Last import result"
+    },
+    "errors": {
+      "noFiles": "No files selected",
+      "noJsonl": "No .jsonl files were found in the uploaded content",
+      "pathRequired": "Path is required",
+      "pathInvalid": "Path must be absolute",
+      "pathNotFound": "Path does not exist",
+      "pathNotDir": "Path is not a directory",
+      "generic": "Import failed: {{message}}"
+    }
+  },
+  "data": {
+    "title": "Data Management",
+    "description": "Database info, import/export, and cleanup.",
+    "dbOverview": "Database Overview",
+    "dbSize": "DB Size",
+    "loadingDb": "Loading database info...",
+    "sessionCleanup": "Session Cleanup",
+    "cleanupDesc": "Abandon stale sessions and purge old data",
+    "abandonAfter": "Abandon stale active sessions older than",
+    "purgeAfter": "Purge completed/errored sessions older than",
+    "confirmCleanup": "Confirm Cleanup",
+    "runCleanup": "Run Cleanup",
+    "nothingToClean": "Nothing to clean up",
+    "abandonedResult": " sessions abandoned",
+    "purgedResult": " sessions purged ({{events}} events, {{agents}} agents)"
+  },
+  "danger": {
+    "title": "Danger Zone",
+    "description": "Irreversible actions that delete data permanently",
+    "warning": "This will delete all sessions, agents, events, and token data. Are you sure?",
+    "yesClearAll": "Yes, Clear All",
+    "clearAllData": "Clear All Data",
+    "clearedResult": "Cleared {{count}} rows"
+  },
+  "about": {
+    "title": "About",
+    "description": "Server runtime information.",
+    "uptime": "Uptime",
+    "nodejs": "Node.js",
+    "platform": "Platform",
+    "wsClients": "WS Clients",
+    "loadingInfo": "Loading server info..."
+  },
+  "tables": {
+    "sessions": "sessions",
+    "agents": "agents",
+    "events": "events",
+    "sessionsWithCost": "sessions with cost",
+    "pricingRules": "pricing rules"
+  },
+  "messages": {
+    "failedLoad": "Failed to load",
+    "failedSave": "Failed to save",
+    "failedDelete": "Failed to delete",
+    "unknownError": "Unknown",
+    "actionFailed": "Error: {{message}}"
+  },
+  "webhooks": {
+    "title": "Webhook Notifications",
+    "description": "Forward fired alerts to Slack, Discord, Microsoft Teams, or any HTTP endpoint. Delivery is automatic, retried on failure, and never blocks monitoring.",
+    "count_one": "{{count}} target",
+    "count_other": "{{count}} targets",
+    "add": "Add Webhook",
+    "loading": "Loading webhooks…",
+    "empty": "No webhooks configured. Add one to forward alerts to Slack, Discord, Teams, or a custom endpoint.",
+    "scopedTo_one": "{{count}} rule",
+    "scopedTo_other": "{{count}} rules",
+    "enabled": "Enabled",
+    "test": "Test",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Confirm",
+    "testOk": "Delivered (HTTP {{status}})",
+    "testFail": "Failed: {{error}}",
+    "addTitle": "New Webhook",
+    "editTitle": "Edit Webhook",
+    "fieldName": "Name",
+    "fieldNamePlaceholder": "e.g. Team Slack #alerts",
+    "fieldType": "Type",
+    "type": {
+      "slack": "Slack",
+      "discord": "Discord",
+      "teams": "Microsoft Teams",
+      "generic": "Generic (custom JSON)"
+    },
+    "fieldUrl": "Webhook URL",
+    "urlKeepHint": "leave blank to keep current",
+    "urlKeepPlaceholder": "•••••••• (unchanged)",
+    "urlPlaceholder": {
+      "slack": "https://hooks.slack.com/services/…",
+      "discord": "https://discord.com/api/webhooks/…",
+      "teams": "https://outlook.office.com/webhook/…",
+      "generic": "https://example.com/webhook"
+    },
+    "fieldSecret": "Signing secret (optional)",
+    "secretPlaceholder": "HMAC-SHA256 secret",
+    "secretKeepPlaceholder": "•••••••• (leave blank to keep)",
+    "secretHint": "When set, requests are signed with an X-Webhook-Signature header.",
+    "fieldHeaders": "Custom headers (optional)",
+    "replaceHeaders": "Replace headers",
+    "headerKey": "Header",
+    "headerValue": "Value",
+    "addHeader": "Add header",
+    "scopeAll": "Receive alerts from all rules",
+    "enabledOnSave": "Enabled",
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel",
+    "urlOptional": "optional override",
+    "urlAuto": "URL is set automatically from the credentials below.",
+    "deleteTitle": "Delete webhook?",
+    "deleteMessage": "Delete \"{{name}}\"? Fired alerts will stop being delivered to this target. This cannot be undone.",
+    "guideToggle": "How to set up {{provider}}",
+    "guideDocs": "Official {{provider}} docs",
+    "guideStaleNote": "Provider setup screens change often, so these steps may be out of date — always confirm against the official docs."
+  },
+  "alertsHub": {
+    "title": "Alerts",
+    "description": "Define alert rules, route them to webhook channels, and review what has fired — all in one place.",
+    "tabRules": "Rules",
+    "tabChannels": "Channels",
+    "tabActivity": "Activity",
+    "rulesHint": "Conditions that trigger an alert. Evaluated server-side against the live event stream.",
+    "rulesEmptyHint": "Add a rule to start alerting on errors, inactivity, stuck agents, or token thresholds."
+  },
+  "jumpTo": "Jump to",
+  "webhookGuides": {
+    "slack": {
+      "steps": [
+        "Create or open a Slack app at api.slack.com/apps.",
+        "Turn on 'Incoming Webhooks', then click 'Add New Webhook to Workspace'.",
+        "Choose the channel to post to and authorize.",
+        "Copy the generated URL (https://hooks.slack.com/services/…) and paste it above."
+      ]
+    },
+    "discord": {
+      "steps": [
+        "Open your server → Server Settings → Integrations → Webhooks.",
+        "Click 'New Webhook', pick a channel, optionally rename it.",
+        "Click 'Copy Webhook URL' and paste it above."
+      ]
+    },
+    "teams": {
+      "steps": [
+        "In the target Teams channel, click ⋯ → 'Workflows'.",
+        "Pick the template 'Post to a channel when a webhook request is received'.",
+        "Finish the flow and copy the generated HTTP POST URL.",
+        "Paste it above. (Classic Office 365 connectors were retired in 2025 — use Workflows.)"
+      ]
+    },
+    "google_chat": {
+      "steps": [
+        "Open the Google Chat space → space title → 'Apps & integrations'.",
+        "Click 'Webhooks' → 'Add webhook' and give it a name.",
+        "Copy the webhook URL and paste it above."
+      ]
+    },
+    "mattermost": {
+      "steps": [
+        "Main Menu → Integrations → Incoming Webhooks (an admin must enable webhooks first).",
+        "Click 'Add Incoming Webhook' and choose a channel.",
+        "Save, then copy the webhook URL and paste it above."
+      ]
+    },
+    "rocketchat": {
+      "steps": [
+        "Administration → Integrations → New → Incoming.",
+        "Enable it, pick a channel, and save.",
+        "Copy the 'Webhook URL' and paste it above."
+      ]
+    },
+    "telegram": {
+      "steps": [
+        "Message @BotFather, run /newbot, and copy the bot token.",
+        "Add the bot to your group/channel (or just DM it).",
+        "Find the chat ID: send a message, open https://api.telegram.org/bot<token>/getUpdates, read result[].message.chat.id.",
+        "Enter the Bot token and Chat ID above — no URL needed."
+      ]
+    },
+    "pagerduty": {
+      "steps": [
+        "Open the target Service → Integrations → 'Add integration'.",
+        "Choose 'Events API v2'.",
+        "Copy the Integration Key (the routing key).",
+        "Enter it as the Routing key above — the Events API URL is prefilled."
+      ]
+    },
+    "opsgenie": {
+      "steps": [
+        "Settings → Integrations → add an 'API' integration.",
+        "Copy the generated API key.",
+        "Note your account region (US or EU).",
+        "Enter the API key and region above — the alerts URL is derived from the region."
+      ]
+    },
+    "splunk_oncall": {
+      "steps": [
+        "Integrations → REST Endpoint, and enable it.",
+        "Copy the REST URL — it already contains your API key.",
+        "Replace the trailing '$routing_key' with one of your routing keys.",
+        "Paste the full URL above."
+      ]
+    },
+    "zapier": {
+      "steps": [
+        "Create a Zap with the trigger 'Webhooks by Zapier' → 'Catch Hook'.",
+        "Copy the custom webhook URL it gives you.",
+        "Paste it above. The alert arrives as JSON: { event, alert }."
+      ]
+    },
+    "make": {
+      "steps": [
+        "Add a 'Webhooks' → 'Custom webhook' module as the first step of a scenario.",
+        "Click 'Add', create the hook, and copy its URL.",
+        "Paste it above, then run once so Make learns the payload shape."
+      ]
+    },
+    "n8n": {
+      "steps": [
+        "Add a 'Webhook' node to your workflow; set the method to POST.",
+        "Copy the Production URL.",
+        "Activate the workflow and paste the URL above (http is allowed for self-hosted)."
+      ]
+    },
+    "pipedream": {
+      "steps": [
+        "Create a workflow with an 'HTTP / Webhook' trigger.",
+        "Copy the unique endpoint URL.",
+        "Paste it above; inspect deliveries in the Pipedream event inspector."
+      ]
+    },
+    "generic": {
+      "steps": [
+        "Point this at any endpoint that accepts a JSON POST (https, or http for local testing).",
+        "Body shape: { event: 'alert.triggered', source, sent_at, alert: { … } }.",
+        "Optional: set a signing secret (HMAC-SHA256 over the body → X-Webhook-Signature header) and custom headers.",
+        "Tip: use a free inspector like webhook.site to see the exact payload."
+      ]
+    }
+  }
+}
