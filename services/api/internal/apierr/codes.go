@@ -73,6 +73,10 @@ const (
 	CodeTaskNotFound Code = "TASK_NOT_FOUND"
 	// CodeTaskTitleInvalid indicates an empty or invalid task title.
 	CodeTaskTitleInvalid Code = "TASK_TITLE_INVALID"
+	// CodeTaskReferenceInvalid indicates a task references an entity (assignee,
+	// reporter, version, component, sprint, status, or type) that does not exist
+	// or is not part of the project.
+	CodeTaskReferenceInvalid Code = "TASK_REFERENCE_INVALID"
 	// CodeEpicCannotHaveParent indicates an attempt to set a parent on an epic task.
 	CodeEpicCannotHaveParent Code = "TASK_EPIC_CANNOT_HAVE_PARENT"
 	// CodeTaskCannotBeOwnParent indicates an attempt to set a task as its own parent.

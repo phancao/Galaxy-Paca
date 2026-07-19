@@ -142,6 +142,8 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusNotFound, apierr.CodeTaskNotFound
 	case errors.Is(err, taskdom.ErrTaskTitleInvalid):
 		return http.StatusBadRequest, apierr.CodeTaskTitleInvalid
+	case errors.Is(err, taskdom.ErrTaskReferenceInvalid):
+		return http.StatusUnprocessableEntity, apierr.CodeTaskReferenceInvalid
 	case errors.Is(err, taskdom.ErrEpicCannotHaveParent):
 		return http.StatusBadRequest, apierr.CodeEpicCannotHaveParent
 	case errors.Is(err, taskdom.ErrTaskCannotBeOwnParent):

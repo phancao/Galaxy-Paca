@@ -918,6 +918,20 @@ func (s *Service) enforceStatusTransition(ctx context.Context, projectID uuid.UU
 	if oldStatus == nil {
 		return nil // initial status assignment is always allowed
 	}
+	// A workflow may be scoped to specific task types (e.g. only Stories go
+	// through review). If every rule is scoped to *other* types, this task's
+	// type has no workflow configured — leave it free rather than freezing it.
+	// A type-agnostic rule (TaskTypeID == nil) applies to all types and counts.
+	applicable := false
+	for _, tr := range transitions {
+		if tr.TaskTypeID == nil || (typeID != nil && *tr.TaskTypeID == *typeID) {
+			applicable = true
+			break
+		}
+	}
+	if !applicable {
+		return nil
+	}
 	var matched *taskdom.StatusTransition
 	for _, tr := range transitions {
 		if tr.ToStatusID != *newStatus {

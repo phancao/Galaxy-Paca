@@ -6,6 +6,13 @@ import "errors"
 var (
 	ErrTaskNotFound            = errors.New("task: not found")
 	ErrTaskTitleInvalid        = errors.New("task: title is empty or invalid")
+	// ErrTaskReferenceInvalid is returned when a task write references an entity
+	// that does not exist or does not belong to this project — an assignee or
+	// reporter member id, or a version/component/sprint/status/type id. It maps
+	// to 422 rather than surfacing the raw database foreign-key violation as a
+	// 500 (a common trap for API/MCP clients that pass a user id where a project
+	// member id is required).
+	ErrTaskReferenceInvalid    = errors.New("task: a referenced entity (assignee, reporter, version, component, sprint, status, or type) is invalid or not part of this project")
 	ErrEpicCannotHaveParent    = errors.New("task: epic tasks cannot have a parent task")
 	ErrTaskCannotBeOwnParent   = errors.New("task: a task cannot be its own parent")
 	ErrTaskParentCycleDetected = errors.New("task: setting this parent would create a cycle")
