@@ -193,19 +193,22 @@ type CustomFieldDefinitionService interface {
 // CreateCustomFieldDefinitionInput carries fields required to create a custom
 // field definition.
 type CreateCustomFieldDefinitionInput struct {
-	ProjectID   uuid.UUID
-	FieldKey    string
-	DisplayName string
-	FieldType   FieldType
-	Options     []string
-	IsRequired  bool
+	ProjectID    uuid.UUID
+	FieldKey     string
+	DisplayName  string
+	FieldType    FieldType
+	Options      []string
+	IsRequired   bool
+	DefaultValue any
 }
 
 // UpdateCustomFieldDefinitionInput carries mutable custom field definition
-// fields.
+// fields. DefaultValue uses a pointer-to-any so the zero value (untouched) is
+// distinguishable from an explicit clear (a non-nil pointer to a nil any).
 type UpdateCustomFieldDefinitionInput struct {
-	DisplayName string
-	FieldType   *FieldType
-	Options     []string
-	IsRequired  *bool
+	DisplayName  string
+	FieldType    *FieldType
+	Options      []string
+	IsRequired   *bool
+	DefaultValue *any
 }

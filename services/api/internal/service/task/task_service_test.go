@@ -1872,6 +1872,10 @@ func (r *fakeTaskRepo) DeleteCustomFieldDefinition(_ context.Context, id uuid.UU
 	return nil
 }
 
+func (r *fakeTaskRepo) ClearCustomFieldValues(_ context.Context, _ uuid.UUID, _ string) error {
+	return nil
+}
+
 // --- TaskLinkRepository stubs -----------------------------------------------
 
 func (r *fakeTaskRepo) ListTaskLinks(_ context.Context, _ uuid.UUID) ([]*taskdom.TaskLink, error) {

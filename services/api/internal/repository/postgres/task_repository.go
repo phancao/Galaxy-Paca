@@ -1295,18 +1295,19 @@ func toTaskEntity(r *taskRecord) (*taskdom.Task, error) {
 // --- Custom Field Definitions -----------------------------------------------
 
 type customFieldDefinitionRecord struct {
-	ID          string    `db:"id"`
-	ProjectID   string    `db:"project_id"`
-	FieldKey    string    `db:"field_key"`
-	DisplayName string    `db:"display_name"`
-	FieldType   string    `db:"field_type"`
-	Options     []byte    `db:"options"`
-	IsRequired  bool      `db:"is_required"`
-	CreatedAt   time.Time `db:"created_at"`
-	UpdatedAt   time.Time `db:"updated_at"`
+	ID           string    `db:"id"`
+	ProjectID    string    `db:"project_id"`
+	FieldKey     string    `db:"field_key"`
+	DisplayName  string    `db:"display_name"`
+	FieldType    string    `db:"field_type"`
+	Options      []byte    `db:"options"`
+	IsRequired   bool      `db:"is_required"`
+	DefaultValue []byte    `db:"default_value"`
+	CreatedAt    time.Time `db:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"`
 }
 
-const customFieldCols = `id, project_id, field_key, display_name, field_type, options, is_required, created_at, updated_at`
+const customFieldCols = `id, project_id, field_key, display_name, field_type, options, is_required, default_value, created_at, updated_at`
 
 // ListCustomFieldDefinitions returns all custom field definitions for a project ordered by display_name.
 func (r *TaskRepository) ListCustomFieldDefinitions(ctx context.Context, projectID uuid.UUID) ([]*taskdom.CustomFieldDefinition, error) {
@@ -1344,11 +1345,15 @@ func (r *TaskRepository) CreateCustomFieldDefinition(ctx context.Context, f *tas
 	if err != nil {
 		return err
 	}
+	def, err := marshalDefaultValue(f.DefaultValue)
+	if err != nil {
+		return err
+	}
 	_, err = r.db.ExecContext(ctx, `
-		INSERT INTO custom_field_definitions (id, project_id, field_key, display_name, field_type, options, is_required, created_at, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		INSERT INTO custom_field_definitions (id, project_id, field_key, display_name, field_type, options, is_required, default_value, created_at, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
 		f.ID.String(), f.ProjectID.String(), f.FieldKey, f.DisplayName,
-		string(f.FieldType), opts, f.IsRequired, f.CreatedAt, f.UpdatedAt,
+		string(f.FieldType), opts, f.IsRequired, def, f.CreatedAt, f.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -1365,10 +1370,14 @@ func (r *TaskRepository) UpdateCustomFieldDefinition(ctx context.Context, f *tas
 	if err != nil {
 		return err
 	}
+	def, err := marshalDefaultValue(f.DefaultValue)
+	if err != nil {
+		return err
+	}
 	_, err = r.db.ExecContext(ctx, `
-		UPDATE custom_field_definitions SET display_name=$1, field_type=$2, options=$3, is_required=$4, updated_at=$5
-		WHERE id=$6`,
-		f.DisplayName, string(f.FieldType), opts, f.IsRequired, f.UpdatedAt, f.ID.String(),
+		UPDATE custom_field_definitions SET display_name=$1, field_type=$2, options=$3, is_required=$4, default_value=$5, updated_at=$6
+		WHERE id=$7`,
+		f.DisplayName, string(f.FieldType), opts, f.IsRequired, def, f.UpdatedAt, f.ID.String(),
 	)
 	if err != nil {
 		return fmt.Errorf("custom field repo: update: %w", err)
@@ -1376,11 +1385,53 @@ func (r *TaskRepository) UpdateCustomFieldDefinition(ctx context.Context, f *tas
 	return nil
 }
 
-// DeleteCustomFieldDefinition removes a custom field definition by ID.
+// DeleteCustomFieldDefinition removes a custom field definition and, in the same
+// transaction, strips its field_key from every task's custom_fields JSONB so no
+// orphaned values linger (ADR-040 Phase 0).
 func (r *TaskRepository) DeleteCustomFieldDefinition(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM custom_field_definitions WHERE id = $1`, id.String())
+	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("custom field repo: delete begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var rec struct {
+		ProjectID string `db:"project_id"`
+		FieldKey  string `db:"field_key"`
+	}
+	err = tx.GetContext(ctx, &rec, `SELECT project_id, field_key FROM custom_field_definitions WHERE id = $1`, id.String())
+	if errors.Is(err, sql.ErrNoRows) {
+		return taskdom.ErrCustomFieldNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("custom field repo: delete lookup: %w", err)
+	}
+
+	if _, err = tx.ExecContext(ctx, `DELETE FROM custom_field_definitions WHERE id = $1`, id.String()); err != nil {
 		return fmt.Errorf("custom field repo: delete: %w", err)
+	}
+	if _, err = tx.ExecContext(ctx,
+		`UPDATE tasks SET custom_fields = custom_fields - $1 WHERE project_id = $2 AND custom_fields ? $1`,
+		rec.FieldKey, rec.ProjectID,
+	); err != nil {
+		return fmt.Errorf("custom field repo: delete strip values: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("custom field repo: delete commit: %w", err)
+	}
+	return nil
+}
+
+// ClearCustomFieldValues strips one field_key from every task's custom_fields
+// JSONB in a project. Used when a definition's type changes so stale, now
+// type-incompatible values don't linger (ADR-040 Phase 0).
+func (r *TaskRepository) ClearCustomFieldValues(ctx context.Context, projectID uuid.UUID, fieldKey string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE tasks SET custom_fields = custom_fields - $1 WHERE project_id = $2 AND custom_fields ? $1`,
+		fieldKey, projectID.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("custom field repo: clear values: %w", err)
 	}
 	return nil
 }
@@ -1399,17 +1450,38 @@ func toCustomFieldEntity(r *customFieldDefinitionRecord) (*taskdom.CustomFieldDe
 		opts = []string{}
 	}
 
+	var defaultVal any
+	if len(r.DefaultValue) > 0 {
+		if err := json.Unmarshal(r.DefaultValue, &defaultVal); err != nil {
+			return nil, fmt.Errorf("custom field repo: unmarshal default_value: %w", err)
+		}
+	}
+
 	return &taskdom.CustomFieldDefinition{
-		ID:          id,
-		ProjectID:   pid,
-		FieldKey:    r.FieldKey,
-		DisplayName: r.DisplayName,
-		FieldType:   taskdom.FieldType(r.FieldType),
-		Options:     opts,
-		IsRequired:  r.IsRequired,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		ID:           id,
+		ProjectID:    pid,
+		FieldKey:     r.FieldKey,
+		DisplayName:  r.DisplayName,
+		FieldType:    taskdom.FieldType(r.FieldType),
+		Options:      opts,
+		IsRequired:   r.IsRequired,
+		DefaultValue: defaultVal,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
 	}, nil
+}
+
+// marshalDefaultValue serializes a custom field's default value to JSONB, or
+// nil (SQL NULL) when there is no default.
+func marshalDefaultValue(v any) ([]byte, error) {
+	if v == nil {
+		return nil, nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("custom field repo: marshal default_value: %w", err)
+	}
+	return b, nil
 }
 
 func marshalOptions(opts []string) ([]byte, error) {

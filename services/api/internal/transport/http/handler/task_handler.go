@@ -1078,12 +1078,13 @@ func (h *TaskHandler) CreateCustomFieldDefinition(w http.ResponseWriter, r *http
 	}
 
 	f, err := h.svc.CreateCustomFieldDefinition(r.Context(), taskdom.CreateCustomFieldDefinitionInput{
-		ProjectID:   projectID,
-		FieldKey:    req.FieldKey,
-		DisplayName: req.DisplayName,
-		FieldType:   req.FieldType,
-		Options:     req.Options,
-		IsRequired:  req.IsRequired,
+		ProjectID:    projectID,
+		FieldKey:     req.FieldKey,
+		DisplayName:  req.DisplayName,
+		FieldType:    req.FieldType,
+		Options:      req.Options,
+		IsRequired:   req.IsRequired,
+		DefaultValue: req.DefaultValue,
 	})
 	if err != nil {
 		presenter.Error(w, r, err)
@@ -1110,12 +1111,22 @@ func (h *TaskHandler) UpdateCustomFieldDefinition(w http.ResponseWriter, r *http
 		return
 	}
 
-	f, err := h.svc.UpdateCustomFieldDefinition(r.Context(), projectID, fieldID, taskdom.UpdateCustomFieldDefinitionInput{
+	in := taskdom.UpdateCustomFieldDefinitionInput{
 		DisplayName: req.DisplayName,
 		FieldType:   req.FieldType,
 		Options:     req.Options,
 		IsRequired:  req.IsRequired,
-	})
+	}
+	if req.DefaultValue != nil {
+		var v any
+		if err := json.Unmarshal(*req.DefaultValue, &v); err != nil {
+			presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "invalid default_value"))
+			return
+		}
+		in.DefaultValue = &v
+	}
+
+	f, err := h.svc.UpdateCustomFieldDefinition(r.Context(), projectID, fieldID, in)
 	if err != nil {
 		presenter.Error(w, r, err)
 		return
