@@ -194,6 +194,20 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusBadRequest, apierr.CodeCustomFieldTypeInvalid
 	case errors.Is(err, taskdom.ErrCustomFieldNameInvalid):
 		return http.StatusBadRequest, apierr.CodeCustomFieldNameInvalid
+	case errors.Is(err, taskdom.ErrCustomFieldOptionsInvalid):
+		return http.StatusBadRequest, apierr.CodeCustomFieldOptionsInvalid
+	case errors.Is(err, taskdom.ErrCustomFieldValueInvalid):
+		return http.StatusBadRequest, apierr.CodeCustomFieldValueInvalid
+	case errors.Is(err, taskdom.ErrCustomFieldRequired):
+		return http.StatusBadRequest, apierr.CodeCustomFieldRequired
+	case errors.Is(err, taskdom.ErrTransitionNotAllowed):
+		return http.StatusConflict, apierr.CodeTransitionNotAllowed
+	case errors.Is(err, taskdom.ErrTransitionRequiredField):
+		return http.StatusUnprocessableEntity, apierr.CodeTransitionRequiredField
+	case errors.Is(err, taskdom.ErrTransitionInvalid):
+		return http.StatusBadRequest, apierr.CodeTransitionInvalid
+	case errors.Is(err, taskdom.ErrTransitionNotFound):
+		return http.StatusNotFound, apierr.CodeTransitionNotFound
 	case errors.Is(err, attachmentdom.ErrFileNotFound):
 		return http.StatusNotFound, apierr.CodeFileNotFound
 	case errors.Is(err, attachmentdom.ErrAttachmentNotFound):
