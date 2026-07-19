@@ -374,7 +374,7 @@ services:
   sdd-server:
     build:
       # context = vendored source; central/Dockerfile reuses central/+client/+server/lib
-      context: ../../services/sdd-server
+      context: ../services/sdd-server
       dockerfile: central/Dockerfile
       args:
         VITE_BASE_PATH: /sdd-server
