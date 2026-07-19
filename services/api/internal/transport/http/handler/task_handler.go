@@ -636,21 +636,24 @@ func (h *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t, err := h.svc.CreateTask(r.Context(), taskdom.CreateTaskInput{
-		ProjectID:    projectID,
-		TaskTypeID:   req.TaskTypeID,
-		StatusID:     req.StatusID,
-		SprintID:     req.SprintID,
-		ParentTaskID: req.ParentTaskID,
-		Title:        req.Title,
-		Description:  req.NormalizedDescription(),
-		Importance:   req.Importance,
-		StoryPoints:  req.StoryPoints,
-		AssigneeIDs:  req.AssigneeIDs,
-		ReporterID:   req.ReporterID,
-		CustomFields: req.CustomFields,
-		StartDate:    req.StartDate,
-		DueDate:      req.DueDate,
-		Tags:         req.Tags,
+		ProjectID:       projectID,
+		TaskTypeID:      req.TaskTypeID,
+		StatusID:        req.StatusID,
+		SprintID:        req.SprintID,
+		ParentTaskID:    req.ParentTaskID,
+		Title:           req.Title,
+		Description:     req.NormalizedDescription(),
+		Importance:      req.Importance,
+		StoryPoints:     req.StoryPoints,
+		AssigneeIDs:     req.AssigneeIDs,
+		ReporterID:      req.ReporterID,
+		CustomFields:    req.CustomFields,
+		StartDate:       req.StartDate,
+		DueDate:         req.DueDate,
+		Tags:            req.Tags,
+		EstimateMinutes: req.EstimateMinutes,
+		VersionID:       req.VersionID,
+		ComponentID:     req.ComponentID,
 	})
 	if err != nil {
 		presenter.Error(w, r, err)
@@ -712,20 +715,23 @@ func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	oldTask, _ := h.svc.GetTask(r.Context(), projectID, taskID)
 
 	t, err := h.svc.UpdateTask(r.Context(), projectID, taskID, taskdom.UpdateTaskInput{
-		TaskTypeID:   req.TaskTypeID.Ptr(),
-		StatusID:     req.StatusID.Ptr(),
-		SprintID:     req.SprintID.Ptr(),
-		ParentTaskID: req.ParentTaskID.Ptr(),
-		Title:        req.Title,
-		Description:  req.Description.Ptr(),
-		Importance:   req.Importance,
-		StoryPoints:  req.StoryPoints.Ptr(),
-		AssigneeIDs:  req.AssigneeIDs.Ptr(),
-		ReporterID:   req.ReporterID.Ptr(),
-		CustomFields: req.CustomFields,
-		StartDate:    req.StartDate.Ptr(),
-		DueDate:      req.DueDate.Ptr(),
-		Tags:         req.Tags,
+		TaskTypeID:      req.TaskTypeID.Ptr(),
+		StatusID:        req.StatusID.Ptr(),
+		SprintID:        req.SprintID.Ptr(),
+		ParentTaskID:    req.ParentTaskID.Ptr(),
+		Title:           req.Title,
+		Description:     req.Description.Ptr(),
+		Importance:      req.Importance,
+		StoryPoints:     req.StoryPoints.Ptr(),
+		AssigneeIDs:     req.AssigneeIDs.Ptr(),
+		ReporterID:      req.ReporterID.Ptr(),
+		CustomFields:    req.CustomFields,
+		StartDate:       req.StartDate.Ptr(),
+		DueDate:         req.DueDate.Ptr(),
+		Tags:            req.Tags,
+		EstimateMinutes: req.EstimateMinutes.Ptr(),
+		VersionID:       req.VersionID.Ptr(),
+		ComponentID:     req.ComponentID.Ptr(),
 	})
 	if err != nil {
 		presenter.Error(w, r, err)
@@ -1105,6 +1111,7 @@ func (h *TaskHandler) CreateCustomFieldDefinition(w http.ResponseWriter, r *http
 		Options:      req.Options,
 		IsRequired:   req.IsRequired,
 		DefaultValue: req.DefaultValue,
+		TaskTypeID:   req.TaskTypeID,
 	})
 	if err != nil {
 		presenter.Error(w, r, err)
@@ -1171,6 +1178,30 @@ func (h *TaskHandler) DeleteCustomFieldDefinition(w http.ResponseWriter, r *http
 		return
 	}
 	presenter.OK(w, r, map[string]any{"message": "custom field deleted"})
+}
+
+// CopyProjectConfiguration handles POST /projects/:projectId/copy-config.
+// It copies the source project's task types, statuses, custom fields, and
+// workflow transitions into this (target) project.
+func (h *TaskHandler) CopyProjectConfiguration(w http.ResponseWriter, r *http.Request) {
+	targetID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	var req dto.CopyConfigurationRequest
+	if !middleware.BindJSON(w, r, &req) {
+		return
+	}
+	if req.SourceProjectID == uuid.Nil {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "source_project_id is required"))
+		return
+	}
+	if err := h.svc.CopyConfiguration(r.Context(), req.SourceProjectID, targetID); err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.OK(w, r, map[string]any{"message": "configuration copied"})
 }
 
 // ListStatusTransitions handles GET /projects/:projectId/status-transitions.

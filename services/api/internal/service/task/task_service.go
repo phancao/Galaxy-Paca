@@ -3,6 +3,7 @@ package tasksvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -358,12 +359,14 @@ func (s *Service) CreateTask(ctx context.Context, in taskdom.CreateTaskInput) (*
 	if cf == nil {
 		cf = map[string]any{}
 	}
-	// Validate/normalize custom fields against the project's definitions:
-	// reject bad types/options, fill defaults, enforce required at creation.
+	// Validate/normalize custom fields against the definitions applicable to
+	// this task's type: reject bad types/options, fill defaults, enforce
+	// required at creation.
 	cfDefs, err := s.repo.ListCustomFieldDefinitions(ctx, in.ProjectID)
 	if err != nil {
 		return nil, err
 	}
+	cfDefs = taskdom.ApplicableCustomFields(cfDefs, taskTypeID)
 	cf, err = taskdom.ValidateCustomFields(cfDefs, cf, true)
 	if err != nil {
 		return nil, err
@@ -379,24 +382,27 @@ func (s *Service) CreateTask(ctx context.Context, in taskdom.CreateTaskInput) (*
 
 	now := time.Now()
 	t := &taskdom.Task{
-		ID:           uuid.New(),
-		ProjectID:    in.ProjectID,
-		TaskTypeID:   taskTypeID,
-		StatusID:     statusID,
-		SprintID:     in.SprintID,
-		ParentTaskID: in.ParentTaskID,
-		Title:        title,
-		Description:  in.Description,
-		Importance:   in.Importance,
-		StoryPoints:  in.StoryPoints,
-		AssigneeIDs:  assigneeIDs,
-		ReporterID:   in.ReporterID,
-		CustomFields: cf,
-		StartDate:    in.StartDate,
-		DueDate:      in.DueDate,
-		Tags:         tags,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:              uuid.New(),
+		ProjectID:       in.ProjectID,
+		TaskTypeID:      taskTypeID,
+		StatusID:        statusID,
+		SprintID:        in.SprintID,
+		ParentTaskID:    in.ParentTaskID,
+		Title:           title,
+		Description:     in.Description,
+		Importance:      in.Importance,
+		StoryPoints:     in.StoryPoints,
+		AssigneeIDs:     assigneeIDs,
+		ReporterID:      in.ReporterID,
+		CustomFields:    cf,
+		StartDate:       in.StartDate,
+		DueDate:         in.DueDate,
+		Tags:            tags,
+		EstimateMinutes: in.EstimateMinutes,
+		VersionID:       in.VersionID,
+		ComponentID:     in.ComponentID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	if err := s.repo.CreateTask(ctx, t); err != nil {
@@ -478,6 +484,7 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 		if err != nil {
 			return nil, err
 		}
+		cfDefs = taskdom.ApplicableCustomFields(cfDefs, t.TaskTypeID)
 		// enforceAllRequired=false: don't block edits of tasks that predate a
 		// required field; still reject bad values or an explicit clear of a
 		// required field.
@@ -495,6 +502,15 @@ func (s *Service) UpdateTask(ctx context.Context, projectID, id uuid.UUID, in ta
 	}
 	if in.Tags != nil {
 		t.Tags = *in.Tags
+	}
+	if in.EstimateMinutes != nil {
+		t.EstimateMinutes = *in.EstimateMinutes
+	}
+	if in.VersionID != nil {
+		t.VersionID = *in.VersionID
+	}
+	if in.ComponentID != nil {
+		t.ComponentID = *in.ComponentID
 	}
 
 	// Enforce the project's workflow (opt-in) on any status change, using the
@@ -579,6 +595,7 @@ func (s *Service) CreateCustomFieldDefinition(ctx context.Context, in taskdom.Cr
 		Options:      opts,
 		IsRequired:   in.IsRequired,
 		DefaultValue: defaultVal,
+		TaskTypeID:   in.TaskTypeID,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -663,6 +680,171 @@ func (s *Service) DeleteCustomFieldDefinition(ctx context.Context, projectID, id
 		return taskdom.ErrCustomFieldNotFound
 	}
 	return s.repo.DeleteCustomFieldDefinition(ctx, id)
+}
+
+// CopyConfiguration copies a source project's task schema — task types,
+// statuses, custom fields, and workflow transitions — into a target project so
+// a "template" project can be reused instead of re-seeding every project by
+// hand (ADR-040 Phase 3, additive: it never mutates existing rows). Items that
+// already exist in the target are skipped (types/statuses by name, custom
+// fields by field_key), and transitions/field scopes are remapped from source
+// ids to the matching target ids by name.
+func (s *Service) CopyConfiguration(ctx context.Context, sourceProjectID, targetProjectID uuid.UUID) error {
+	if sourceProjectID == targetProjectID {
+		return nil
+	}
+	now := time.Now()
+
+	// --- Task types (skip system + existing-by-name) ---
+	srcTypes, err := s.repo.ListTaskTypes(ctx, sourceProjectID)
+	if err != nil {
+		return err
+	}
+	tgtTypes, err := s.repo.ListTaskTypes(ctx, targetProjectID)
+	if err != nil {
+		return err
+	}
+	typeByName := make(map[string]uuid.UUID, len(tgtTypes))
+	for _, t := range tgtTypes {
+		typeByName[t.Name] = t.ID
+	}
+	for _, st := range srcTypes {
+		if st.IsSystem {
+			continue
+		}
+		if _, exists := typeByName[st.Name]; exists {
+			continue
+		}
+		nt := &taskdom.TaskType{
+			ID: uuid.New(), ProjectID: targetProjectID, Name: st.Name,
+			Icon: st.Icon, Color: st.Color, Description: st.Description,
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := s.repo.CreateTaskType(ctx, nt); err != nil {
+			return err
+		}
+		typeByName[st.Name] = nt.ID
+	}
+
+	// --- Statuses (skip existing-by-name) ---
+	srcStatuses, err := s.repo.ListTaskStatuses(ctx, sourceProjectID)
+	if err != nil {
+		return err
+	}
+	tgtStatuses, err := s.repo.ListTaskStatuses(ctx, targetProjectID)
+	if err != nil {
+		return err
+	}
+	statusByName := make(map[string]uuid.UUID, len(tgtStatuses))
+	for _, st := range tgtStatuses {
+		statusByName[st.Name] = st.ID
+	}
+	for _, ss := range srcStatuses {
+		if _, exists := statusByName[ss.Name]; exists {
+			continue
+		}
+		ns := &taskdom.TaskStatus{
+			ID: uuid.New(), ProjectID: targetProjectID, Name: ss.Name,
+			Color: ss.Color, Position: ss.Position, Category: ss.Category,
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := s.repo.CreateTaskStatus(ctx, ns); err != nil {
+			return err
+		}
+		statusByName[ss.Name] = ns.ID
+	}
+
+	// --- Custom fields (skip existing-by-key; remap type scope by name) ---
+	srcFields, err := s.repo.ListCustomFieldDefinitions(ctx, sourceProjectID)
+	if err != nil {
+		return err
+	}
+	tgtFields, err := s.repo.ListCustomFieldDefinitions(ctx, targetProjectID)
+	if err != nil {
+		return err
+	}
+	fieldKeys := make(map[string]bool, len(tgtFields))
+	for _, f := range tgtFields {
+		fieldKeys[f.FieldKey] = true
+	}
+	for _, sf := range srcFields {
+		if fieldKeys[sf.FieldKey] {
+			continue
+		}
+		var typeScope *uuid.UUID
+		if sf.TaskTypeID != nil {
+			// Map the source type scope to the target type of the same name;
+			// drop the scope if that type doesn't exist in the target.
+			for _, st := range srcTypes {
+				if st.ID == *sf.TaskTypeID {
+					if id, ok := typeByName[st.Name]; ok {
+						idCopy := id
+						typeScope = &idCopy
+					}
+					break
+				}
+			}
+		}
+		nf := &taskdom.CustomFieldDefinition{
+			ID: uuid.New(), ProjectID: targetProjectID, FieldKey: sf.FieldKey,
+			DisplayName: sf.DisplayName, FieldType: sf.FieldType, Options: sf.Options,
+			IsRequired: sf.IsRequired, DefaultValue: sf.DefaultValue, TaskTypeID: typeScope,
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := s.repo.CreateCustomFieldDefinition(ctx, nf); err != nil {
+			return err
+		}
+		fieldKeys[sf.FieldKey] = true
+	}
+
+	// --- Workflow transitions (remap status/type ids by name) ---
+	srcTransitions, err := s.repo.ListStatusTransitions(ctx, sourceProjectID)
+	if err != nil {
+		return err
+	}
+	// Source id -> name lookups for remapping.
+	srcStatusName := make(map[uuid.UUID]string, len(srcStatuses))
+	for _, st := range srcStatuses {
+		srcStatusName[st.ID] = st.Name
+	}
+	srcTypeName := make(map[uuid.UUID]string, len(srcTypes))
+	for _, st := range srcTypes {
+		srcTypeName[st.ID] = st.Name
+	}
+	for _, tr := range srcTransitions {
+		toID, ok := statusByName[srcStatusName[tr.ToStatusID]]
+		if !ok {
+			continue // destination status not present in target
+		}
+		var fromID *uuid.UUID
+		if tr.FromStatusID != nil {
+			id, ok := statusByName[srcStatusName[*tr.FromStatusID]]
+			if !ok {
+				continue
+			}
+			fromID = &id
+		}
+		var typeID *uuid.UUID
+		if tr.TaskTypeID != nil {
+			id, ok := typeByName[srcTypeName[*tr.TaskTypeID]]
+			if !ok {
+				continue
+			}
+			typeID = &id
+		}
+		nt := &taskdom.StatusTransition{
+			ID: uuid.New(), ProjectID: targetProjectID, TaskTypeID: typeID,
+			FromStatusID: fromID, ToStatusID: toID, RequiredFields: tr.RequiredFields,
+			CreatedAt: now,
+		}
+		// Duplicate rules (same project/type/from/to) are refused by the unique
+		// index; ignore that so re-copying is idempotent.
+		if err := s.repo.CreateStatusTransition(ctx, nt); err != nil && !errors.Is(err, taskdom.ErrTransitionInvalid) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // --- Status Transitions (workflow engine, ADR-040) --------------------------

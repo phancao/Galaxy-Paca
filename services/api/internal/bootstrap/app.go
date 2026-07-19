@@ -33,6 +33,7 @@ import (
 	apikeysvc "github.com/Paca-AI/api/internal/service/apikey"
 	attachmentsvc "github.com/Paca-AI/api/internal/service/attachment"
 	authsvc "github.com/Paca-AI/api/internal/service/auth"
+	componentsvc "github.com/Paca-AI/api/internal/service/component"
 	docsvc "github.com/Paca-AI/api/internal/service/doc"
 	galaxyauthsvc "github.com/Paca-AI/api/internal/service/galaxyauth"
 	globalrolesvc "github.com/Paca-AI/api/internal/service/globalrole"
@@ -42,7 +43,9 @@ import (
 	sprintsvc "github.com/Paca-AI/api/internal/service/sprint"
 	tasksvc "github.com/Paca-AI/api/internal/service/task"
 	usersvc "github.com/Paca-AI/api/internal/service/user"
+	versionsvc "github.com/Paca-AI/api/internal/service/version"
 	workflowsvc "github.com/Paca-AI/api/internal/service/workflow"
+	worklogsvc "github.com/Paca-AI/api/internal/service/worklog"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	httpmw "github.com/Paca-AI/api/internal/transport/http/middleware"
 	"github.com/Paca-AI/api/internal/transport/http/router"
@@ -102,6 +105,9 @@ func New(cfg *config.Config) (*App, error) {
 	globalRoleRepo := pgRepo.NewGlobalRoleRepository(db)
 	projectRepo := pgRepo.NewProjectRepository(db)
 	taskRepo := pgRepo.NewTaskRepository(db)
+	versionRepo := pgRepo.NewVersionRepository(db)
+	componentRepo := pgRepo.NewComponentRepository(db)
+	worklogRepo := pgRepo.NewWorklogRepository(db)
 	activityRepo := pgRepo.NewTaskActivityRepository(db)
 	notificationRepo := pgRepo.NewNotificationRepository(db)
 	sprintRepo := pgRepo.NewSprintRepository(db)
@@ -146,6 +152,9 @@ func New(cfg *config.Config) (*App, error) {
 	globalRoleService := globalrolesvc.NewCachedService(globalrolesvc.New(globalRoleRepo), cacheStore, cfg.Cache.ConfigTTL, log)
 	projectService := projectsvc.NewCachedService(projectsvc.New(projectRepo, taskRepo), cacheStore, cfg.Cache.ProjectTTL, cfg.Cache.ConfigTTL, log)
 	taskService := tasksvc.NewCachedService(tasksvc.New(taskRepo).WithWorkflowStatusChecker(rawWorkflowRepo), cacheStore, cfg.Cache.ConfigTTL, log)
+	versionService := versionsvc.New(versionRepo)
+	componentService := componentsvc.New(componentRepo)
+	worklogService := worklogsvc.New(worklogRepo, worklogsvc.NewTaskOwnerChecker(taskRepo))
 	sprintService := sprintsvc.NewCachedSprintService(sprintsvc.New(sprintRepo, taskRepo), cacheStore, cfg.Cache.SprintTTL, log)
 	viewService := sprintsvc.NewCachedViewService(sprintsvc.NewViewService(viewRepo), cacheStore, cfg.Cache.SprintTTL, log)
 	notificationService := notificationsvc.New(notificationRepo, projectRepo, publisher)
@@ -368,6 +377,9 @@ func New(cfg *config.Config) (*App, error) {
 		Project:              handler.NewProjectHandler(projectService, authorizer, handler.WithProjectDefaultViews(viewService, taskService)),
 		Task: handler.NewTaskHandler(taskService, viewService, activityService,
 			handler.WithTaskPublisher(publisher)),
+		Version:   handler.NewVersionHandler(versionService),
+		Component: handler.NewComponentHandler(componentService),
+		Worklog:   handler.NewWorklogHandler(worklogService).WithMemberRepo(projectRepo),
 		Sprint: handler.NewSprintHandler(sprintService, viewService,
 			handler.WithSprintDefaultTaskTypes(taskService),
 			handler.WithSprintDefaultTaskStatuses(taskService),

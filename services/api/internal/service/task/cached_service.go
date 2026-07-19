@@ -347,6 +347,20 @@ func (c *CachedService) DeleteStatusTransition(ctx context.Context, projectID, i
 	return c.svc.DeleteStatusTransition(ctx, projectID, id)
 }
 
+// CopyConfiguration delegates to the underlying service and invalidates the
+// target project's config caches (types/statuses/custom-fields).
+func (c *CachedService) CopyConfiguration(ctx context.Context, sourceProjectID, targetProjectID uuid.UUID) error {
+	if err := c.svc.CopyConfiguration(ctx, sourceProjectID, targetProjectID); err != nil {
+		return err
+	}
+	for _, key := range []string{taskTypesKey(targetProjectID), taskStatusesKey(targetProjectID), customFieldsKey(targetProjectID)} {
+		if err := c.st.Delete(ctx, key); err != nil {
+			c.log.WarnContext(ctx, "cache: CopyConfiguration invalidate", "err", err)
+		}
+	}
+	return nil
+}
+
 // --- Task Links (pass-through) -----------------------------------------------
 
 // ListTaskLinks delegates directly to the underlying service (not cached).

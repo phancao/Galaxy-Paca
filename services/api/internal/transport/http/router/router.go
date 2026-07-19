@@ -30,6 +30,9 @@ type Deps struct {
 	GlobalRole           *handler.GlobalRoleHandler
 	Project              *handler.ProjectHandler
 	Task                 *handler.TaskHandler
+	Version              *handler.VersionHandler
+	Component            *handler.ComponentHandler
+	Worklog              *handler.WorklogHandler
 	Sprint               *handler.SprintHandler
 	View                 *handler.ViewHandler
 	Attachment           *handler.AttachmentHandler
@@ -384,6 +387,20 @@ func New(deps Deps) http.Handler {
 							Delete("/{linkId}", deps.Task.DeleteTaskLink)
 					})
 
+					// Worklogs (time tracking) — ADR-040 Phase 2
+					if deps.Worklog != nil {
+						r.Route("/{taskId}/worklogs", func(r chi.Router) {
+							r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+								httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+								httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionTasksRead}},
+							)).Get("/", deps.Worklog.ListWorklogs)
+							r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+								Post("/", deps.Worklog.CreateWorklog)
+							r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+								Delete("/{worklogId}", deps.Worklog.DeleteWorklog)
+						})
+					}
+
 					// Workflows this task belongs to (read-only, for the task detail view)
 					if deps.Workflow != nil {
 						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
@@ -429,6 +446,10 @@ func New(deps Deps) http.Handler {
 						Delete("/{fieldId}", deps.Task.DeleteCustomFieldDefinition)
 				})
 
+				// Copy task schema from another project (ADR-040 Phase 3)
+				r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+					Post("/copy-config", deps.Task.CopyProjectConfiguration)
+
 				// Workflow status transitions (ADR-040)
 				r.Route("/status-transitions", func(r chi.Router) {
 					r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
@@ -440,6 +461,38 @@ func New(deps Deps) http.Handler {
 					r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
 						Delete("/{transitionId}", deps.Task.DeleteStatusTransition)
 				})
+
+				// Versions (fixVersion) — ADR-040 Phase 2
+				if deps.Version != nil {
+					r.Route("/versions", func(r chi.Router) {
+						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionTasksRead}},
+						)).Get("/", deps.Version.ListVersions)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+							Post("/", deps.Version.CreateVersion)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+							Patch("/{versionId}", deps.Version.UpdateVersion)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+							Delete("/{versionId}", deps.Version.DeleteVersion)
+					})
+				}
+
+				// Components — ADR-040 Phase 2
+				if deps.Component != nil {
+					r.Route("/components", func(r chi.Router) {
+						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
+							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
+							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionTasksRead}},
+						)).Get("/", deps.Component.ListComponents)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+							Post("/", deps.Component.CreateComponent)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+							Patch("/{componentId}", deps.Component.UpdateComponent)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+							Delete("/{componentId}", deps.Component.DeleteComponent)
+					})
+				}
 
 				// Documentation
 				r.Route("/docs", func(r chi.Router) {

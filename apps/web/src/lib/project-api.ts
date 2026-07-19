@@ -429,6 +429,10 @@ export interface CustomFieldDefinition {
 	options: string[];
 	is_required: boolean;
 	default_value: CustomFieldDefaultValue;
+	// ADR-040 Phase 2.8: scopes a field to a single task type.
+	// null → applies to all task types; a type id → only that type.
+	// Set at creation, immutable on edit.
+	task_type_id: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -461,6 +465,8 @@ export async function createCustomFieldDefinition(
 		options?: string[];
 		is_required?: boolean;
 		default_value?: CustomFieldDefaultValue;
+		// ADR-040 Phase 2.8: null / omitted → all task types; a type id → scoped.
+		task_type_id?: string | null;
 	},
 ): Promise<CustomFieldDefinition> {
 	const { data } = await apiClient.instance.post<
@@ -549,6 +555,132 @@ export async function deleteStatusTransition(
 	);
 }
 
+// ── Versions (ADR-040 Phase 2.9) ──────────────────────────────────────────────
+
+/** A release/fix version a task can be assigned to via `version_id`. */
+export interface ProjectVersion {
+	id: string;
+	project_id: string;
+	name: string;
+	description: string;
+	released: boolean;
+	release_date: string | null;
+	archived: boolean;
+	created_at: string;
+	updated_at: string;
+}
+
+export async function listProjectVersions(
+	projectId: string,
+): Promise<ProjectVersion[]> {
+	const { data } = await apiClient.instance.get<
+		SuccessEnvelope<{ items: ProjectVersion[] }>
+	>(`/projects/${projectId}/versions`);
+	return data.data.items;
+}
+
+export async function createProjectVersion(
+	projectId: string,
+	payload: {
+		name: string;
+		description?: string;
+		released?: boolean;
+		release_date?: string | null;
+		archived?: boolean;
+	},
+): Promise<ProjectVersion> {
+	const { data } = await apiClient.instance.post<
+		SuccessEnvelope<ProjectVersion>
+	>(`/projects/${projectId}/versions`, payload);
+	return data.data;
+}
+
+export async function updateProjectVersion(
+	projectId: string,
+	versionId: string,
+	payload: {
+		name?: string;
+		description?: string;
+		released?: boolean;
+		release_date?: string | null;
+		archived?: boolean;
+	},
+): Promise<ProjectVersion> {
+	const { data } = await apiClient.instance.patch<
+		SuccessEnvelope<ProjectVersion>
+	>(`/projects/${projectId}/versions/${versionId}`, payload);
+	return data.data;
+}
+
+export async function deleteProjectVersion(
+	projectId: string,
+	versionId: string,
+): Promise<void> {
+	await apiClient.instance.delete(
+		`/projects/${projectId}/versions/${versionId}`,
+	);
+}
+
+// ── Components (ADR-040 Phase 2.9) ────────────────────────────────────────────
+
+/** A functional area a task can be assigned to via `component_id`. */
+export interface ProjectComponent {
+	id: string;
+	project_id: string;
+	name: string;
+	description: string;
+	lead_member_id: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export async function listProjectComponents(
+	projectId: string,
+): Promise<ProjectComponent[]> {
+	const { data } = await apiClient.instance.get<
+		SuccessEnvelope<{ items: ProjectComponent[] }>
+	>(`/projects/${projectId}/components`);
+	return data.data.items;
+}
+
+export async function createProjectComponent(
+	projectId: string,
+	payload: {
+		name: string;
+		description?: string;
+		lead_member_id?: string | null;
+	},
+): Promise<ProjectComponent> {
+	const { data } = await apiClient.instance.post<
+		SuccessEnvelope<ProjectComponent>
+	>(`/projects/${projectId}/components`, payload);
+	return data.data;
+}
+
+export async function updateProjectComponent(
+	projectId: string,
+	componentId: string,
+	payload: {
+		name?: string;
+		description?: string;
+		lead_member_id?: string | null;
+	},
+): Promise<ProjectComponent> {
+	const { data } = await apiClient.instance.patch<
+		SuccessEnvelope<ProjectComponent>
+	>(`/projects/${projectId}/components/${componentId}`, payload);
+	return data.data;
+}
+
+export async function deleteProjectComponent(
+	projectId: string,
+	componentId: string,
+): Promise<void> {
+	await apiClient.instance.delete(
+		`/projects/${projectId}/components/${componentId}`,
+	);
+}
+
 // ── Query Options ─────────────────────────────────────────────────────────────
 
 export const projectsQueryOptions = (page = 1, pageSize = 50) =>
@@ -606,4 +738,16 @@ export const statusTransitionsQueryOptions = (projectId: string) =>
 	queryOptions({
 		queryKey: ["projects", projectId, "status-transitions"],
 		queryFn: () => listStatusTransitions(projectId),
+	});
+
+export const projectVersionsQueryOptions = (projectId: string) =>
+	queryOptions({
+		queryKey: ["projects", projectId, "versions"],
+		queryFn: () => listProjectVersions(projectId),
+	});
+
+export const projectComponentsQueryOptions = (projectId: string) =>
+	queryOptions({
+		queryKey: ["projects", projectId, "components"],
+		queryFn: () => listProjectComponents(projectId),
 	});

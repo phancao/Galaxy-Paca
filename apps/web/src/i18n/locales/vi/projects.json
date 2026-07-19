@@ -12,7 +12,9 @@
 				"customFields": "Trường tùy chỉnh",
 				"workflow": "Quy trình",
 				"dangerZone": "Khu vực nguy hiểm",
-				"plugins": "Plugin"
+				"plugins": "Plugin",
+				"versions": "Phiên bản",
+				"components": "Thành phần"
 			}
 		}
 	},
@@ -468,7 +470,8 @@
 				"displayName": "Tên hiển thị",
 				"fieldKey": "Khóa trường",
 				"type": "Loại",
-				"required": "Bắt buộc"
+				"required": "Bắt buộc",
+				"appliesTo": "Áp dụng cho"
 			},
 			"yes": "Có",
 			"no": "Không",
@@ -529,7 +532,12 @@
 				"confirmTextSuffix": "? Dữ liệu nhiệm vụ lưu trong trường này sẽ bị mất. Hành động này không thể hoàn tác.",
 				"deleteFailed": "Xóa trường thất bại. Vui lòng thử lại.",
 				"deleteField": "Xóa trường"
-			}
+			},
+			"appliesToLabel": "Áp dụng cho",
+			"appliesToAllTypes": "Tất cả loại nhiệm vụ",
+			"appliesToHint": "Giới hạn trường này cho một loại nhiệm vụ. Không thể thay đổi sau khi tạo.",
+			"appliesToImmutableHint": "Phạm vi loại nhiệm vụ không thể thay đổi sau khi tạo.",
+			"scopeOnly": "Chỉ: {{type}}"
 		},
 		"workflow": {
 			"title": "Quy trình",
@@ -577,6 +585,103 @@
 				"deleteFailed": "Xóa dự án thất bại. Vui lòng thử lại.",
 				"cancel": "Hủy",
 				"deletePermanently": "Xóa vĩnh viễn"
+			}
+		},
+		"versions": {
+			"title": "Phiên bản",
+			"description": "Định nghĩa các phiên bản phát hành/sửa lỗi mà nhiệm vụ có thể được gán vào.",
+			"newVersion": "Phiên bản mới",
+			"nameLabel": "Tên",
+			"namePlaceholder": "vd: 1.0.0",
+			"descriptionLabel": "Mô tả",
+			"descriptionPlaceholder": "Phiên bản này bao gồm những gì…",
+			"releaseDateLabel": "Ngày phát hành",
+			"releasedLabel": "Đã phát hành",
+			"releasedHint": "Đánh dấu phiên bản này đã được phát hành.",
+			"archivedLabel": "Đã lưu trữ",
+			"archivedHint": "Ẩn phiên bản này khỏi các bộ chọn đang dùng.",
+			"released": "Đã phát hành",
+			"unreleased": "Chưa phát hành",
+			"noDate": "—",
+			"archivedBadge": "Đã lưu trữ",
+			"editVersion": "Chỉnh sửa phiên bản",
+			"deleteVersion": "Xóa phiên bản",
+			"cancel": "Hủy",
+			"saveChanges": "Lưu thay đổi",
+			"table": {
+				"name": "Tên",
+				"status": "Trạng thái",
+				"releaseDate": "Ngày phát hành"
+			},
+			"empty": {
+				"title": "Chưa có phiên bản nào",
+				"description": "Phiên bản cho phép bạn nhóm nhiệm vụ theo bản phát hành mục tiêu.",
+				"createFirst": "Tạo phiên bản đầu tiên"
+			},
+			"createDialog": {
+				"title": "Tạo phiên bản",
+				"description": "Thêm một phiên bản phát hành/sửa lỗi cho dự án này.",
+				"createVersion": "Tạo phiên bản"
+			},
+			"editDialog": {
+				"title": "Chỉnh sửa phiên bản",
+				"description": "Cập nhật thông tin phiên bản."
+			},
+			"deleteDialog": {
+				"title": "Xóa phiên bản",
+				"confirmTextPrefix": "Xóa",
+				"confirmTextSuffix": "? Nhiệm vụ được gán sẽ mất phiên bản sửa lỗi. Hành động này không thể hoàn tác.",
+				"deleteVersion": "Xóa phiên bản",
+				"deleteFailed": "Xóa phiên bản thất bại. Vui lòng thử lại."
+			},
+			"errors": {
+				"createFailed": "Tạo phiên bản thất bại. Vui lòng thử lại.",
+				"saveFailed": "Lưu thay đổi thất bại. Vui lòng thử lại."
+			}
+		},
+		"components": {
+			"title": "Thành phần",
+			"description": "Định nghĩa các mảng chức năng mà nhiệm vụ có thể được gán vào, mỗi mảng có thể có người phụ trách.",
+			"newComponent": "Thành phần mới",
+			"nameLabel": "Tên",
+			"namePlaceholder": "vd: Thanh toán",
+			"descriptionLabel": "Mô tả",
+			"descriptionPlaceholder": "Thành phần này bao gồm những gì…",
+			"leadLabel": "Người phụ trách",
+			"leadHint": "Tùy chọn. Thành viên chịu trách nhiệm cho thành phần này.",
+			"noLead": "Không có người phụ trách",
+			"editComponent": "Chỉnh sửa thành phần",
+			"deleteComponent": "Xóa thành phần",
+			"cancel": "Hủy",
+			"saveChanges": "Lưu thay đổi",
+			"table": {
+				"name": "Tên",
+				"lead": "Người phụ trách"
+			},
+			"empty": {
+				"title": "Chưa có thành phần nào",
+				"description": "Thành phần cho phép bạn nhóm nhiệm vụ theo mảng chức năng.",
+				"createFirst": "Tạo thành phần đầu tiên"
+			},
+			"createDialog": {
+				"title": "Tạo thành phần",
+				"description": "Thêm một mảng chức năng cho dự án này.",
+				"createComponent": "Tạo thành phần"
+			},
+			"editDialog": {
+				"title": "Chỉnh sửa thành phần",
+				"description": "Cập nhật thông tin thành phần."
+			},
+			"deleteDialog": {
+				"title": "Xóa thành phần",
+				"confirmTextPrefix": "Xóa",
+				"confirmTextSuffix": "? Nhiệm vụ được gán sẽ mất thành phần. Hành động này không thể hoàn tác.",
+				"deleteComponent": "Xóa thành phần",
+				"deleteFailed": "Xóa thành phần thất bại. Vui lòng thử lại."
+			},
+			"errors": {
+				"createFailed": "Tạo thành phần thất bại. Vui lòng thử lại.",
+				"saveFailed": "Lưu thay đổi thất bại. Vui lòng thử lại."
 			}
 		}
 	},
@@ -743,7 +848,11 @@
 			"parent": "Nhiệm vụ cha",
 			"viewParent": "Xem nhiệm vụ cha",
 			"removeParent": "Gỡ nhiệm vụ cha",
-			"addFields": "Thêm trường"
+			"addFields": "Thêm trường",
+			"estimate": "Ước lượng",
+			"hoursSuffix": "giờ",
+			"version": "Phiên bản",
+			"component": "Thành phần"
 		},
 		"description": {
 			"title": "Mô tả",
@@ -911,6 +1020,22 @@
 			"watchSession": "Theo dõi phiên",
 			"madeChange": "đã thực hiện một thay đổi",
 			"descriptionChangeDiff": "Thay đổi mô tả"
+		},
+		"timeTracking": {
+			"title": "Theo dõi thời gian",
+			"logged": "Đã ghi {{logged}}",
+			"ofEstimate": "trên {{estimate}} ước lượng",
+			"noEstimate": "Chưa ước lượng",
+			"minutesPlaceholder": "Số phút",
+			"notePlaceholder": "Bạn đã làm gì? (tùy chọn)",
+			"logWork": "Ghi thời gian",
+			"deleteEntry": "Xóa mục",
+			"empty": "Chưa ghi thời gian nào.",
+			"unknown": "Không rõ",
+			"errors": {
+				"logFailed": "Ghi thời gian thất bại. Vui lòng thử lại.",
+				"deleteFailed": "Xóa mục thất bại. Vui lòng thử lại."
+			}
 		}
 	},
 	"board": {

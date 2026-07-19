@@ -11,6 +11,23 @@ import (
 	"github.com/google/uuid"
 )
 
+// ApplicableCustomFields filters definitions to those that apply to a task of
+// the given type: fields scoped to no type (nil TaskTypeID) always apply;
+// type-scoped fields apply only when the task's type matches (ADR-040 Phase 2).
+func ApplicableCustomFields(defs []*CustomFieldDefinition, taskTypeID *uuid.UUID) []*CustomFieldDefinition {
+	out := make([]*CustomFieldDefinition, 0, len(defs))
+	for _, d := range defs {
+		if d.TaskTypeID == nil {
+			out = append(out, d)
+			continue
+		}
+		if taskTypeID != nil && *d.TaskTypeID == *taskTypeID {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // ValidateFieldDefinition enforces structural rules on a custom-field
 // definition itself (independent of any task value): select / multi_select
 // must carry at least one option, otherwise the field can never hold a valid

@@ -35,6 +35,11 @@ export interface Task {
 	description?: unknown[] | null;
 	importance: number;
 	story_points?: number | null;
+	// ADR-040 Phase 2.9: original time estimate (minutes), release/fix version,
+	// and functional component the task belongs to.
+	estimate_minutes?: number | null;
+	version_id?: string | null;
+	component_id?: string | null;
 	assignee_ids?: string[];
 	reporter_id?: string | null;
 	custom_fields: Record<string, unknown>;
@@ -549,6 +554,9 @@ export async function createTask(
 		task_type_id?: string | null;
 		assignee_ids?: string[];
 		parent_task_id?: string | null;
+		estimate_minutes?: number | null;
+		version_id?: string | null;
+		component_id?: string | null;
 	},
 ): Promise<Task> {
 	const { data } = await apiClient.instance.post<SuccessEnvelope<Task>>(
@@ -582,6 +590,10 @@ export async function updateTask(
 		description: unknown[] | null;
 		importance: number;
 		story_points?: number | null;
+		// ADR-040 Phase 2.9 — nullable so "clear" is sent explicitly (mirrors sprint_id).
+		estimate_minutes: number | null;
+		version_id: string | null;
+		component_id: string | null;
 		start_date: string | null;
 		due_date: string | null;
 		tags: string[];
@@ -854,6 +866,65 @@ export const taskLinksQueryOptions = (projectId: string, taskId: string) =>
 	queryOptions({
 		queryKey: ["projects", projectId, "tasks", taskId, "links"],
 		queryFn: () => listTaskLinks(projectId, taskId),
+		staleTime: 15_000,
+		enabled: !!projectId && !!taskId,
+	});
+
+// ── Worklogs (ADR-040 Phase 2.9) ──────────────────────────────────────────────
+
+/** A single logged time entry against a task. */
+export interface Worklog {
+	id: string;
+	task_id: string;
+	member_id: string;
+	minutes: number;
+	note: string;
+	logged_at: string;
+	created_at: string;
+}
+
+export interface WorklogListResult {
+	items: Worklog[];
+	/** Sum of `minutes` across all entries. */
+	total_minutes: number;
+}
+
+export async function listWorklogs(
+	projectId: string,
+	taskId: string,
+): Promise<WorklogListResult> {
+	const { data } = await apiClient.instance.get<
+		SuccessEnvelope<WorklogListResult>
+	>(`/projects/${projectId}/tasks/${taskId}/worklogs`);
+	return data.data;
+}
+
+export async function createWorklog(
+	projectId: string,
+	taskId: string,
+	payload: { minutes: number; note?: string; logged_at?: string },
+): Promise<Worklog> {
+	const { data } = await apiClient.instance.post<SuccessEnvelope<Worklog>>(
+		`/projects/${projectId}/tasks/${taskId}/worklogs`,
+		payload,
+	);
+	return data.data;
+}
+
+export async function deleteWorklog(
+	projectId: string,
+	taskId: string,
+	worklogId: string,
+): Promise<void> {
+	await apiClient.instance.delete(
+		`/projects/${projectId}/tasks/${taskId}/worklogs/${worklogId}`,
+	);
+}
+
+export const worklogsQueryOptions = (projectId: string, taskId: string) =>
+	queryOptions({
+		queryKey: ["projects", projectId, "tasks", taskId, "worklogs"],
+		queryFn: () => listWorklogs(projectId, taskId),
 		staleTime: 15_000,
 		enabled: !!projectId && !!taskId,
 	});

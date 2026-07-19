@@ -12,7 +12,9 @@
 				"customFields": "Custom Fields",
 				"workflow": "Workflow",
 				"dangerZone": "Danger Zone",
-				"plugins": "Plugins"
+				"plugins": "Plugins",
+				"versions": "Versions",
+				"components": "Components"
 			}
 		}
 	},
@@ -468,7 +470,8 @@
 				"displayName": "Display Name",
 				"fieldKey": "Field Key",
 				"type": "Type",
-				"required": "Required"
+				"required": "Required",
+				"appliesTo": "Applies to"
 			},
 			"yes": "Yes",
 			"no": "No",
@@ -529,7 +532,12 @@
 				"confirmTextSuffix": "? Task data stored in this field will be lost. This action cannot be undone.",
 				"deleteFailed": "Failed to delete field. Please try again.",
 				"deleteField": "Delete field"
-			}
+			},
+			"appliesToLabel": "Applies to",
+			"appliesToAllTypes": "All task types",
+			"appliesToHint": "Scope this field to a single task type. Cannot be changed after creation.",
+			"appliesToImmutableHint": "The task type scope cannot be changed after creation.",
+			"scopeOnly": "Only: {{type}}"
 		},
 		"workflow": {
 			"title": "Workflow",
@@ -577,6 +585,103 @@
 				"deleteFailed": "Failed to delete project. Please try again.",
 				"cancel": "Cancel",
 				"deletePermanently": "Delete permanently"
+			}
+		},
+		"versions": {
+			"title": "Versions",
+			"description": "Define release/fix versions that tasks can be assigned to.",
+			"newVersion": "New version",
+			"nameLabel": "Name",
+			"namePlaceholder": "e.g. 1.0.0",
+			"descriptionLabel": "Description",
+			"descriptionPlaceholder": "What this version covers…",
+			"releaseDateLabel": "Release date",
+			"releasedLabel": "Released",
+			"releasedHint": "Mark this version as shipped.",
+			"archivedLabel": "Archived",
+			"archivedHint": "Hide this version from active pickers.",
+			"released": "Released",
+			"unreleased": "Unreleased",
+			"noDate": "—",
+			"archivedBadge": "Archived",
+			"editVersion": "Edit version",
+			"deleteVersion": "Delete version",
+			"cancel": "Cancel",
+			"saveChanges": "Save changes",
+			"table": {
+				"name": "Name",
+				"status": "Status",
+				"releaseDate": "Release date"
+			},
+			"empty": {
+				"title": "No versions yet",
+				"description": "Versions let you group tasks by the release they target.",
+				"createFirst": "Create first version"
+			},
+			"createDialog": {
+				"title": "Create version",
+				"description": "Add a release/fix version for this project.",
+				"createVersion": "Create version"
+			},
+			"editDialog": {
+				"title": "Edit version",
+				"description": "Update the version details."
+			},
+			"deleteDialog": {
+				"title": "Delete version",
+				"confirmTextPrefix": "Delete",
+				"confirmTextSuffix": "? Tasks assigned to it will lose their fix version. This action cannot be undone.",
+				"deleteVersion": "Delete version",
+				"deleteFailed": "Failed to delete version. Please try again."
+			},
+			"errors": {
+				"createFailed": "Failed to create version. Please try again.",
+				"saveFailed": "Failed to save changes. Please try again."
+			}
+		},
+		"components": {
+			"title": "Components",
+			"description": "Define functional areas that tasks can be assigned to, each with an optional lead.",
+			"newComponent": "New component",
+			"nameLabel": "Name",
+			"namePlaceholder": "e.g. Payments",
+			"descriptionLabel": "Description",
+			"descriptionPlaceholder": "What this component covers…",
+			"leadLabel": "Component lead",
+			"leadHint": "Optional. The member responsible for this component.",
+			"noLead": "No lead",
+			"editComponent": "Edit component",
+			"deleteComponent": "Delete component",
+			"cancel": "Cancel",
+			"saveChanges": "Save changes",
+			"table": {
+				"name": "Name",
+				"lead": "Lead"
+			},
+			"empty": {
+				"title": "No components yet",
+				"description": "Components let you group tasks by functional area.",
+				"createFirst": "Create first component"
+			},
+			"createDialog": {
+				"title": "Create component",
+				"description": "Add a functional area for this project.",
+				"createComponent": "Create component"
+			},
+			"editDialog": {
+				"title": "Edit component",
+				"description": "Update the component details."
+			},
+			"deleteDialog": {
+				"title": "Delete component",
+				"confirmTextPrefix": "Delete",
+				"confirmTextSuffix": "? Tasks assigned to it will lose their component. This action cannot be undone.",
+				"deleteComponent": "Delete component",
+				"deleteFailed": "Failed to delete component. Please try again."
+			},
+			"errors": {
+				"createFailed": "Failed to create component. Please try again.",
+				"saveFailed": "Failed to save changes. Please try again."
 			}
 		}
 	},
@@ -743,7 +848,11 @@
 			"parent": "Parent",
 			"viewParent": "View parent",
 			"removeParent": "Remove parent",
-			"addFields": "Add fields"
+			"addFields": "Add fields",
+			"estimate": "Estimate",
+			"hoursSuffix": "h",
+			"version": "Version",
+			"component": "Component"
 		},
 		"description": {
 			"title": "Description",
@@ -911,6 +1020,22 @@
 			"watchSession": "Watch session",
 			"madeChange": "made a change",
 			"descriptionChangeDiff": "Description change diff"
+		},
+		"timeTracking": {
+			"title": "Time Tracking",
+			"logged": "{{logged}} logged",
+			"ofEstimate": "of {{estimate}} estimated",
+			"noEstimate": "No estimate",
+			"minutesPlaceholder": "Minutes",
+			"notePlaceholder": "What did you work on? (optional)",
+			"logWork": "Log work",
+			"deleteEntry": "Delete entry",
+			"empty": "No time logged yet.",
+			"unknown": "Unknown",
+			"errors": {
+				"logFailed": "Failed to log work. Please try again.",
+				"deleteFailed": "Failed to delete entry. Please try again."
+			}
 		}
 	},
 	"board": {

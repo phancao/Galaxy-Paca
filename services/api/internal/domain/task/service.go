@@ -131,21 +131,24 @@ type TaskService interface {
 
 // CreateTaskInput carries fields required to create a task.
 type CreateTaskInput struct {
-	ProjectID    uuid.UUID
-	TaskTypeID   *uuid.UUID
-	StatusID     *uuid.UUID
-	SprintID     *uuid.UUID
-	ParentTaskID *uuid.UUID
-	Title        string
-	Description  json.RawMessage
-	Importance   int
-	StoryPoints  *int
-	AssigneeIDs  []uuid.UUID
-	ReporterID   *uuid.UUID
-	CustomFields map[string]any
-	StartDate    *time.Time
-	DueDate      *time.Time
-	Tags         []string
+	ProjectID       uuid.UUID
+	TaskTypeID      *uuid.UUID
+	StatusID        *uuid.UUID
+	SprintID        *uuid.UUID
+	ParentTaskID    *uuid.UUID
+	Title           string
+	Description     json.RawMessage
+	Importance      int
+	StoryPoints     *int
+	AssigneeIDs     []uuid.UUID
+	ReporterID      *uuid.UUID
+	CustomFields    map[string]any
+	StartDate       *time.Time
+	DueDate         *time.Time
+	Tags            []string
+	EstimateMinutes *int
+	VersionID       *uuid.UUID
+	ComponentID     *uuid.UUID
 }
 
 // UpdateTaskInput carries mutable task fields for a PATCH operation.
@@ -160,20 +163,23 @@ type CreateTaskInput struct {
 // to an empty slice/map) means the field was explicitly set and replaces the
 // stored value in full.
 type UpdateTaskInput struct {
-	TaskTypeID   **uuid.UUID
-	StatusID     **uuid.UUID
-	SprintID     **uuid.UUID
-	ParentTaskID **uuid.UUID
-	Title        string
-	Description  *json.RawMessage
-	Importance   *int
-	StoryPoints  **int
-	AssigneeIDs  *[]uuid.UUID
-	ReporterID   **uuid.UUID
-	CustomFields *map[string]any
-	StartDate    **time.Time
-	DueDate      **time.Time
-	Tags         *[]string
+	TaskTypeID      **uuid.UUID
+	StatusID        **uuid.UUID
+	SprintID        **uuid.UUID
+	ParentTaskID    **uuid.UUID
+	Title           string
+	Description     *json.RawMessage
+	Importance      *int
+	StoryPoints     **int
+	AssigneeIDs     *[]uuid.UUID
+	ReporterID      **uuid.UUID
+	CustomFields    *map[string]any
+	StartDate       **time.Time
+	DueDate         **time.Time
+	Tags            *[]string
+	EstimateMinutes **int
+	VersionID       **uuid.UUID
+	ComponentID     **uuid.UUID
 }
 
 // --- Custom Field Definition Service --------------------------------------
@@ -193,6 +199,10 @@ type CustomFieldDefinitionService interface {
 	ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*StatusTransition, error)
 	CreateStatusTransition(ctx context.Context, in CreateStatusTransitionInput) (*StatusTransition, error)
 	DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error
+
+	// CopyConfiguration copies types/statuses/custom-fields/transitions from a
+	// source project into a target project (ADR-040 Phase 3, additive reuse).
+	CopyConfiguration(ctx context.Context, sourceProjectID, targetProjectID uuid.UUID) error
 }
 
 // CreateStatusTransitionInput carries fields to declare one allowed workflow
@@ -216,6 +226,9 @@ type CreateCustomFieldDefinitionInput struct {
 	Options      []string
 	IsRequired   bool
 	DefaultValue any
+	// TaskTypeID scopes the field to a single task type (nil = all types).
+	// Set at creation; immutable afterward (like FieldKey).
+	TaskTypeID *uuid.UUID
 }
 
 // UpdateCustomFieldDefinitionInput carries mutable custom field definition

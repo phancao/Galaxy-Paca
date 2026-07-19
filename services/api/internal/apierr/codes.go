@@ -346,6 +346,25 @@ const (
 	CodeWorkflowActivateTaskMissing Code = "WORKFLOW_ACTIVATE_TASK_MISSING"
 	// CodeWorkflowActivateNoStatusRules indicates the workflow has no status rules, so activating it would never reassign anything.
 	CodeWorkflowActivateNoStatusRules Code = "WORKFLOW_ACTIVATE_NO_STATUS_RULES"
+
+	// CodeVersionNotFound indicates the requested project version does not exist.
+	CodeVersionNotFound Code = "VERSION_NOT_FOUND"
+	// CodeVersionNameInvalid indicates an empty or invalid version name.
+	CodeVersionNameInvalid Code = "VERSION_NAME_INVALID"
+	// CodeVersionNameTaken indicates the version name is already in use within the project.
+	CodeVersionNameTaken Code = "VERSION_NAME_TAKEN"
+
+	// CodeComponentNotFound indicates the requested project component does not exist.
+	CodeComponentNotFound Code = "COMPONENT_NOT_FOUND"
+	// CodeComponentNameInvalid indicates an empty or invalid component name.
+	CodeComponentNameInvalid Code = "COMPONENT_NAME_INVALID"
+	// CodeComponentNameTaken indicates the component name is already in use within the project.
+	CodeComponentNameTaken Code = "COMPONENT_NAME_TAKEN"
+
+	// CodeWorklogNotFound indicates the requested worklog does not exist.
+	CodeWorklogNotFound Code = "WORKLOG_NOT_FOUND"
+	// CodeWorklogMinutesInvalid indicates the worklog minutes value is not a positive integer.
+	CodeWorklogMinutesInvalid Code = "WORKLOG_MINUTES_INVALID"
 )
 
 // Error carries a machine-readable Code alongside a human-readable Message.

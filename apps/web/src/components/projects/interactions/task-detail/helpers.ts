@@ -5,6 +5,19 @@ export function shortId(id: string): string {
 	return id.slice(0, 8).toUpperCase();
 }
 
+/**
+ * Formats a minute count as a compact "Xh Ym" duration (ADR-040 Phase 2.9).
+ * Used for estimates and logged time. `0` → "0m".
+ */
+export function formatDuration(minutes: number | null | undefined): string {
+	const m = Math.max(0, Math.round(minutes ?? 0));
+	const h = Math.floor(m / 60);
+	const mins = m % 60;
+	if (h === 0) return `${mins}m`;
+	if (mins === 0) return `${h}h`;
+	return `${h}h ${mins}m`;
+}
+
 export function slugify(s: string): string {
 	return s
 		.toLowerCase()
@@ -48,6 +61,7 @@ export function mapApiFieldToUi(
 		field_type: API_TO_UI_FIELD_TYPE[apiField.field_type] ?? "Text",
 		required: apiField.is_required,
 		options: apiField.options,
+		task_type_id: apiField.task_type_id,
 	};
 }
 

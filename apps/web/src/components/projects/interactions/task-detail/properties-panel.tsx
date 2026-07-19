@@ -7,6 +7,8 @@ import {
 	KanbanSquare,
 	Layers,
 	Link2,
+	Milestone,
+	Package,
 	Plus,
 	X,
 } from "lucide-react";
@@ -20,7 +22,13 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Sprint, Task } from "@/lib/interaction-api";
-import type { ProjectMember, TaskStatus, TaskType } from "@/lib/project-api";
+import type {
+	ProjectComponent,
+	ProjectMember,
+	ProjectVersion,
+	TaskStatus,
+	TaskType,
+} from "@/lib/project-api";
 import { getTaskTypeIconComponent } from "../../task-types/task-type-icons";
 import type { PriorityMeta } from "../priority";
 import {
@@ -31,12 +39,17 @@ import {
 } from "../priority";
 import { TaskTypeSelector } from "../task-type-selector";
 import { AddFieldDialog } from "./add-field-dialog";
+import { formatDuration } from "./helpers";
 import { FieldRow, FieldValue } from "./primitives";
+import { EstimateEditor } from "./property-field/estimate-editor";
 import type { SelectOption, UserOption } from "./property-field";
 import { PropertyField } from "./property-field";
 import { NumberEditor } from "./property-field/number-editor";
 import { StoryPointsEditor } from "./property-field/story-points-editor";
 import type { CustomFieldDef } from "./types";
+
+// Sentinel for the "None" option on the version / component pickers.
+const NONE_VALUE = "__none__";
 
 type UpdatePayload = Partial<{
 	status_id: string | null;
@@ -45,6 +58,9 @@ type UpdatePayload = Partial<{
 	reporter_id: string | null;
 	importance: number;
 	story_points: number | null;
+	estimate_minutes: number | null;
+	version_id: string | null;
+	component_id: string | null;
 	start_date: string | null;
 	due_date: string | null;
 	tags: string[];
@@ -64,6 +80,8 @@ interface PropertiesPanelProps {
 	taskTypes?: TaskType[];
 	members?: ProjectMember[];
 	sprints?: Sprint[];
+	versions?: ProjectVersion[];
+	components?: ProjectComponent[];
 	projectId?: string;
 	initialCustomFields?: CustomFieldDef[];
 	canEdit?: boolean;
@@ -96,6 +114,8 @@ export function PropertiesPanel({
 	taskTypes = [],
 	members = [],
 	sprints = [],
+	versions = [],
+	components = [],
 	projectId,
 	initialCustomFields = [],
 	canEdit = true,
@@ -135,9 +155,32 @@ export function PropertiesPanel({
 		})),
 	];
 
+	const versionOptions: SelectOption[] = [
+		{ value: NONE_VALUE, label: t("taskDetail.properties.none") },
+		...versions.map((v) => ({
+			value: v.id,
+			label: v.name,
+			icon: <Milestone className="size-3 shrink-0 text-muted-foreground/70" />,
+		})),
+	];
+
+	const componentOptions: SelectOption[] = [
+		{ value: NONE_VALUE, label: t("taskDetail.properties.none") },
+		...components.map((c) => ({
+			value: c.id,
+			label: c.name,
+			icon: <Package className="size-3 shrink-0 text-muted-foreground/70" />,
+		})),
+	];
+
 	const memberUserOptions: UserOption[] = members.map(toUserOption);
 	const assigneeUserOptions: UserOption[] = assignees.map(toUserOption);
 	const reporterUserOption = reporter ? toUserOption(reporter) : null;
+
+	// ADR-040 Phase 2.8: hide custom fields scoped to a different task type.
+	const visibleCustomFields = localCustomFields.filter(
+		(cf) => cf.task_type_id == null || cf.task_type_id === task.task_type_id,
+	);
 
 	return (
 		<>
@@ -163,14 +206,20 @@ export function PropertiesPanel({
 					canEdit={canEdit}
 				/>
 
-				<FieldRow label={t("taskDetail.properties.trackTime")}>
-					<button
-						type="button"
-						className="inline-flex items-center gap-1.5 text-sm text-muted-foreground/70 hover:text-foreground transition-colors duration-150 font-medium"
-					>
-						<Clock className="size-3.5 opacity-70" />
-						{t("taskDetail.properties.addTime")}
-					</button>
+				<FieldRow label={t("taskDetail.properties.estimate")}>
+					{canEdit ? (
+						<EstimateEditor
+							value={task.estimate_minutes ?? null}
+							onChange={(v) => onUpdate?.({ estimate_minutes: v })}
+						/>
+					) : (
+						<span className="inline-flex items-center gap-1.5 text-sm font-medium">
+							<Clock className="size-3.5 text-muted-foreground/70" />
+							{task.estimate_minutes != null
+								? formatDuration(task.estimate_minutes)
+								: t("taskDetail.common.dash")}
+						</span>
+					)}
 				</FieldRow>
 
 				{(taskType || (canEdit && taskTypes.length > 0)) && (
@@ -330,6 +379,36 @@ export function PropertiesPanel({
 					hidden={!task.sprint_id && !(canEdit && sprints.length > 0)}
 				/>
 
+				<PropertyField
+					label={t("taskDetail.properties.version")}
+					mode="select"
+					value={task.version_id ?? NONE_VALUE}
+					options={versionOptions}
+					onChange={(v) =>
+						onUpdate?.({
+							version_id:
+								v === NONE_VALUE ? null : typeof v === "string" ? v : null,
+						})
+					}
+					canEdit={canEdit && versions.length > 0}
+					hidden={!task.version_id && !(canEdit && versions.length > 0)}
+				/>
+
+				<PropertyField
+					label={t("taskDetail.properties.component")}
+					mode="select"
+					value={task.component_id ?? NONE_VALUE}
+					options={componentOptions}
+					onChange={(v) =>
+						onUpdate?.({
+							component_id:
+								v === NONE_VALUE ? null : typeof v === "string" ? v : null,
+						})
+					}
+					canEdit={canEdit && components.length > 0}
+					hidden={!task.component_id && !(canEdit && components.length > 0)}
+				/>
+
 				{/* Epic field – normal tasks only */}
 				{taskRole === "normal" &&
 					(epicTasks.length > 0 || task.parent_task_id) &&
@@ -444,7 +523,7 @@ export function PropertiesPanel({
 						</FieldRow>
 					)}
 
-				{localCustomFields.map((cf) => (
+				{visibleCustomFields.map((cf) => (
 					<PropertyField
 						key={cf.id}
 						label={cf.display_name}
