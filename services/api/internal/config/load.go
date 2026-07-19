@@ -219,6 +219,10 @@ func Load() (*Config, error) {
 			// unaffected).
 			GalaxyBearerAudience:      strings.TrimSpace(env("GALAXY_BEARER_AUDIENCE", "")),
 			GalaxyResourceScopePrefix: strings.TrimSpace(env("GALAXY_RESOURCE_SCOPE_PREFIX", "mcp:paca:")),
+			// Identity-sync webhook shared secret (ADR-040).  env() treats a
+			// defined-but-empty variable as unset, mirroring the sender's
+			// VORTEX_WEBHOOK_SECRET-or-NEXUS_WEBHOOK_SECRET fallback chain.
+			VortexWebhookSecret: env("VORTEX_WEBHOOK_SECRET", env("NEXUS_WEBHOOK_SECRET", "")),
 		},
 		Plugins: PluginsConfig{
 			// PLUGINS_STORE controls where WASM binaries are loaded from.

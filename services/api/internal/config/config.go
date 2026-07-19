@@ -253,6 +253,15 @@ type SecurityConfig struct {
 	// compatible). Configure via GALAXY_BEARER_AUDIENCE.
 	GalaxyBearerAudience string
 
+	// VortexWebhookSecret authenticates identity-sync webhook deliveries
+	// (ADR-040): POST /api/v1/nexus/webhook is registered only when this is
+	// set, and every delivery must carry a valid HMAC-SHA256 signature
+	// computed with this shared secret over "<ts>." + raw body
+	// (X-Nexus-Signature + X-Nexus-Timestamp headers).  Configure via
+	// VORTEX_WEBHOOK_SECRET, falling back to NEXUS_WEBHOOK_SECRET — the same
+	// chain the identity-side sender uses; empty means unset.
+	VortexWebhookSecret string
+
 	// GalaxyResourceScopePrefix is Paca's own OAuth resource-scope prefix (e.g.
 	// "mcp:paca:") used to enforce scope on trusted-issuer bearer tokens
 	// (PACA-C1): a token that carries resource-family scopes but none for Paca

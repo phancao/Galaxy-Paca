@@ -25,7 +25,8 @@ type Deps struct {
 	ProjectVisibilitySvc httpmw.ProjectVisibilityChecker
 	Health               *handler.HealthHandler
 	Auth                 *handler.AuthHandler
-	OIDC                 *handler.OIDCHandler // nil unless OIDC SSO is configured (ADR-038)
+	OIDC                 *handler.OIDCHandler         // nil unless OIDC SSO is configured (ADR-038)
+	NexusWebhook         *handler.NexusWebhookHandler // nil unless VORTEX_WEBHOOK_SECRET is configured (ADR-040)
 	User                 *handler.UserHandler
 	GlobalRole           *handler.GlobalRoleHandler
 	Project              *handler.ProjectHandler
@@ -80,6 +81,15 @@ func New(deps Deps) http.Handler {
 					r.Get("/oidc/callback", deps.OIDC.Callback)
 				}
 			})
+
+			// Vortex identity-sync webhook (ADR-040) — registered only when
+			// the shared secret is configured.  Deliberately OUTSIDE the
+			// session-auth middleware, like the OIDC callback above: the
+			// identity service authenticates with the HMAC signature the
+			// handler verifies, not with a Paca session.
+			if deps.NexusWebhook != nil {
+				r.Post("/nexus/webhook", deps.NexusWebhook.Handle)
+			}
 
 			// Users
 			r.Route("/users", func(r chi.Router) {
