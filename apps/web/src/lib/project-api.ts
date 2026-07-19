@@ -790,3 +790,39 @@ export const projectComponentsQueryOptions = (projectId: string) =>
 		queryKey: ["projects", projectId, "components"],
 		queryFn: () => listProjectComponents(projectId),
 	});
+
+// ── Worklogs (time tracking / efficiency reporting) ──────────────────────────
+
+export interface Worklog {
+	id: string;
+	task_id: string;
+	member_id: string | null;
+	minutes: number;
+	note?: string | null;
+	logged_at: string;
+}
+
+/** All worklogs across a project's tasks, filterable by an inclusive date range
+ * and member. Powers the team Efficiency dashboard. */
+export async function listProjectWorklogs(
+	projectId: string,
+	opts: { from?: string; to?: string; memberId?: string } = {},
+): Promise<Worklog[]> {
+	const params: Record<string, string> = {};
+	if (opts.from) params.from = opts.from;
+	if (opts.to) params.to = opts.to;
+	if (opts.memberId) params.member_id = opts.memberId;
+	const { data } = await apiClient.instance.get<
+		SuccessEnvelope<{ items: Worklog[]; total_minutes: number }>
+	>(`/projects/${projectId}/worklogs`, { params });
+	return data.data.items ?? [];
+}
+
+export const projectWorklogsQueryOptions = (
+	projectId: string,
+	opts: { from?: string; to?: string; memberId?: string } = {},
+) =>
+	queryOptions({
+		queryKey: ["projects", projectId, "worklogs", opts],
+		queryFn: () => listProjectWorklogs(projectId, opts),
+	});
