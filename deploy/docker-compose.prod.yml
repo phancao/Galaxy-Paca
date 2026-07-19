@@ -172,6 +172,9 @@ services:
     image: ${PACA_API_IMAGE:-pacaai/paca-api:latest}
     restart: unless-stopped
     environment:
+      # ADR-040: inbound Nexus webhook HMAC secret (receiver at /api/v1/nexus/webhook)
+      VORTEX_WEBHOOK_SECRET: ${VORTEX_WEBHOOK_SECRET:-}
+      NEXUS_WEBHOOK_SECRET: ${NEXUS_WEBHOOK_SECRET:-}
       ENV: ${ENVIRONMENT:-production}
       PORT: 8080
       # Defaults to the bundled postgres. Set DATABASE_URL explicitly when using
