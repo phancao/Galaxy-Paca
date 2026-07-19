@@ -446,6 +446,10 @@ func New(deps Deps) http.Handler {
 						Delete("/{fieldId}", deps.Task.DeleteCustomFieldDefinition)
 				})
 
+				// Copy task schema from another project (ADR-040 Phase 3)
+				r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionTasksWrite)).
+					Post("/copy-config", deps.Task.CopyProjectConfiguration)
+
 				// Workflow status transitions (ADR-040)
 				r.Route("/status-transitions", func(r chi.Router) {
 					r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,

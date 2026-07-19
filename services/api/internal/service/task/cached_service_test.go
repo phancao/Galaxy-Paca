@@ -218,6 +218,10 @@ func (s *stubTaskSvc) DeleteStatusTransition(_ context.Context, _, _ uuid.UUID) 
 	return nil
 }
 
+func (s *stubTaskSvc) CopyConfiguration(_ context.Context, _, _ uuid.UUID) error {
+	return nil
+}
+
 // --- TaskLinkService stubs --------------------------------------------------
 
 func (s *stubTaskSvc) ListTaskLinks(_ context.Context, _, _ uuid.UUID) ([]*taskdom.TaskLink, error) {

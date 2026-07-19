@@ -539,6 +539,15 @@ func TaskStatusTransitionFromEntity(t *taskdom.StatusTransition) TaskStatusTrans
 	}
 }
 
+// --- Copy Configuration DTO (ADR-040 Phase 3) ------------------------------
+
+// CopyConfigurationRequest is the body for
+// POST /projects/:projectId/copy-config — copies the source project's task
+// types, statuses, custom fields, and workflow transitions into this project.
+type CopyConfigurationRequest struct {
+	SourceProjectID uuid.UUID `json:"source_project_id" binding:"required"`
+}
+
 // --- Activity / Comment DTOs -----------------------------------------------
 
 // ActivityResponse is the public representation of a task activity entry.

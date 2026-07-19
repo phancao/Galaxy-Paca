@@ -1180,6 +1180,30 @@ func (h *TaskHandler) DeleteCustomFieldDefinition(w http.ResponseWriter, r *http
 	presenter.OK(w, r, map[string]any{"message": "custom field deleted"})
 }
 
+// CopyProjectConfiguration handles POST /projects/:projectId/copy-config.
+// It copies the source project's task types, statuses, custom fields, and
+// workflow transitions into this (target) project.
+func (h *TaskHandler) CopyProjectConfiguration(w http.ResponseWriter, r *http.Request) {
+	targetID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	var req dto.CopyConfigurationRequest
+	if !middleware.BindJSON(w, r, &req) {
+		return
+	}
+	if req.SourceProjectID == uuid.Nil {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "source_project_id is required"))
+		return
+	}
+	if err := h.svc.CopyConfiguration(r.Context(), req.SourceProjectID, targetID); err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.OK(w, r, map[string]any{"message": "configuration copied"})
+}
+
 // ListStatusTransitions handles GET /projects/:projectId/status-transitions.
 func (h *TaskHandler) ListStatusTransitions(w http.ResponseWriter, r *http.Request) {
 	projectID, err := parseProjectID(r)

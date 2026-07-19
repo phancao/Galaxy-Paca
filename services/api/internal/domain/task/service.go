@@ -199,6 +199,10 @@ type CustomFieldDefinitionService interface {
 	ListStatusTransitions(ctx context.Context, projectID uuid.UUID) ([]*StatusTransition, error)
 	CreateStatusTransition(ctx context.Context, in CreateStatusTransitionInput) (*StatusTransition, error)
 	DeleteStatusTransition(ctx context.Context, projectID, id uuid.UUID) error
+
+	// CopyConfiguration copies types/statuses/custom-fields/transitions from a
+	// source project into a target project (ADR-040 Phase 3, additive reuse).
+	CopyConfiguration(ctx context.Context, sourceProjectID, targetProjectID uuid.UUID) error
 }
 
 // CreateStatusTransitionInput carries fields to declare one allowed workflow
