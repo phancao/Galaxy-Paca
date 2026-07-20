@@ -4,7 +4,6 @@
 // into namespace-scoped rooms at join time:
 //
 //   project:<projectId>:tasks      — receives all task.* events
-//   project:<projectId>:docs       — receives all doc.* events
 //   project:<projectId>:workflows  — receives all workflow.* graph events
 //
 // Room membership is determined once when the client emits "join": the server
@@ -12,14 +11,13 @@
 // allowed to see.  The Pub/Sub subscriber routes events directly to the correct
 // room with a plain io.to(room).emit() — no per-socket checks needed.
 
-// EventNamespace identifies the three permission-gated sub-domains.
-export type EventNamespace = "tasks" | "docs" | "workflows";
+// EventNamespace identifies the permission-gated sub-domains.
+export type EventNamespace = "tasks" | "workflows";
 
 // NAMESPACE_PERMISSIONS maps each namespace to the project permission required
 // to receive events in that namespace.
 export const NAMESPACE_PERMISSIONS: Record<EventNamespace, string> = {
 	tasks: "tasks.read",
-	docs: "docs.read",
 	workflows: "workflows.read",
 };
 
@@ -35,7 +33,6 @@ export function projectRoomName(
 // Returns undefined for unknown event types.
 export function eventNamespace(type: string): EventNamespace | undefined {
 	if (type.startsWith("task.")) return "tasks";
-	if (type.startsWith("doc.")) return "docs";
 	// github.branch.* and github.pr.* events are delivered to the tasks room
 	// because they are task-scoped and require the same tasks.read permission.
 	if (type.startsWith("github.")) return "tasks";

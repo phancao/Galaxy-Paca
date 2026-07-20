@@ -250,7 +250,6 @@ export function DescriptionSection({
 					)}
 				</BlockNoteView>
 			</div>
-
 		</div>
 	);
 }

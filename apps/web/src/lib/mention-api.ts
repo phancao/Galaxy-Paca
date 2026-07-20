@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { listDocuments } from "./doc-api";
 import { listAllTasks } from "./interaction-api";
 import { listProjectMembers, type ProjectMember } from "./project-api";
 import {
@@ -45,12 +44,6 @@ const tasksQueryOptions = (projectId: string) => ({
 	staleTime: 2 * 60 * 1000,
 });
 
-const documentsQueryOptions = (projectId: string) => ({
-	queryKey: ["projects", projectId, "docs", "mentions"],
-	queryFn: () => listDocuments(projectId),
-	staleTime: 2 * 60 * 1000,
-});
-
 /** Flattens a wiki page tree into mentionable {id, title} entries. */
 function flattenWikiPages(pages: WikiPage[], out: MentionableDocument[] = []) {
 	for (const page of pages) {
@@ -71,8 +64,8 @@ export function useMentionData(projectId?: string | null) {
 		enabled: !!projectId,
 	});
 
-	// ADR-042: when the Wiki integration is live, doc mentions suggest the
-	// project's Wiki pages; otherwise fall back to native documents.
+	// ADR-042: doc mentions suggest the project's Wiki pages (the native doc
+	// feature was removed in Stage 6).
 	const wikiProbe = useQuery({
 		...wikiSpaceQueryOptions(projectId ?? ""),
 		enabled: !!projectId,
@@ -82,11 +75,6 @@ export function useMentionData(projectId?: string | null) {
 	const { data: wikiTree } = useQuery({
 		...wikiTreeQueryOptions(projectId ?? ""),
 		enabled: !!projectId && wikiEnabled,
-	});
-
-	const { data: documents = [] } = useQuery({
-		...documentsQueryOptions(projectId ?? ""),
-		enabled: !!projectId && !wikiEnabled && !wikiProbe.isPending,
 	});
 
 	const teamMembers: TeamMember[] = members.map((member: ProjectMember) => ({
@@ -109,10 +97,7 @@ export function useMentionData(projectId?: string | null) {
 
 	const mentionDocs: MentionableDocument[] = wikiEnabled
 		? flattenWikiPages(wikiTree?.items ?? [])
-		: documents.map((doc) => ({
-				id: doc.id,
-				title: doc.title,
-			}));
+		: [];
 
 	return {
 		teamMembers,

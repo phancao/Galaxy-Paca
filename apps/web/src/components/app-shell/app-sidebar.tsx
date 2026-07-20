@@ -11,11 +11,8 @@ import {
 	BookOpen,
 	ChevronDown,
 	ChevronRight,
-	File,
 	FileText,
-	Folder,
 	FolderKanban,
-	FolderOpen,
 	GanttChart,
 	Gauge,
 	GitBranch,
@@ -25,26 +22,17 @@ import {
 	Milestone,
 	Monitor,
 	Moon,
-	MoreHorizontal,
 	Package,
-	Pencil,
 	Plus,
 	Puzzle,
 	Settings,
 	Shield,
 	Sun,
 	Tag,
-	Trash2,
 	Users,
 	Workflow,
 } from "lucide-react";
-import {
-	type ComponentType,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type ComponentType, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +50,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
 	Sidebar,
 	SidebarContent,
@@ -86,19 +73,6 @@ import { useProjectPermissions } from "@/hooks/use-project-permissions";
 import type { ThemeMode } from "@/hooks/use-theme-mode";
 import { useThemeMode } from "@/hooks/use-theme-mode";
 import { currentUserOptionalQueryOptions } from "@/lib/auth-api";
-import {
-	createDocument,
-	createFolder,
-	type DocFolder,
-	type Document,
-	deleteDocument,
-	deleteFolder,
-	docFoldersQueryOptions,
-	docListQueryOptions,
-	docQueryKeys,
-	updateDocument,
-	updateFolder,
-} from "@/lib/doc-api";
 import { sprintsQueryOptions, updateTask } from "@/lib/interaction-api";
 import type { PluginNavRegistration } from "@/lib/plugin-api";
 import { ExtensionPoint } from "@/lib/plugins/extension-point";
@@ -115,414 +89,30 @@ import {
 } from "@/lib/wiki-api";
 import { UserMenu } from "./user-menu";
 
-// ── Docs Tree ─────────────────────────────────────────────────────────────────
-
-/** Tiny inline rename input used in the sidebar tree */
-function TreeInlineRename({
-	initialValue,
-	onConfirm,
-	onCancel,
-}: {
-	initialValue: string;
-	onConfirm: (v: string) => void;
-	onCancel: () => void;
-}) {
-	const [value, setValue] = useState(initialValue);
-	const confirmedRef = useRef(false);
-
-	const confirm = useCallback(() => {
-		if (confirmedRef.current) return;
-		confirmedRef.current = true;
-		const trimmed = value.trim();
-		if (trimmed) onConfirm(trimmed);
-		else onCancel();
-	}, [value, onConfirm, onCancel]);
-
-	return (
-		<Input
-			autoFocus
-			value={value}
-			className="h-6 text-sm px-1.5 rounded border border-primary/30 bg-sidebar focus:ring-1 focus:ring-primary/25 flex-1 min-w-0"
-			onChange={(e) => setValue(e.target.value)}
-			onFocus={(e) => e.target.select()}
-			onKeyDown={(e) => {
-				if (e.key === "Enter") confirm();
-				else if (e.key === "Escape") onCancel();
-				e.stopPropagation();
-			}}
-			onBlur={confirm}
-			onClick={(e) => e.stopPropagation()}
-		/>
-	);
-}
-
-/** Single document row in the sidebar tree */
-function DocsDocRow({
-	doc,
-	projectId,
-	canWrite,
-	depth,
-}: {
-	doc: Document;
-	projectId: string;
-	canWrite: boolean;
-	depth: number;
-}) {
-	const { t } = useTranslation("appShell");
-	const location = useRouterState({ select: (s) => s.location.pathname });
-	const navigate = useNavigate();
-	const qc = useQueryClient();
-	const [renaming, setRenaming] = useState(false);
-
-	const isActive = location === `/projects/${projectId}/docs/${doc.id}`;
-
-	const renameMutation = useMutation({
-		mutationFn: (title: string) => updateDocument(projectId, doc.id, { title }),
-		onSuccess: (updated) => {
-			qc.setQueryData(docQueryKeys.detail(projectId, doc.id), updated);
-			qc.invalidateQueries({ queryKey: docQueryKeys.list(projectId) });
-			if (doc.folder_id) {
-				qc.invalidateQueries({
-					queryKey: docQueryKeys.list(projectId, doc.folder_id),
-				});
-			}
-		},
-	});
-
-	const deleteMutation = useMutation({
-		mutationFn: () => deleteDocument(projectId, doc.id),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: docQueryKeys.all(projectId) });
-			if (isActive) {
-				navigate({ to: "/projects/$projectId", params: { projectId } });
-			}
-		},
-	});
-
-	return (
-		<div
-			className="group relative flex items-center gap-1 pr-1"
-			style={{ paddingLeft: `${8 + depth * 16 + 16}px` }}
-		>
-			<button
-				type="button"
-				className={cn(
-					"flex flex-1 min-w-0 items-center gap-1.5 rounded-md px-2 py-1 cursor-pointer transition-all duration-150 text-sm",
-					isActive
-						? "bg-primary/10 text-primary font-medium"
-						: "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-				)}
-				onClick={() => {
-					if (renaming) return;
-					navigate({
-						to: "/projects/$projectId/docs/$docId",
-						params: { projectId, docId: doc.id },
-					});
-				}}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						navigate({
-							to: "/projects/$projectId/docs/$docId",
-							params: { projectId, docId: doc.id },
-						});
-					}
-				}}
-			>
-				<FileText
-					className={cn(
-						"size-3.5 shrink-0 transition-colors",
-						isActive ? "text-primary/70" : "text-sidebar-foreground/40",
-					)}
-				/>
-				{renaming ? (
-					<TreeInlineRename
-						initialValue={doc.title || t("docs.untitled")}
-						onConfirm={(title) => {
-							renameMutation.mutate(title);
-							setRenaming(false);
-						}}
-						onCancel={() => setRenaming(false)}
-					/>
-				) : (
-					<span className="truncate leading-snug">
-						{doc.title || (
-							<span className="italic text-sidebar-foreground/40">
-								{t("docs.untitled")}
-							</span>
-						)}
-					</span>
-				)}
-			</button>
-
-			{canWrite && !renaming && (
-				<DropdownMenu>
-					<DropdownMenuTrigger
-						className="opacity-0 group-hover:opacity-100 flex size-5 shrink-0 items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all duration-150"
-						onClick={(e) => e.stopPropagation()}
-					>
-						<MoreHorizontal className="size-3" />
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start" className="w-36">
-						<DropdownMenuItem
-							onClick={(e) => {
-								e.stopPropagation();
-								setRenaming(true);
-							}}
-						>
-							<Pencil className="size-3.5 mr-2" />
-							{t("docs.rename")}
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							className="text-destructive focus:text-destructive"
-							onClick={(e) => {
-								e.stopPropagation();
-								deleteMutation.mutate();
-							}}
-						>
-							<Trash2 className="size-3.5 mr-2" />
-							{t("docs.delete")}
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			)}
-		</div>
-	);
-}
-
-/** Folder node — fetches its docs lazily when expanded */
-function DocsFolderNode({
-	folder,
-	projectId,
-	allFolders,
-	canWrite,
-	expandedFolders,
-	onToggle,
-	depth,
-}: {
-	folder: DocFolder;
-	projectId: string;
-	allFolders: DocFolder[];
-	canWrite: boolean;
-	expandedFolders: Set<string>;
-	onToggle: (id: string) => void;
-	depth: number;
-}) {
-	const { t } = useTranslation("appShell");
-	const qc = useQueryClient();
-	const [renaming, setRenaming] = useState(false);
-	const [addingDoc, setAddingDoc] = useState(false);
-	const navigate = useNavigate();
-
-	const isExpanded = expandedFolders.has(folder.id);
-
-	const { data: folderDocs = [] } = useQuery({
-		...docListQueryOptions(projectId, folder.id),
-		enabled: isExpanded,
-	});
-
-	const childFolders = allFolders.filter((f) => f.parent_id === folder.id);
-	const renameMutation = useMutation({
-		mutationFn: (name: string) => updateFolder(projectId, folder.id, { name }),
-		onSuccess: () =>
-			qc.invalidateQueries({ queryKey: docQueryKeys.folders(projectId) }),
-	});
-
-	const deleteMutation = useMutation({
-		mutationFn: () => deleteFolder(projectId, folder.id),
-		onSuccess: () =>
-			qc.invalidateQueries({ queryKey: docQueryKeys.folders(projectId) }),
-	});
-
-	const newDocMutation = useMutation({
-		mutationFn: () =>
-			createDocument(projectId, {
-				title: t("docs.untitled"),
-				folder_id: folder.id,
-			}),
-		onSuccess: (doc) => {
-			qc.invalidateQueries({ queryKey: docQueryKeys.all(projectId) });
-			setAddingDoc(false);
-			navigate({
-				to: "/projects/$projectId/docs/$docId",
-				params: { projectId, docId: doc.id },
-			});
-		},
-	});
-
-	const newSubfolderMutation = useMutation({
-		mutationFn: (name: string) =>
-			createFolder(projectId, { name, parent_id: folder.id }),
-		onSuccess: () =>
-			qc.invalidateQueries({ queryKey: docQueryKeys.folders(projectId) }),
-	});
-
-	return (
-		<div>
-			{/* Folder row */}
-			<div
-				className="group relative flex items-center gap-1 pr-1"
-				style={{ paddingLeft: `${8 + depth * 16}px` }}
-			>
-				<button
-					type="button"
-					className="flex flex-1 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 cursor-pointer transition-all duration-150 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-					onClick={() => {
-						if (!renaming) onToggle(folder.id);
-					}}
-					onKeyDown={(e) => {
-						if ((e.key === "Enter" || e.key === " ") && !renaming)
-							onToggle(folder.id);
-					}}
-				>
-					<ChevronRight
-						className={cn(
-							"size-3 shrink-0 text-sidebar-foreground/30 transition-transform duration-150",
-							isExpanded && "rotate-90",
-						)}
-					/>
-					{isExpanded ? (
-						<FolderOpen className="size-3.5 shrink-0 text-sidebar-foreground/40" />
-					) : (
-						<Folder className="size-3.5 shrink-0 text-sidebar-foreground/40" />
-					)}
-					{renaming ? (
-						<TreeInlineRename
-							initialValue={folder.name}
-							onConfirm={(name) => {
-								renameMutation.mutate(name);
-								setRenaming(false);
-							}}
-							onCancel={() => setRenaming(false)}
-						/>
-					) : (
-						<span className="truncate leading-snug font-medium">
-							{folder.name}
-						</span>
-					)}
-				</button>
-
-				{canWrite && !renaming && (
-					<div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-						<DropdownMenu>
-							<DropdownMenuTrigger
-								className="flex size-5 items-center justify-center rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/60 transition-all duration-150"
-								onClick={(e) => e.stopPropagation()}
-							>
-								<MoreHorizontal className="size-3" />
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start" className="w-36">
-								<DropdownMenuItem
-									onClick={(e) => {
-										e.stopPropagation();
-										setRenaming(true);
-									}}
-								>
-									<Pencil className="size-3.5 mr-2" />
-									{t("docs.rename")}
-								</DropdownMenuItem>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem
-									className="text-destructive focus:text-destructive"
-									onClick={(e) => {
-										e.stopPropagation();
-										deleteMutation.mutate();
-									}}
-								>
-									<Trash2 className="size-3.5 mr-2" />
-									{t("docs.delete")}
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				)}
-			</div>
-
-			{/* Children */}
-			{isExpanded && (
-				<div>
-					{childFolders.map((cf) => (
-						<DocsFolderNode
-							key={cf.id}
-							folder={cf}
-							projectId={projectId}
-							allFolders={allFolders}
-							canWrite={canWrite}
-							expandedFolders={expandedFolders}
-							onToggle={onToggle}
-							depth={depth + 1}
-						/>
-					))}
-					{folderDocs.map((doc) => (
-						<DocsDocRow
-							key={doc.id}
-							doc={doc}
-							projectId={projectId}
-							canWrite={canWrite}
-							depth={depth + 1}
-						/>
-					))}
-					{folderDocs.length === 0 &&
-						childFolders.length === 0 &&
-						!addingDoc && (
-							<div
-								className="text-xs text-sidebar-foreground/30 italic py-1"
-								style={{ paddingLeft: `${8 + (depth + 1) * 16 + 26}px` }}
-							>
-								{t("docs.emptyFolder")}
-							</div>
-						)}
-					{canWrite && (
-						<div style={{ paddingLeft: `${8 + (depth + 1) * 16 + 16}px` }}>
-							<DropdownMenu>
-								<DropdownMenuTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs text-sidebar-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-all duration-150">
-									<Plus className="size-3 shrink-0" />
-									<span>{t("docs.add")}</span>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="start" className="w-40">
-									<DropdownMenuItem
-										onClick={() => {
-											if (!isExpanded) onToggle(folder.id);
-											newDocMutation.mutate();
-										}}
-										disabled={newDocMutation.isPending}
-									>
-										<File className="size-3.5 mr-2" />
-										{t("docs.newDocument")}
-									</DropdownMenuItem>
-									<DropdownMenuItem
-										onClick={() => {
-											if (!isExpanded) onToggle(folder.id);
-											newSubfolderMutation.mutate(
-												t("docs.newFolderDefaultName"),
-											);
-										}}
-										disabled={newSubfolderMutation.isPending}
-									>
-										<FolderOpen className="size-3.5 mr-2" />
-										{t("docs.newSubfolder")}
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
-						</div>
-					)}
-				</div>
-			)}
-		</div>
-	);
-}
+// ── Documentation (Galaxy AI Wiki, ADR-042) ──────────────────────────────────
 
 /**
- * ADR-042 runtime switch: when the Wiki integration is live the Documentation
- * section is backed by the project's Galaxy AI Wiki space; a 503
- * (WIKI_UNAVAILABLE) falls back to the native docs surface. No build-time
- * flag — the API decides.
+ * The Documentation section is backed by the project's Galaxy AI Wiki space
+ * (the native doc feature was removed by ADR-042 Stage 6). While the Wiki
+ * integration is unreachable the section shows a muted unavailable note.
  */
 function DocsSectionSwitch({ projectId }: { projectId: string }) {
+	const { t } = useTranslation("appShell");
 	const probe = useQuery(wikiSpaceQueryOptions(projectId));
 	if (probe.isSuccess) return <WikiDocsSidebarSection projectId={projectId} />;
 	if (probe.isPending) return null;
-	return <DocsSidebarSection projectId={projectId} />;
+	return (
+		<SidebarGroup className="px-0">
+			<SidebarGroupLabel className="px-3">
+				{t("docs.documentation")}
+			</SidebarGroupLabel>
+			<SidebarGroupContent>
+				<p className="px-3 py-1 text-xs italic text-sidebar-foreground/45">
+					{t("docs.wikiUnavailable")}
+				</p>
+			</SidebarGroupContent>
+		</SidebarGroup>
+	);
 }
 
 /** One node of the Wiki page tree (recursive, links into the embedded view). */
@@ -664,222 +254,6 @@ function WikiDocsSidebarSection({ projectId }: { projectId: string }) {
 								</SidebarMenuItem>
 							)}
 						</SidebarMenu>
-					</div>
-				</SidebarGroupContent>
-			)}
-		</SidebarGroup>
-	);
-}
-
-/** The full docs tree sidebar section — shown when in project context */
-function DocsSidebarSection({ projectId }: { projectId: string }) {
-	const { t } = useTranslation("appShell");
-	const qc = useQueryClient();
-	const navigate = useNavigate();
-	const location = useRouterState({ select: (s) => s.location.pathname });
-	const { hasProjectPermission } = useProjectPermissions(projectId);
-	const canWrite = hasProjectPermission("docs.write");
-
-	const isDocsSection = location.startsWith(`/projects/${projectId}/docs`);
-
-	const [collapsed, setCollapsed] = useState(() => {
-		try {
-			return (
-				localStorage.getItem(`paca:sidebar-docs-collapsed:${projectId}`) ===
-				"true"
-			);
-		} catch {
-			return false;
-		}
-	});
-
-	// Auto-expand once when first navigating into docs (user can still collapse manually)
-	const autoExpandedRef = useRef(false);
-	useEffect(() => {
-		if (isDocsSection && !autoExpandedRef.current) {
-			autoExpandedRef.current = true;
-			setCollapsed(false);
-			try {
-				localStorage.removeItem(`paca:sidebar-docs-collapsed:${projectId}`);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (!isDocsSection) {
-			autoExpandedRef.current = false;
-		}
-	}, [isDocsSection, projectId]);
-
-	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
-		try {
-			const stored = localStorage.getItem(
-				`paca:sidebar-docs-expanded:${projectId}`,
-			);
-			return stored ? new Set(JSON.parse(stored)) : new Set();
-		} catch {
-			return new Set();
-		}
-	});
-
-	const toggleFolder = useCallback(
-		(folderId: string) => {
-			setExpandedFolders((prev) => {
-				const next = new Set(prev);
-				if (next.has(folderId)) next.delete(folderId);
-				else next.add(folderId);
-				try {
-					localStorage.setItem(
-						`paca:sidebar-docs-expanded:${projectId}`,
-						JSON.stringify([...next]),
-					);
-				} catch {
-					/* ignore */
-				}
-				return next;
-			});
-		},
-		[projectId],
-	);
-
-	const { data: allFolders = [] } = useQuery(docFoldersQueryOptions(projectId));
-	const { data: rootDocs = [] } = useQuery(docListQueryOptions(projectId));
-
-	// Use loose null check — backend omits parent_id for root folders (omitempty)
-	const rootFolders = allFolders.filter((f) => !f.parent_id);
-	const rootOnlyDocs = rootDocs.filter((d) => !d.folder_id);
-
-	const newDocMutation = useMutation({
-		mutationFn: () => createDocument(projectId, { title: t("docs.untitled") }),
-		onSuccess: (doc) => {
-			qc.invalidateQueries({ queryKey: docQueryKeys.all(projectId) });
-			navigate({
-				to: "/projects/$projectId/docs/$docId",
-				params: { projectId, docId: doc.id },
-			});
-		},
-	});
-
-	const newFolderMutation = useMutation({
-		mutationFn: (name: string) => createFolder(projectId, { name }),
-		onSuccess: () =>
-			qc.invalidateQueries({ queryKey: docQueryKeys.folders(projectId) }),
-	});
-
-	const toggleCollapse = () => {
-		setCollapsed((prev) => {
-			const next = !prev;
-			try {
-				if (next) {
-					localStorage.setItem(
-						`paca:sidebar-docs-collapsed:${projectId}`,
-						"true",
-					);
-				} else {
-					localStorage.removeItem(`paca:sidebar-docs-collapsed:${projectId}`);
-				}
-			} catch {
-				/* ignore */
-			}
-			return next;
-		});
-	};
-
-	const isEmpty = rootFolders.length === 0 && rootOnlyDocs.length === 0;
-	const { state: sidebarState } = useSidebar();
-	const isSidebarCollapsed = sidebarState === "collapsed";
-
-	if (isSidebarCollapsed) {
-		return (
-			<SidebarGroup>
-				<SidebarGroupContent>
-					<SidebarMenu>
-						<SidebarMenuItem>
-							<SidebarMenuButton tooltip={t("docs.documentation")}>
-								<BookOpen className="size-4" />
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-					</SidebarMenu>
-				</SidebarGroupContent>
-			</SidebarGroup>
-		);
-	}
-
-	return (
-		<SidebarGroup className="px-0">
-			{/* Section header */}
-			<SidebarGroupLabel
-				className="flex cursor-pointer items-center justify-between hover:text-sidebar-foreground transition-colors px-3"
-				onClick={toggleCollapse}
-			>
-				<span>{t("docs.documentation")}</span>
-				<ChevronRight
-					className={cn(
-						"size-3.5 transition-transform duration-200 text-sidebar-foreground/40",
-						!collapsed && "rotate-90",
-					)}
-				/>
-			</SidebarGroupLabel>
-
-			{!collapsed && (
-				<SidebarGroupContent>
-					<div className="py-1 space-y-0.5">
-						{isEmpty ? (
-							<div className="px-4 py-2 text-xs text-sidebar-foreground/40 italic">
-								{t("docs.noDocumentsYet")}
-							</div>
-						) : (
-							<>
-								{rootFolders.map((folder) => (
-									<DocsFolderNode
-										key={folder.id}
-										folder={folder}
-										projectId={projectId}
-										allFolders={allFolders}
-										canWrite={canWrite}
-										expandedFolders={expandedFolders}
-										onToggle={toggleFolder}
-										depth={0}
-									/>
-								))}
-								{rootOnlyDocs.map((doc) => (
-									<DocsDocRow
-										key={doc.id}
-										doc={doc}
-										projectId={projectId}
-										canWrite={canWrite}
-										depth={0}
-									/>
-								))}
-							</>
-						)}
-						{canWrite && (
-							<div className="px-2 pt-1">
-								<DropdownMenu>
-									<DropdownMenuTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs text-sidebar-foreground/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-all duration-150">
-										<Plus className="size-3 shrink-0" />
-										<span>{t("docs.add")}</span>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent align="start" className="w-40">
-										<DropdownMenuItem
-											onClick={() => newDocMutation.mutate()}
-											disabled={newDocMutation.isPending}
-										>
-											<File className="size-3.5 mr-2" />
-											{t("docs.newDocument")}
-										</DropdownMenuItem>
-										<DropdownMenuItem
-											onClick={() =>
-												newFolderMutation.mutate(t("docs.newFolderDefaultName"))
-											}
-											disabled={newFolderMutation.isPending}
-										>
-											<FolderOpen className="size-3.5 mr-2" />
-											{t("docs.newFolder")}
-										</DropdownMenuItem>
-									</DropdownMenuContent>
-								</DropdownMenu>
-							</div>
-						)}
 					</div>
 				</SidebarGroupContent>
 			)}

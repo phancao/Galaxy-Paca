@@ -17,7 +17,7 @@ const StreamTaskActivities = "paca.task_activities"
 // StreamDocActivities is the Valkey Stream key used to fan out doc-activity
 // events from the API to the internal consumer that persists them to PostgreSQL.
 // System-generated activities (doc created, updated, etc.) are appended here;
-// the DocActivityConsumer worker reads this stream and handles the DB write.
+// a worker consumer reads this stream and handles the DB write.
 const StreamDocActivities = "paca.doc_activities"
 
 // StreamTaskAssignments is the Valkey Stream key used to fan out task
@@ -55,22 +55,6 @@ const (
 	TopicTaskCommentAdded   = "task.comment.added"
 	TopicTaskCommentUpdated = "task.comment.updated"
 	TopicTaskCommentDeleted = "task.comment.deleted"
-
-	// --- Doc events ---------------------------------------------------------
-	TopicDocCreated = "doc.created"
-	TopicDocUpdated = "doc.updated"
-	TopicDocDeleted = "doc.deleted"
-	TopicDocMoved   = "doc.moved"
-
-	// --- Doc folder events --------------------------------------------------
-	TopicDocFolderCreated = "doc.folder.created"
-	TopicDocFolderUpdated = "doc.folder.updated"
-	TopicDocFolderDeleted = "doc.folder.deleted"
-
-	// --- Doc comment events -------------------------------------------------
-	TopicDocCommentAdded   = "doc.comment.added"
-	TopicDocCommentUpdated = "doc.comment.updated"
-	TopicDocCommentDeleted = "doc.comment.deleted"
 
 	// --- Notification events ------------------------------------------------
 	// TopicNotificationCreated is published to ChannelRealtime when a new

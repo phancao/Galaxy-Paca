@@ -37,8 +37,6 @@ type Deps struct {
 	Sprint               *handler.SprintHandler
 	View                 *handler.ViewHandler
 	Attachment           *handler.AttachmentHandler
-	Document             *handler.DocumentHandler
-	DocFile              *handler.DocFileHandler
 	Notification         *handler.NotificationHandler
 	APIKey               *handler.APIKeyHandler
 	Plugin               *handler.PluginHandler
@@ -549,80 +547,6 @@ func New(deps Deps) http.Handler {
 					})
 				}
 
-				// Documentation
-				r.Route("/docs", func(r chi.Router) {
-					// Folders
-					r.Route("/folders", func(r chi.Router) {
-						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-						)).Get("/", deps.Document.ListFolders)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Post("/", deps.Document.CreateFolder)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Patch("/{folderId}", deps.Document.UpdateFolder)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Delete("/{folderId}", deps.Document.DeleteFolder)
-					})
-
-					// Documents — collection
-					r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-						httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-						httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-					)).Get("/", deps.Document.ListDocuments)
-					r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-						Post("/", deps.Document.CreateDocument)
-
-					// Documents — single item
-					r.Route("/{docId}", func(r chi.Router) {
-						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-						)).Get("/", deps.Document.GetDocument)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Patch("/", deps.Document.UpdateDocument)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Delete("/", deps.Document.DeleteDocument)
-
-						// Snapshots
-						r.Route("/snapshots", func(r chi.Router) {
-							r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-								httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-								httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-							)).Get("/", deps.Document.ListSnapshots)
-							r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-								httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-								httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-							)).Get("/{snapshotId}", deps.Document.GetSnapshot)
-						})
-
-						// Activity log
-						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-						)).Get("/activities", deps.Document.ListActivities)
-
-						// Comments
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Post("/comments", deps.Document.AddComment)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Patch("/comments/{commentId}", deps.Document.UpdateComment)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Delete("/comments/{commentId}", deps.Document.DeleteComment)
-
-						// Doc file uploads
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Post("/files/initiate-upload", deps.DocFile.InitiateDocUpload)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Post("/files/complete-upload", deps.DocFile.CompleteDocUpload)
-						r.With(httpmw.RequirePublicProjectOrPermissions(deps.ProjectVisibilitySvc, deps.Authorizer,
-							httpmw.PermissionGroup{Scope: httpmw.GlobalScope(), Permissions: []authz.Permission{authz.PermissionProjectsRead}},
-							httpmw.PermissionGroup{Scope: httpmw.ProjectScopeFromParam("projectId"), Permissions: []authz.Permission{authz.PermissionDocsRead}},
-						)).Get("/files/{fileId}/download-url", deps.DocFile.GetDocFileDownloadURL)
-						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
-							Delete("/files/{fileId}", deps.DocFile.DeleteDocFile)
-					})
-				})
 
 				// Agents
 				if deps.Agent != nil {

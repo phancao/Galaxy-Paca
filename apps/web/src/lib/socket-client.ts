@@ -5,9 +5,8 @@
 // logout.  Project pages call `joinProject` / `leaveProject` to subscribe to
 // namespace-scoped rooms.
 //
-// The realtime service uses two rooms per project:
+// The realtime service scopes rooms per project:
 //   project:<projectId>:tasks  — task.* events
-//   project:<projectId>:docs   — doc.* events
 //
 // The server places each socket into only the rooms it has permission for, so
 // clients always emit join/leave for both namespaces and let the server decide.
