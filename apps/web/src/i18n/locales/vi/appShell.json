@@ -56,7 +56,10 @@
 			"privateFull": "Riêng tư — chỉ thành viên dự án",
 			"teamReadFull": "Toàn công ty được xem",
 			"teamWriteFull": "Toàn công ty được sửa"
-		}
+		},
+		"rename": "Đổi tên",
+		"delete": "Xóa",
+		"deleteConfirm": "Bấm lần nữa để xóa"
 	},
 	"notifications": {
 		"title": "Thông báo",

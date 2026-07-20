@@ -207,6 +207,59 @@ func (h *WikiHandler) CreatePage(w http.ResponseWriter, r *http.Request) {
 	presenter.Created(w, r, wikiPageDTO{ID: page.ID, Title: page.Title, URL: page.URL})
 }
 
+// RenamePage retitles a page in the project's space.
+// PATCH /projects/{projectId}/wiki-space/pages/{recordId} {"title": "..."}
+func (h *WikiHandler) RenamePage(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	recordID := strings.TrimSpace(chi.URLParam(r, "recordId"))
+	if recordID == "" {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "recordId is required"))
+		return
+	}
+	var body struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "invalid JSON body"))
+		return
+	}
+	title := strings.TrimSpace(body.Title)
+	if title == "" {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "title is required"))
+		return
+	}
+	page, err := h.svc.RenamePage(r.Context(), projectID, h.actorUserID(r), recordID, title)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.OK(w, r, wikiPageDTO{ID: page.ID, Title: page.Title, URL: page.URL})
+}
+
+// DeletePage moves a page to the Wiki trash.
+// DELETE /projects/{projectId}/wiki-space/pages/{recordId}
+func (h *WikiHandler) DeletePage(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	recordID := strings.TrimSpace(chi.URLParam(r, "recordId"))
+	if recordID == "" {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "recordId is required"))
+		return
+	}
+	if err := h.svc.DeletePage(r.Context(), projectID, h.actorUserID(r), recordID); err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.NoContent(w)
+}
+
 // ListTaskLinks returns a task's linked wiki pages.
 // GET /projects/{projectId}/tasks/{taskId}/wiki-links
 func (h *WikiHandler) ListTaskLinks(w http.ResponseWriter, r *http.Request) {

@@ -544,6 +544,10 @@ func New(deps Deps) http.Handler {
 						r.With(wikiRead).Get("/search", deps.Wiki.Search)
 						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
 							Post("/pages", deps.Wiki.CreatePage)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
+							Patch("/pages/{recordId}", deps.Wiki.RenamePage)
+						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionDocsWrite)).
+							Delete("/pages/{recordId}", deps.Wiki.DeletePage)
 						// Space visibility is a project-governance action.
 						r.With(httpmw.RequirePermissions(deps.Authorizer, httpmw.ProjectScopeFromParam("projectId"), authz.PermissionProjectsWrite)).
 							Patch("/", deps.Wiki.SetVisibility)

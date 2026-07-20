@@ -291,6 +291,35 @@ func (s *Service) CreatePage(ctx context.Context, projectID, actorUserID uuid.UU
 	}, nil
 }
 
+// RenamePage retitles a page in the project's space.
+func (s *Service) RenamePage(ctx context.Context, projectID, actorUserID uuid.UUID, recordID, title string) (*wikispacedom.PageRef, error) {
+	if !s.wiki.Enabled() {
+		return nil, wikispacedom.ErrDisabled
+	}
+	actor, _ := s.actorFor(ctx, actorUserID)
+	rec, err := s.wiki.RenameRecord(ctx, actor, recordID, title)
+	if err != nil {
+		return nil, fmt.Errorf("wikispace: rename page: %w", err)
+	}
+	return &wikispacedom.PageRef{
+		ID:    rec.ID,
+		Title: rec.Title,
+		URL:   s.wiki.PublicPageURL(rec.URL),
+	}, nil
+}
+
+// DeletePage moves a page to the Wiki trash.
+func (s *Service) DeletePage(ctx context.Context, projectID, actorUserID uuid.UUID, recordID string) error {
+	if !s.wiki.Enabled() {
+		return wikispacedom.ErrDisabled
+	}
+	actor, _ := s.actorFor(ctx, actorUserID)
+	if err := s.wiki.DeleteRecord(ctx, actor, recordID); err != nil {
+		return fmt.Errorf("wikispace: delete page: %w", err)
+	}
+	return nil
+}
+
 // ListTaskLinks returns a task's linked wiki pages.
 func (s *Service) ListTaskLinks(ctx context.Context, taskID uuid.UUID) ([]*wikispacedom.TaskWikiLink, error) {
 	if !s.wiki.Enabled() {

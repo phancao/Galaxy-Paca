@@ -63,6 +63,10 @@ type Service interface {
 	Search(ctx context.Context, projectID, actorUserID uuid.UUID, query string) ([]SearchHit, error)
 	// CreatePage creates an empty published page in the project's space.
 	CreatePage(ctx context.Context, projectID, actorUserID uuid.UUID, title string) (*PageRef, error)
+	// RenamePage retitles a page, acting as the requesting user.
+	RenamePage(ctx context.Context, projectID, actorUserID uuid.UUID, recordID, title string) (*PageRef, error)
+	// DeletePage moves a page to the Wiki trash, acting as the requesting user.
+	DeletePage(ctx context.Context, projectID, actorUserID uuid.UUID, recordID string) error
 	// ListTaskLinks returns a task's linked wiki pages.
 	ListTaskLinks(ctx context.Context, taskID uuid.UUID) ([]*TaskWikiLink, error)
 	// AddTaskLink links a wiki record to a task. The record is resolved (and

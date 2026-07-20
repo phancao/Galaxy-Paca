@@ -229,6 +229,21 @@ func (c *Client) RecordInfo(ctx context.Context, actor Actor, id string) (*Recor
 	return &rec, nil
 }
 
+// RenameRecord updates a page's title.
+func (c *Client) RenameRecord(ctx context.Context, actor Actor, id, title string) (*Record, error) {
+	var rec Record
+	if err := c.rpc(ctx, actor, "records.update", map[string]any{"id": id, "title": title}, &rec); err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
+// DeleteRecord moves a page to the Wiki trash (recoverable there; not a
+// permanent delete).
+func (c *Client) DeleteRecord(ctx context.Context, actor Actor, id string) error {
+	return c.rpc(ctx, actor, "records.delete", map[string]any{"id": id}, nil)
+}
+
 // searchItem tolerates both the fork's "record" key and upstream "document".
 type searchItem struct {
 	Context  string  `json:"context"`
