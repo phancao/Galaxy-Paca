@@ -14,7 +14,17 @@ type SpaceInfo struct {
 	URL       string
 	// Created reports whether this call provisioned the space.
 	Created bool
+	// Visibility is the space's team-wide access: "private" (members only),
+	// "team_read" or "team_write". Empty when it could not be determined.
+	Visibility string
 }
+
+// Space visibility values.
+const (
+	VisibilityPrivate   = "private"
+	VisibilityTeamRead  = "team_read"
+	VisibilityTeamWrite = "team_write"
+)
 
 // PageRef references one Wiki page with its browser-facing URL.
 type PageRef struct {
@@ -44,6 +54,9 @@ type Service interface {
 	// EnsureSpace returns the project's wiki space, provisioning the Wiki
 	// Folder on first use (acting as the requesting user).
 	EnsureSpace(ctx context.Context, projectID, actorUserID uuid.UUID) (*SpaceInfo, error)
+	// SetSpaceVisibility changes the space's team-wide access ("private",
+	// "team_read", "team_write"), acting as the requesting user.
+	SetSpaceVisibility(ctx context.Context, projectID, actorUserID uuid.UUID, visibility string) (*SpaceInfo, error)
 	// Tree returns the space plus its page tree.
 	Tree(ctx context.Context, projectID, actorUserID uuid.UUID) (*SpaceInfo, []PageNode, error)
 	// Search full-text searches within the project's space.

@@ -9,4 +9,6 @@ var (
 	// ErrDisabled indicates the Wiki integration is not configured
 	// (missing WIKI_API_URL / WIKI_API_TOKEN).
 	ErrDisabled = errors.New("wikispace: wiki integration disabled")
+	// ErrVisibilityInvalid indicates an unknown space visibility value.
+	ErrVisibilityInvalid = errors.New("wikispace: visibility must be private, team_read or team_write")
 )

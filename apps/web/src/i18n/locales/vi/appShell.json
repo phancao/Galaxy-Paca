@@ -47,7 +47,16 @@
 		"openSpace": "Mở không gian tài liệu",
 		"searchWiki": "Tìm trong tài liệu…",
 		"noResults": "Không có kết quả",
-		"wikiUnavailable": "Dịch vụ tài liệu Wiki hiện chưa sẵn sàng."
+		"wikiUnavailable": "Dịch vụ tài liệu Wiki hiện chưa sẵn sàng.",
+		"visibility": {
+			"label": "Phạm vi không gian tài liệu",
+			"private": "Riêng tư",
+			"teamRead": "Công ty — xem",
+			"teamWrite": "Công ty — sửa",
+			"privateFull": "Riêng tư — chỉ thành viên dự án",
+			"teamReadFull": "Toàn công ty được xem",
+			"teamWriteFull": "Toàn công ty được sửa"
+		}
 	},
 	"notifications": {
 		"title": "Thông báo",

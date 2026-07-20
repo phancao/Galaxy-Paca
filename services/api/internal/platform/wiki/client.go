@@ -70,11 +70,14 @@ func (c *Client) PublicPageURL(path string) string {
 	return c.publicURL + path
 }
 
-// Folder is a Wiki space (Outline "collection").
+// Folder is a Wiki space (Outline "collection"). Permission is the
+// team-wide default access: nil = membership-only (private), "read" /
+// "read_write" = every tenant-team member can view / edit.
 type Folder struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	URL        string  `json:"url"`
+	Permission *string `json:"permission"`
 }
 
 // Record is a Wiki page (Outline "document").
@@ -255,6 +258,17 @@ func (c *Client) SearchRecords(ctx context.Context, actor Actor, query, folderID
 		results = append(results, SearchResult{Context: it.Context, Record: *rec})
 	}
 	return results, nil
+}
+
+// UpdateFolderPermission sets the folder's team-wide default access:
+// nil = membership-only (private), "read" / "read_write" = team-visible.
+func (c *Client) UpdateFolderPermission(ctx context.Context, actor Actor, folderID string, permission *string) (*Folder, error) {
+	var f Folder
+	body := map[string]any{"id": folderID, "permission": permission}
+	if err := c.rpc(ctx, actor, "folders.update", body, &f); err != nil {
+		return nil, err
+	}
+	return &f, nil
 }
 
 // AddFolderUser grants a Wiki user access to a folder (permission read /

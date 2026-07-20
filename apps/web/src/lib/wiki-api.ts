@@ -10,10 +10,14 @@ import type { SuccessEnvelope } from "./api-error";
 
 // ── Shapes ────────────────────────────────────────────────────────────────────
 
+export type WikiSpaceVisibility = "private" | "team_read" | "team_write";
+
 export interface WikiSpace {
 	folder_id: string;
 	url: string;
 	created: boolean;
+	/** "private" | "team_read" | "team_write"; missing = unknown. */
+	visibility?: WikiSpaceVisibility;
 }
 
 export interface WikiPage {
@@ -41,6 +45,17 @@ export interface WikiLink {
 export async function getWikiSpace(projectId: string): Promise<WikiSpace> {
 	const res = await apiClient.instance.get<SuccessEnvelope<WikiSpace>>(
 		`/projects/${projectId}/wiki-space`,
+	);
+	return res.data.data;
+}
+
+export async function setWikiSpaceVisibility(
+	projectId: string,
+	visibility: WikiSpaceVisibility,
+): Promise<WikiSpace> {
+	const res = await apiClient.instance.patch<SuccessEnvelope<WikiSpace>>(
+		`/projects/${projectId}/wiki-space`,
+		{ visibility },
 	);
 	return res.data.data;
 }
