@@ -59,7 +59,14 @@
 		},
 		"rename": "Đổi tên",
 		"delete": "Xóa",
-		"deleteConfirm": "Bấm lần nữa để xóa"
+		"deleteDialog": {
+			"title": "Xóa trang?",
+			"confirmPrefix": "Trang",
+			"confirmSuffix": "sẽ được chuyển vào thùng rác của Wiki. Bạn có thể khôi phục từ đó.",
+			"cancel": "Hủy",
+			"delete": "Xóa trang",
+			"failed": "Không xóa được trang. Vui lòng thử lại."
+		}
 	},
 	"notifications": {
 		"title": "Thông báo",

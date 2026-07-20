@@ -59,7 +59,14 @@
 		},
 		"rename": "Rename",
 		"delete": "Delete",
-		"deleteConfirm": "Click again to delete"
+		"deleteDialog": {
+			"title": "Delete page?",
+			"confirmPrefix": "The page",
+			"confirmSuffix": "will be moved to the Wiki trash. You can restore it from there.",
+			"cancel": "Cancel",
+			"delete": "Delete page",
+			"failed": "Could not delete the page. Please try again."
+		}
 	},
 	"notifications": {
 		"title": "Notifications",
