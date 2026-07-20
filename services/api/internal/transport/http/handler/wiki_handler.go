@@ -56,6 +56,8 @@ type wikiSpaceDTO struct {
 	FolderID string `json:"folder_id"`
 	URL      string `json:"url"`
 	Created  bool   `json:"created"`
+	// Visibility: "private" | "team_read" | "team_write"; "" = unknown.
+	Visibility string `json:"visibility,omitempty"`
 }
 
 type wikiPageDTO struct {
@@ -74,7 +76,7 @@ type wikiLinkDTO struct {
 }
 
 func toWikiSpaceDTO(s *wikispacedom.SpaceInfo) wikiSpaceDTO {
-	return wikiSpaceDTO{FolderID: s.FolderID, URL: s.URL, Created: s.Created}
+	return wikiSpaceDTO{FolderID: s.FolderID, URL: s.URL, Created: s.Created, Visibility: s.Visibility}
 }
 
 func toWikiPageDTOs(nodes []wikispacedom.PageNode) []wikiPageDTO {
@@ -103,6 +105,29 @@ func (h *WikiHandler) GetSpace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	space, err := h.svc.EnsureSpace(r.Context(), projectID, h.actorUserID(r))
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	presenter.OK(w, r, toWikiSpaceDTO(space))
+}
+
+// SetVisibility changes the space's team-wide access.
+// PATCH /projects/{projectId}/wiki-space {"visibility": "private"|"team_read"|"team_write"}
+func (h *WikiHandler) SetVisibility(w http.ResponseWriter, r *http.Request) {
+	projectID, err := parseProjectID(r)
+	if err != nil {
+		presenter.Error(w, r, err)
+		return
+	}
+	var body struct {
+		Visibility string `json:"visibility"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "invalid JSON body"))
+		return
+	}
+	space, err := h.svc.SetSpaceVisibility(r.Context(), projectID, h.actorUserID(r), strings.TrimSpace(body.Visibility))
 	if err != nil {
 		presenter.Error(w, r, err)
 		return

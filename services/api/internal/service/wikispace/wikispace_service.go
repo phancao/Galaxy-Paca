@@ -47,6 +47,38 @@ func New(
 // Enabled reports whether the Wiki integration is configured.
 func (s *Service) Enabled() bool { return s.wiki.Enabled() }
 
+// visibilityFromPermission maps a Wiki folder permission to the domain
+// visibility value.
+func visibilityFromPermission(permission *string) string {
+	switch {
+	case permission == nil:
+		return wikispacedom.VisibilityPrivate
+	case *permission == "read":
+		return wikispacedom.VisibilityTeamRead
+	case *permission == "read_write":
+		return wikispacedom.VisibilityTeamWrite
+	default:
+		return ""
+	}
+}
+
+// permissionFromVisibility maps a domain visibility value to the Wiki folder
+// permission; ok=false for unknown values.
+func permissionFromVisibility(visibility string) (perm *string, ok bool) {
+	switch visibility {
+	case wikispacedom.VisibilityPrivate:
+		return nil, true
+	case wikispacedom.VisibilityTeamRead:
+		v := "read"
+		return &v, true
+	case wikispacedom.VisibilityTeamWrite:
+		v := "read_write"
+		return &v, true
+	default:
+		return nil, false
+	}
+}
+
 // actorFor resolves a Paca user to the Wiki act-as actor. Users without an
 // OIDC identity (local accounts) act as the plain service account.
 func (s *Service) actorFor(ctx context.Context, userID uuid.UUID) (wiki.Actor, *userdom.User) {
@@ -66,11 +98,18 @@ func (s *Service) EnsureSpace(ctx context.Context, projectID, actorUserID uuid.U
 		return nil, wikispacedom.ErrDisabled
 	}
 	if existing, err := s.repo.GetSpace(ctx, projectID); err == nil {
-		return &wikispacedom.SpaceInfo{
+		info := &wikispacedom.SpaceInfo{
 			ProjectID: projectID,
 			FolderID:  existing.WikiFolderID,
 			URL:       existing.WikiURL,
-		}, nil
+		}
+		// Visibility is read live from the Wiki, best-effort: the surface
+		// must keep working (URL from the mapping) when the Wiki hiccups.
+		actor, _ := s.actorFor(ctx, actorUserID)
+		if folder, ferr := s.wiki.FolderInfo(ctx, actor, existing.WikiFolderID); ferr == nil {
+			info.Visibility = visibilityFromPermission(folder.Permission)
+		}
+		return info, nil
 	} else if err != wikispacedom.ErrSpaceNotFound {
 		return nil, err
 	}
@@ -110,12 +149,45 @@ func (s *Service) EnsureSpace(ctx context.Context, projectID, actorUserID uuid.U
 		s.syncMembersAsync(projectID, folder.ID, actor)
 	}
 
+	visibility := wikispacedom.VisibilityTeamWrite
+	if !project.IsPublic {
+		visibility = wikispacedom.VisibilityPrivate
+	}
 	return &wikispacedom.SpaceInfo{
-		ProjectID: projectID,
-		FolderID:  folder.ID,
-		URL:       space.WikiURL,
-		Created:   true,
+		ProjectID:  projectID,
+		FolderID:   folder.ID,
+		URL:        space.WikiURL,
+		Created:    true,
+		Visibility: visibility,
 	}, nil
+}
+
+// SetSpaceVisibility changes the space's team-wide access, acting as the
+// requesting user (the Wiki enforces its own folder-admin authorization).
+func (s *Service) SetSpaceVisibility(ctx context.Context, projectID, actorUserID uuid.UUID, visibility string) (*wikispacedom.SpaceInfo, error) {
+	if !s.wiki.Enabled() {
+		return nil, wikispacedom.ErrDisabled
+	}
+	perm, ok := permissionFromVisibility(visibility)
+	if !ok {
+		return nil, wikispacedom.ErrVisibilityInvalid
+	}
+	space, err := s.EnsureSpace(ctx, projectID, actorUserID)
+	if err != nil {
+		return nil, err
+	}
+	actor, _ := s.actorFor(ctx, actorUserID)
+	folder, err := s.wiki.UpdateFolderPermission(ctx, actor, space.FolderID, perm)
+	if err != nil {
+		return nil, fmt.Errorf("wikispace: set visibility: %w", err)
+	}
+	// Going private cuts off tenant-wide access — mirror the project's
+	// members onto the folder so they keep theirs (best-effort, async).
+	if visibility == wikispacedom.VisibilityPrivate {
+		s.syncMembersAsync(projectID, space.FolderID, actor)
+	}
+	space.Visibility = visibilityFromPermission(folder.Permission)
+	return space, nil
 }
 
 // syncMembersAsync mirrors current project members onto a private folder.

@@ -4,16 +4,25 @@
 // creation through Paca's server-side proxy.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FilePlus2, Loader2, Search } from "lucide-react";
+import { Building2, FilePlus2, Loader2, Lock, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useProjectPermissions } from "@/hooks/use-project-permissions";
 import {
 	createWikiPage,
 	searchWiki,
+	setWikiSpaceVisibility,
 	type WikiPage,
+	type WikiSpaceVisibility,
 	wikiQueryKeys,
 	wikiSpaceQueryOptions,
 } from "@/lib/wiki-api";
@@ -37,12 +46,22 @@ function WikiDocsPage() {
 	const navigate = useNavigate();
 	const qc = useQueryClient();
 	const { t } = useTranslation("appShell");
+	const { hasProjectPermission } = useProjectPermissions(projectId);
+	const canGovern = hasProjectPermission("projects.write");
 
 	const {
 		data: space,
 		isPending,
 		isError,
 	} = useQuery(wikiSpaceQueryOptions(projectId));
+
+	const visibilityMutation = useMutation({
+		mutationFn: (visibility: WikiSpaceVisibility) =>
+			setWikiSpaceVisibility(projectId, visibility),
+		onSuccess: (updated) => {
+			qc.setQueryData(wikiSpaceQueryOptions(projectId).queryKey, updated);
+		},
+	});
 
 	const [query, setQuery] = useState("");
 	const [results, setResults] = useState<WikiPage[] | null>(null);
@@ -135,6 +154,61 @@ function WikiDocsPage() {
 					<FilePlus2 className="size-4" />
 					{t("docs.newDocument", { defaultValue: "New Document" })}
 				</Button>
+				{canGovern && (
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer"
+							disabled={visibilityMutation.isPending}
+							title={t("docs.visibility.label", {
+								defaultValue: "Space visibility",
+							})}
+						>
+							{space.visibility === "team_read" ||
+							space.visibility === "team_write" ? (
+								<Building2 className="size-4" />
+							) : (
+								<Lock className="size-4" />
+							)}
+							{space.visibility === "team_write"
+								? t("docs.visibility.teamWrite", {
+										defaultValue: "Company — edit",
+									})
+								: space.visibility === "team_read"
+									? t("docs.visibility.teamRead", {
+											defaultValue: "Company — view",
+										})
+									: t("docs.visibility.private", {
+											defaultValue: "Private",
+										})}
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem
+								onClick={() => visibilityMutation.mutate("private")}
+							>
+								<Lock className="size-4" />
+								{t("docs.visibility.privateFull", {
+									defaultValue: "Private — project members only",
+								})}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() => visibilityMutation.mutate("team_read")}
+							>
+								<Building2 className="size-4" />
+								{t("docs.visibility.teamReadFull", {
+									defaultValue: "Whole company can view",
+								})}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() => visibilityMutation.mutate("team_write")}
+							>
+								<Building2 className="size-4" />
+								{t("docs.visibility.teamWriteFull", {
+									defaultValue: "Whole company can edit",
+								})}
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				)}
 			</div>
 
 			{/* Search results overlay */}

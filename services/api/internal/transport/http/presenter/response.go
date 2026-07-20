@@ -268,6 +268,8 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusNotFound, apierr.CodeWikiSpaceNotFound
 	case errors.Is(err, wikispacedom.ErrLinkNotFound):
 		return http.StatusNotFound, apierr.CodeWikiLinkNotFound
+	case errors.Is(err, wikispacedom.ErrVisibilityInvalid):
+		return http.StatusBadRequest, apierr.CodeBadRequest
 	case errors.Is(err, worklogdom.ErrWorklogNotFound):
 		return http.StatusNotFound, apierr.CodeWorklogNotFound
 	case errors.Is(err, worklogdom.ErrWorklogMinutesInvalid):

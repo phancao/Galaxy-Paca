@@ -47,7 +47,16 @@
 		"openSpace": "Open space",
 		"searchWiki": "Search documentation…",
 		"noResults": "No results",
-		"wikiUnavailable": "The Wiki documentation service is not available."
+		"wikiUnavailable": "The Wiki documentation service is not available.",
+		"visibility": {
+			"label": "Space visibility",
+			"private": "Private",
+			"teamRead": "Company — view",
+			"teamWrite": "Company — edit",
+			"privateFull": "Private — project members only",
+			"teamReadFull": "Whole company can view",
+			"teamWriteFull": "Whole company can edit"
+		}
 	},
 	"notifications": {
 		"title": "Notifications",
