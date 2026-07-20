@@ -19,6 +19,7 @@ import {
 	Home,
 	KanbanSquare,
 	LayoutList,
+	Loader2,
 	Milestone,
 	Monitor,
 	Moon,
@@ -38,11 +39,21 @@ import { type ComponentType, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -119,25 +130,129 @@ function DocsSectionSwitch({ projectId }: { projectId: string }) {
 	);
 }
 
+/**
+ * Destructive-confirm dialog for deleting a wiki page from the sidebar
+ * (mirrors the VersionsSettings delete dialog). Deleting moves the page to
+ * the Wiki trash — recoverable there, never permanent.
+ */
+function WikiPageDeleteDialog({
+	projectId,
+	page,
+	open,
+	onOpenChange,
+}: {
+	projectId: string;
+	page: WikiPage | null;
+	open: boolean;
+	onOpenChange: (v: boolean) => void;
+}) {
+	const { t } = useTranslation("appShell");
+	const qc = useQueryClient();
+	const [error, setError] = useState<string | null>(null);
+
+	const mutation = useMutation({
+		mutationFn: () => {
+			if (!page) return Promise.resolve();
+			return deleteWikiPage(projectId, page.id);
+		},
+		onSuccess: () => {
+			void qc.invalidateQueries({ queryKey: wikiQueryKeys.tree(projectId) });
+			onOpenChange(false);
+		},
+		onError: () =>
+			setError(
+				t("docs.deleteDialog.failed", {
+					defaultValue: "Could not delete the page. Please try again.",
+				}),
+			),
+	});
+
+	if (!page) return null;
+
+	return (
+		<Dialog
+			open={open}
+			onOpenChange={(o) => {
+				if (!o) setError(null);
+				onOpenChange(o);
+			}}
+		>
+			<DialogContent className="sm:max-w-sm">
+				<DialogHeader>
+					<div className="flex size-10 items-center justify-center rounded-full bg-destructive/10 mb-2">
+						<Trash2 className="size-5 text-destructive" />
+					</div>
+					<DialogTitle>
+						{t("docs.deleteDialog.title", { defaultValue: "Delete page?" })}
+					</DialogTitle>
+					<DialogDescription>
+						{t("docs.deleteDialog.confirmPrefix", {
+							defaultValue: "The page",
+						})}{" "}
+						<span className="font-semibold text-foreground">
+							&ldquo;{page.title || t("docs.untitled")}&rdquo;
+						</span>{" "}
+						{t("docs.deleteDialog.confirmSuffix", {
+							defaultValue:
+								"will be moved to the Wiki trash. You can restore it from there.",
+						})}
+					</DialogDescription>
+				</DialogHeader>
+
+				{error ? (
+					<p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+						{error}
+					</p>
+				) : null}
+
+				<DialogFooter>
+					<DialogClose
+						render={
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={mutation.isPending}
+							/>
+						}
+					>
+						{t("docs.deleteDialog.cancel", { defaultValue: "Cancel" })}
+					</DialogClose>
+					<Button
+						variant="destructive"
+						size="sm"
+						disabled={mutation.isPending}
+						onClick={() => mutation.mutate()}
+					>
+						{mutation.isPending ? (
+							<Loader2 className="size-3.5 animate-spin" />
+						) : null}
+						{t("docs.deleteDialog.delete", { defaultValue: "Delete page" })}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 /** One node of the Wiki page tree (recursive, links into the embedded view). */
 function WikiPageNode({
 	projectId,
 	page,
 	depth,
 	canWrite,
+	onRequestDelete,
 }: {
 	projectId: string;
 	page: WikiPage;
 	depth: number;
 	canWrite: boolean;
+	onRequestDelete: (page: WikiPage) => void;
 }) {
 	const navigate = useNavigate();
 	const { t } = useTranslation("appShell");
 	const qc = useQueryClient();
 	const [renaming, setRenaming] = useState(false);
 	const [title, setTitle] = useState(page.title);
-	// Two-step delete confirm: first click arms (icon turns red), second fires.
-	const [armed, setArmed] = useState(false);
 
 	const invalidateTree = () =>
 		qc.invalidateQueries({ queryKey: wikiQueryKeys.tree(projectId) });
@@ -149,11 +264,6 @@ function WikiPageNode({
 			setRenaming(false);
 			invalidateTree();
 		},
-	});
-
-	const deleteMutation = useMutation({
-		mutationFn: () => deleteWikiPage(projectId, page.id),
-		onSuccess: invalidateTree,
 	});
 
 	const submitRename = () => {
@@ -225,30 +335,12 @@ function WikiPageNode({
 								</button>
 								<button
 									type="button"
-									title={
-										armed
-											? t("docs.deleteConfirm", {
-													defaultValue: "Click again to delete",
-												})
-											: t("docs.delete", { defaultValue: "Delete" })
-									}
+									title={t("docs.delete", { defaultValue: "Delete" })}
 									onClick={(e) => {
 										e.stopPropagation();
-										if (armed) {
-											deleteMutation.mutate();
-											setArmed(false);
-										} else {
-											setArmed(true);
-											window.setTimeout(() => setArmed(false), 2500);
-										}
+										onRequestDelete(page);
 									}}
-									disabled={deleteMutation.isPending}
-									className={cn(
-										"flex size-5 items-center justify-center rounded transition-colors",
-										armed
-											? "bg-destructive/15 text-destructive"
-											: "text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-destructive",
-									)}
+									className="flex size-5 items-center justify-center rounded text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-destructive"
 								>
 									<Trash2 className="size-3" />
 								</button>
@@ -264,6 +356,7 @@ function WikiPageNode({
 					page={child}
 					depth={depth + 1}
 					canWrite={canWrite}
+					onRequestDelete={onRequestDelete}
 				/>
 			))}
 		</>
@@ -278,6 +371,8 @@ function WikiDocsSidebarSection({ projectId }: { projectId: string }) {
 	const { hasProjectPermission } = useProjectPermissions(projectId);
 	const canWrite = hasProjectPermission("docs.write");
 	const [collapsed, setCollapsed] = useState(false);
+	const [deleteTarget, setDeleteTarget] = useState<WikiPage | null>(null);
+	const [deleteOpen, setDeleteOpen] = useState(false);
 
 	const { data: tree } = useQuery(wikiTreeQueryOptions(projectId));
 
@@ -353,6 +448,10 @@ function WikiDocsSidebarSection({ projectId }: { projectId: string }) {
 									page={page}
 									depth={0}
 									canWrite={canWrite}
+									onRequestDelete={(target) => {
+										setDeleteTarget(target);
+										setDeleteOpen(true);
+									}}
 								/>
 							))}
 							{canWrite && (
@@ -371,6 +470,12 @@ function WikiDocsSidebarSection({ projectId }: { projectId: string }) {
 					</div>
 				</SidebarGroupContent>
 			)}
+			<WikiPageDeleteDialog
+				projectId={projectId}
+				page={deleteTarget}
+				open={deleteOpen}
+				onOpenChange={setDeleteOpen}
+			/>
 		</SidebarGroup>
 	);
 }
