@@ -32,6 +32,7 @@ import { PropertiesPanel } from "./properties-panel";
 import { SubtasksSection } from "./subtasks-section";
 import { TaskHeader } from "./task-header";
 import { TaskLinksSection } from "./task-links-section";
+import { TaskWikiLinksSection } from "./task-wiki-links-section";
 import { TimeTrackingSection } from "./time-tracking-section";
 import type { TaskDetailModalProps } from "./types";
 import { WorkflowsSection } from "./workflows-section";
@@ -464,6 +465,16 @@ export function TaskDetailModal({
 								taskIdPrefix={taskIdPrefix}
 								canEdit={canEdit}
 								onNavigateToTask={navigateToTask}
+							/>
+						)}
+
+						{/* Linked wiki pages (ADR-042) — hidden when the Wiki
+						    integration is not configured */}
+						{projectId && (
+							<TaskWikiLinksSection
+								projectId={projectId}
+								taskId={task.id}
+								canEdit={canEdit}
 							/>
 						)}
 

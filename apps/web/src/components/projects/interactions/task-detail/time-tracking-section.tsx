@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDate } from "@/lib/format-date";
 import {
 	createWorklog,
 	deleteWorklog,
 	type Worklog,
 	worklogsQueryOptions,
 } from "@/lib/interaction-api";
-import { formatDate } from "@/lib/format-date";
 import type { ProjectMember } from "@/lib/project-api";
 import { formatDuration } from "./helpers";
 import { SectionHeading } from "./primitives";
@@ -86,7 +86,9 @@ export function TimeTrackingSection({
 
 	const estimate = estimateMinutes ?? 0;
 	const pct =
-		estimate > 0 ? Math.min(100, Math.round((totalMinutes / estimate) * 100)) : 0;
+		estimate > 0
+			? Math.min(100, Math.round((totalMinutes / estimate) * 100))
+			: 0;
 
 	return (
 		<div>

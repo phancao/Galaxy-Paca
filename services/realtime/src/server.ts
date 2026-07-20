@@ -21,7 +21,6 @@
 // Events are routed through three namespace-scoped rooms per project:
 //
 //   project:<projectId>:tasks      — all task.* events
-//   project:<projectId>:docs       — all doc.* events
 //   project:<projectId>:workflows  — all workflow.* graph events
 //
 // When a client emits "join" with { projectId }, the server fetches the user's

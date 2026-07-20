@@ -13,7 +13,6 @@ import (
 	attachmentdom "github.com/Paca-AI/api/internal/domain/attachment"
 	domainauth "github.com/Paca-AI/api/internal/domain/auth"
 	componentdom "github.com/Paca-AI/api/internal/domain/component"
-	docdom "github.com/Paca-AI/api/internal/domain/doc"
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	notificationdom "github.com/Paca-AI/api/internal/domain/notification"
 	pluginom "github.com/Paca-AI/api/internal/domain/plugin"
@@ -266,7 +265,7 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 	case errors.Is(err, wikispacedom.ErrDisabled):
 		return http.StatusServiceUnavailable, apierr.CodeWikiUnavailable
 	case errors.Is(err, wikispacedom.ErrSpaceNotFound):
-		return http.StatusNotFound, apierr.CodeDocFolderNotFound
+		return http.StatusNotFound, apierr.CodeWikiSpaceNotFound
 	case errors.Is(err, wikispacedom.ErrLinkNotFound):
 		return http.StatusNotFound, apierr.CodeWikiLinkNotFound
 	case errors.Is(err, worklogdom.ErrWorklogNotFound):
@@ -275,30 +274,6 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusBadRequest, apierr.CodeWorklogMinutesInvalid
 	case errors.Is(err, worklogdom.ErrWorklogTaskNotInProject):
 		return http.StatusNotFound, apierr.CodeTaskNotFound
-	case errors.Is(err, docdom.ErrDocNotFound):
-		return http.StatusNotFound, apierr.CodeDocNotFound
-	case errors.Is(err, docdom.ErrDocTitleInvalid):
-		return http.StatusBadRequest, apierr.CodeDocTitleInvalid
-	case errors.Is(err, docdom.ErrFolderNotFound):
-		return http.StatusNotFound, apierr.CodeDocFolderNotFound
-	case errors.Is(err, docdom.ErrFolderNameInvalid):
-		return http.StatusBadRequest, apierr.CodeDocFolderNameInvalid
-	case errors.Is(err, docdom.ErrFolderNotInProject):
-		return http.StatusBadRequest, apierr.CodeDocFolderNotInProject
-	case errors.Is(err, docdom.ErrFolderSelfParent):
-		return http.StatusBadRequest, apierr.CodeDocFolderSelfParent
-	case errors.Is(err, docdom.ErrSnapshotNotFound):
-		return http.StatusNotFound, apierr.CodeDocSnapshotNotFound
-	case errors.Is(err, docdom.ErrActivityNotFound):
-		return http.StatusNotFound, apierr.CodeDocActivityNotFound
-	case errors.Is(err, docdom.ErrActivityForbidden):
-		return http.StatusForbidden, apierr.CodeDocActivityForbidden
-	case errors.Is(err, docdom.ErrActivityNotAComment):
-		return http.StatusBadRequest, apierr.CodeDocActivityNotAComment
-	case errors.Is(err, docdom.ErrCommentContentInvalid):
-		return http.StatusBadRequest, apierr.CodeDocCommentContentInvalid
-	case errors.Is(err, docdom.ErrCommentActorUnidentified):
-		return http.StatusBadRequest, apierr.CodeDocCommentActorUnidentified
 	case errors.Is(err, notificationdom.ErrNotificationNotFound):
 		return http.StatusNotFound, apierr.CodeNotificationNotFound
 	case errors.Is(err, apikeydom.ErrNotFound):
@@ -497,21 +472,6 @@ func httpStatusForCode(code apierr.Code) int {
 		return http.StatusConflict
 	case apierr.CodeTaskTypeIsSystem:
 		return http.StatusForbidden
-	case apierr.CodeDocNotFound,
-		apierr.CodeDocFolderNotFound,
-		apierr.CodeDocSnapshotNotFound,
-		apierr.CodeDocActivityNotFound:
-		return http.StatusNotFound
-	case apierr.CodeDocTitleInvalid,
-		apierr.CodeDocFolderNameInvalid,
-		apierr.CodeDocFolderNotInProject,
-		apierr.CodeDocFolderSelfParent,
-		apierr.CodeDocActivityNotAComment,
-		apierr.CodeDocCommentContentInvalid,
-		apierr.CodeDocCommentActorUnidentified:
-		return http.StatusBadRequest
-	case apierr.CodeDocActivityForbidden:
-		return http.StatusForbidden
 	case apierr.CodeNotificationNotFound:
 		return http.StatusNotFound
 	case apierr.CodeGitHubIntegrationNotFound,
@@ -600,7 +560,7 @@ func httpStatusForCode(code apierr.Code) int {
 		return http.StatusBadRequest
 	case apierr.CodeWikiUnavailable:
 		return http.StatusServiceUnavailable
-	case apierr.CodeWikiLinkNotFound:
+	case apierr.CodeWikiLinkNotFound, apierr.CodeWikiSpaceNotFound:
 		return http.StatusNotFound
 	case apierr.CodePasswordChangeRequired:
 		return http.StatusForbidden

@@ -10,7 +10,6 @@
 // Events are routed to namespace-scoped Socket.IO rooms:
 //
 //   task.*     events  →  project:<projectId>:tasks
-//   doc.*      events  →  project:<projectId>:docs
 //   workflow.* events  →  project:<projectId>:workflows (except
 //                          workflow.assigned, which is task-scoped)
 //

@@ -190,35 +190,6 @@ const (
 	// CodeTaskLinkCrossProject indicates an attempt to link tasks from different projects.
 	CodeTaskLinkCrossProject Code = "TASK_LINK_CROSS_PROJECT"
 
-	// --- Document errors --------------------------------------------------
-
-	// CodeDocNotFound indicates the requested document does not exist.
-	CodeDocNotFound Code = "DOC_NOT_FOUND"
-	// CodeDocTitleInvalid indicates an empty or invalid document title.
-	CodeDocTitleInvalid Code = "DOC_TITLE_INVALID"
-	// CodeDocFolderNotFound indicates the requested document folder does not exist.
-	CodeDocFolderNotFound Code = "DOC_FOLDER_NOT_FOUND"
-	// CodeDocFolderNameInvalid indicates an empty or invalid folder name.
-	CodeDocFolderNameInvalid Code = "DOC_FOLDER_NAME_INVALID"
-	// CodeDocFolderNotInProject indicates the folder does not belong to the project.
-	CodeDocFolderNotInProject Code = "DOC_FOLDER_NOT_IN_PROJECT"
-	// CodeDocFolderSelfParent indicates a folder cannot be set as its own parent.
-	CodeDocFolderSelfParent Code = "DOC_FOLDER_SELF_PARENT"
-	// CodeDocSnapshotNotFound indicates the requested snapshot does not exist.
-	CodeDocSnapshotNotFound Code = "DOC_SNAPSHOT_NOT_FOUND"
-	// CodeDocActivityNotFound indicates the requested doc activity does not exist.
-	CodeDocActivityNotFound Code = "DOC_ACTIVITY_NOT_FOUND"
-	// CodeDocActivityForbidden indicates the caller is not the author of the comment.
-	CodeDocActivityForbidden Code = "DOC_ACTIVITY_FORBIDDEN"
-	// CodeDocActivityNotAComment indicates the entry cannot be edited as a comment.
-	CodeDocActivityNotAComment Code = "DOC_ACTIVITY_NOT_A_COMMENT"
-	// CodeDocCommentContentInvalid indicates an empty or invalid comment content.
-	CodeDocCommentContentInvalid Code = "DOC_COMMENT_CONTENT_INVALID"
-	// CodeDocCommentActorUnidentified indicates the caller authenticated with
-	// the shared agent API key but did not supply an X-Agent-ID header, so
-	// there is no project member identity to attribute the comment to.
-	CodeDocCommentActorUnidentified Code = "DOC_COMMENT_ACTOR_UNIDENTIFIED"
-
 	// CodeNotificationNotFound indicates the requested notification does not exist
 	// or does not belong to the authenticated user.
 	CodeNotificationNotFound Code = "NOTIFICATION_NOT_FOUND"
@@ -389,6 +360,8 @@ const (
 	CodeWikiUnavailable Code = "WIKI_UNAVAILABLE"
 	// CodeWikiLinkNotFound indicates the task↔wiki-page link does not exist.
 	CodeWikiLinkNotFound Code = "WIKI_LINK_NOT_FOUND"
+	// CodeWikiSpaceNotFound indicates the project has no provisioned wiki space.
+	CodeWikiSpaceNotFound Code = "WIKI_SPACE_NOT_FOUND"
 )
 
 // Error carries a machine-readable Code alongside a human-readable Message.

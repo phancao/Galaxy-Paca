@@ -35,7 +35,6 @@ import (
 	attachmentsvc "github.com/Paca-AI/api/internal/service/attachment"
 	authsvc "github.com/Paca-AI/api/internal/service/auth"
 	componentsvc "github.com/Paca-AI/api/internal/service/component"
-	docsvc "github.com/Paca-AI/api/internal/service/doc"
 	galaxyauthsvc "github.com/Paca-AI/api/internal/service/galaxyauth"
 	globalrolesvc "github.com/Paca-AI/api/internal/service/globalrole"
 	nexussyncsvc "github.com/Paca-AI/api/internal/service/nexussync"
@@ -71,7 +70,6 @@ type App struct {
 	server               *http.Server
 	publisher            *messaging.Publisher
 	activityConsumer     *worker.ActivityConsumer
-	docActivityConsumer  *worker.DocActivityConsumer
 	notificationConsumer *worker.NotificationConsumer
 	pluginEventConsumer  *worker.PluginEventConsumer
 	workflowConsumer     *worker.WorkflowConsumer
@@ -117,7 +115,6 @@ func New(cfg *config.Config) (*App, error) {
 	sprintRepo := pgRepo.NewSprintRepository(db)
 	viewRepo := pgRepo.NewViewRepository(db)
 	attachmentRepo := pgRepo.NewAttachmentRepository(db)
-	docRepo := pgRepo.NewDocumentRepository(db)
 	refreshStore := redisRepo.NewRefreshTokenStore(redisClient)
 	pluginRepo := pgRepo.NewPluginRepository(db)
 	rawWorkflowRepo := pgRepo.NewWorkflowRepository(db)
@@ -186,10 +183,6 @@ func New(cfg *config.Config) (*App, error) {
 	notificationConsumer := worker.NewNotificationConsumer(redisClient, notificationService, log, projectRepo, agentService).
 		WithActivityRecorder(activityService)
 	activityConsumer := worker.NewActivityConsumer(redisClient, activityRepo, projectRepo, log)
-	docService := docsvc.New(docRepo, projectRepo)
-	docActivityService := docsvc.NewActivityService(docRepo, projectRepo, publisher).
-		WithNotificationService(notificationService)
-	docActivityConsumer := worker.NewDocActivityConsumer(redisClient, docRepo, projectRepo, log)
 	workflowService := workflowsvc.New(workflowRepo, taskRepo, projectRepo, publisher)
 	workflowConsumer := worker.NewWorkflowConsumer(redisClient, workflowRepo, taskRepo, taskService, activityService, publisher, log)
 
@@ -409,8 +402,6 @@ func New(cfg *config.Config) (*App, error) {
 		),
 		View:         handler.NewViewHandler(viewService),
 		Attachment:   handler.NewAttachmentHandler(attachmentService),
-		Document:     handler.NewDocumentHandler(docService, docActivityService),
-		DocFile:      handler.NewDocFileHandler(attachmentService),
 		Notification: handler.NewNotificationHandler(notificationService),
 		APIKey:       handler.NewAPIKeyHandler(apiKeyService),
 		Plugin:       pluginHandler,
@@ -431,7 +422,7 @@ func New(cfg *config.Config) (*App, error) {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	return &App{server: srv, publisher: publisher, activityConsumer: activityConsumer, docActivityConsumer: docActivityConsumer, notificationConsumer: notificationConsumer, pluginEventConsumer: pluginEventConsumer, workflowConsumer: workflowConsumer, log: log}, nil
+	return &App{server: srv, publisher: publisher, activityConsumer: activityConsumer, notificationConsumer: notificationConsumer, pluginEventConsumer: pluginEventConsumer, workflowConsumer: workflowConsumer, log: log}, nil
 }
 
 // Run starts the activity consumers and the HTTP server.
@@ -439,7 +430,6 @@ func New(cfg *config.Config) (*App, error) {
 func (a *App) Run() error {
 	a.log.Info("starting server", "addr", a.server.Addr)
 	a.activityConsumer.Start(context.Background())
-	a.docActivityConsumer.Start(context.Background())
 	a.notificationConsumer.Start(context.Background())
 	a.pluginEventConsumer.Start(context.Background())
 	a.workflowConsumer.Start(context.Background())
@@ -450,7 +440,6 @@ func (a *App) Run() error {
 func (a *App) Shutdown(ctx context.Context) error {
 	a.log.Info("shutting down server")
 	a.activityConsumer.Stop()
-	a.docActivityConsumer.Stop()
 	a.notificationConsumer.Stop()
 	a.pluginEventConsumer.Stop()
 	a.workflowConsumer.Stop()

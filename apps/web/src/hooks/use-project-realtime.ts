@@ -6,7 +6,7 @@
 //   useProjectRealtime(projectId);
 //
 // The hook:
-//   1. Joins the project rooms on mount (server grants tasks/docs room
+//   1. Joins the project rooms on mount (server grants tasks room
 //      access based on the caller's permissions).
 //   2. Listens for "event" messages and maps event types to query
 //      invalidations using the same query key prefixes as the API helpers.
@@ -17,9 +17,6 @@
 // task.* events  → invalidate ["projects", projectId, "tasks"]
 //                  This covers allTasksQueryOptions, taskQueryOptions,
 //                  sprintTasksQueryOptions, epicTasksQueryOptions, etc.
-// doc.* events   → invalidate ["projects", projectId, "docs"]
-//                  This covers docFoldersQueryOptions, docListQueryOptions,
-//                  docQueryOptions, etc.
 // workflow.* events → invalidate ["projects", projectId, "workflows"] (the
 //                  automation list/graph queries) and ["projects", projectId,
 //                  "tasks"] (covers workflowsForTaskQueryOptions, which hangs
@@ -55,13 +52,6 @@ export function useProjectRealtime(projectId: string): void {
 			if (type.startsWith("task.")) {
 				void queryClient.invalidateQueries({
 					queryKey: ["projects", projectId, "tasks"],
-				});
-				return;
-			}
-
-			if (type.startsWith("doc.")) {
-				void queryClient.invalidateQueries({
-					queryKey: ["projects", projectId, "docs"],
 				});
 				return;
 			}

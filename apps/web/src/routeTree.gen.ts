@@ -23,13 +23,11 @@ import { Route as AuthenticatedAdminGlobalRolesIndexRouteImport } from './routes
 import { Route as AuthenticatedProjectsProjectIdTeamIndexRouteImport } from './routes/_authenticated/projects/$projectId/team/index'
 import { Route as AuthenticatedProjectsProjectIdSettingsIndexRouteImport } from './routes/_authenticated/projects/$projectId/settings/index'
 import { Route as AuthenticatedProjectsProjectIdEfficiencyIndexRouteImport } from './routes/_authenticated/projects/$projectId/efficiency/index'
-import { Route as AuthenticatedProjectsProjectIdDocsIndexRouteImport } from './routes/_authenticated/projects/$projectId/docs/index'
 import { Route as AuthenticatedProjectsProjectIdAutomationIndexRouteImport } from './routes/_authenticated/projects/$projectId/automation/index'
 import { Route as AuthenticatedProjectsProjectIdTasksTaskIdRouteImport } from './routes/_authenticated/projects/$projectId/tasks/$taskId'
 import { Route as AuthenticatedProjectsProjectIdInteractionsTimelineRouteImport } from './routes/_authenticated/projects/$projectId/interactions/timeline'
 import { Route as AuthenticatedProjectsProjectIdInteractionsBacklogRouteImport } from './routes/_authenticated/projects/$projectId/interactions/backlog'
 import { Route as AuthenticatedProjectsProjectIdDocsWikiRouteImport } from './routes/_authenticated/projects/$projectId/docs/wiki'
-import { Route as AuthenticatedProjectsProjectIdDocsDocIdRouteImport } from './routes/_authenticated/projects/$projectId/docs/$docId'
 import { Route as AuthenticatedProjectsProjectIdAutomationWorkflowIdRouteImport } from './routes/_authenticated/projects/$projectId/automation/$workflowId'
 import { Route as AuthenticatedAdminPluginsPluginIdSlugRouteImport } from './routes/_authenticated/admin/plugins/$pluginId/$slug'
 import { Route as AuthenticatedProjectsProjectIdPluginsPluginIdSlugRouteImport } from './routes/_authenticated/projects/$projectId/plugins/$pluginId/$slug'
@@ -114,12 +112,6 @@ const AuthenticatedProjectsProjectIdEfficiencyIndexRoute =
     path: '/efficiency/',
     getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
-const AuthenticatedProjectsProjectIdDocsIndexRoute =
-  AuthenticatedProjectsProjectIdDocsIndexRouteImport.update({
-    id: '/docs/',
-    path: '/docs/',
-    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
-  } as any)
 const AuthenticatedProjectsProjectIdAutomationIndexRoute =
   AuthenticatedProjectsProjectIdAutomationIndexRouteImport.update({
     id: '/automation/',
@@ -148,12 +140,6 @@ const AuthenticatedProjectsProjectIdDocsWikiRoute =
   AuthenticatedProjectsProjectIdDocsWikiRouteImport.update({
     id: '/docs/wiki',
     path: '/docs/wiki',
-    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
-  } as any)
-const AuthenticatedProjectsProjectIdDocsDocIdRoute =
-  AuthenticatedProjectsProjectIdDocsDocIdRouteImport.update({
-    id: '/docs/$docId',
-    path: '/docs/$docId',
     getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
 const AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute =
@@ -194,13 +180,11 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute
   '/admin/plugins/$pluginId/$slug': typeof AuthenticatedAdminPluginsPluginIdSlugRoute
   '/projects/$projectId/automation/$workflowId': typeof AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute
-  '/projects/$projectId/docs/$docId': typeof AuthenticatedProjectsProjectIdDocsDocIdRoute
   '/projects/$projectId/docs/wiki': typeof AuthenticatedProjectsProjectIdDocsWikiRoute
   '/projects/$projectId/interactions/backlog': typeof AuthenticatedProjectsProjectIdInteractionsBacklogRoute
   '/projects/$projectId/interactions/timeline': typeof AuthenticatedProjectsProjectIdInteractionsTimelineRoute
   '/projects/$projectId/tasks/$taskId': typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   '/projects/$projectId/automation/': typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
-  '/projects/$projectId/docs/': typeof AuthenticatedProjectsProjectIdDocsIndexRoute
   '/projects/$projectId/efficiency/': typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   '/projects/$projectId/settings/': typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   '/projects/$projectId/team/': typeof AuthenticatedProjectsProjectIdTeamIndexRoute
@@ -219,13 +203,11 @@ export interface FileRoutesByTo {
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdIndexRoute
   '/admin/plugins/$pluginId/$slug': typeof AuthenticatedAdminPluginsPluginIdSlugRoute
   '/projects/$projectId/automation/$workflowId': typeof AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute
-  '/projects/$projectId/docs/$docId': typeof AuthenticatedProjectsProjectIdDocsDocIdRoute
   '/projects/$projectId/docs/wiki': typeof AuthenticatedProjectsProjectIdDocsWikiRoute
   '/projects/$projectId/interactions/backlog': typeof AuthenticatedProjectsProjectIdInteractionsBacklogRoute
   '/projects/$projectId/interactions/timeline': typeof AuthenticatedProjectsProjectIdInteractionsTimelineRoute
   '/projects/$projectId/tasks/$taskId': typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   '/projects/$projectId/automation': typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
-  '/projects/$projectId/docs': typeof AuthenticatedProjectsProjectIdDocsIndexRoute
   '/projects/$projectId/efficiency': typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   '/projects/$projectId/settings': typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   '/projects/$projectId/team': typeof AuthenticatedProjectsProjectIdTeamIndexRoute
@@ -247,13 +229,11 @@ export interface FileRoutesById {
   '/_authenticated/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute
   '/_authenticated/admin/plugins/$pluginId/$slug': typeof AuthenticatedAdminPluginsPluginIdSlugRoute
   '/_authenticated/projects/$projectId/automation/$workflowId': typeof AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute
-  '/_authenticated/projects/$projectId/docs/$docId': typeof AuthenticatedProjectsProjectIdDocsDocIdRoute
   '/_authenticated/projects/$projectId/docs/wiki': typeof AuthenticatedProjectsProjectIdDocsWikiRoute
   '/_authenticated/projects/$projectId/interactions/backlog': typeof AuthenticatedProjectsProjectIdInteractionsBacklogRoute
   '/_authenticated/projects/$projectId/interactions/timeline': typeof AuthenticatedProjectsProjectIdInteractionsTimelineRoute
   '/_authenticated/projects/$projectId/tasks/$taskId': typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   '/_authenticated/projects/$projectId/automation/': typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
-  '/_authenticated/projects/$projectId/docs/': typeof AuthenticatedProjectsProjectIdDocsIndexRoute
   '/_authenticated/projects/$projectId/efficiency/': typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   '/_authenticated/projects/$projectId/settings/': typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   '/_authenticated/projects/$projectId/team/': typeof AuthenticatedProjectsProjectIdTeamIndexRoute
@@ -275,13 +255,11 @@ export interface FileRouteTypes {
     | '/projects/$projectId/'
     | '/admin/plugins/$pluginId/$slug'
     | '/projects/$projectId/automation/$workflowId'
-    | '/projects/$projectId/docs/$docId'
     | '/projects/$projectId/docs/wiki'
     | '/projects/$projectId/interactions/backlog'
     | '/projects/$projectId/interactions/timeline'
     | '/projects/$projectId/tasks/$taskId'
     | '/projects/$projectId/automation/'
-    | '/projects/$projectId/docs/'
     | '/projects/$projectId/efficiency/'
     | '/projects/$projectId/settings/'
     | '/projects/$projectId/team/'
@@ -300,13 +278,11 @@ export interface FileRouteTypes {
     | '/projects/$projectId'
     | '/admin/plugins/$pluginId/$slug'
     | '/projects/$projectId/automation/$workflowId'
-    | '/projects/$projectId/docs/$docId'
     | '/projects/$projectId/docs/wiki'
     | '/projects/$projectId/interactions/backlog'
     | '/projects/$projectId/interactions/timeline'
     | '/projects/$projectId/tasks/$taskId'
     | '/projects/$projectId/automation'
-    | '/projects/$projectId/docs'
     | '/projects/$projectId/efficiency'
     | '/projects/$projectId/settings'
     | '/projects/$projectId/team'
@@ -327,13 +303,11 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/$projectId/'
     | '/_authenticated/admin/plugins/$pluginId/$slug'
     | '/_authenticated/projects/$projectId/automation/$workflowId'
-    | '/_authenticated/projects/$projectId/docs/$docId'
     | '/_authenticated/projects/$projectId/docs/wiki'
     | '/_authenticated/projects/$projectId/interactions/backlog'
     | '/_authenticated/projects/$projectId/interactions/timeline'
     | '/_authenticated/projects/$projectId/tasks/$taskId'
     | '/_authenticated/projects/$projectId/automation/'
-    | '/_authenticated/projects/$projectId/docs/'
     | '/_authenticated/projects/$projectId/efficiency/'
     | '/_authenticated/projects/$projectId/settings/'
     | '/_authenticated/projects/$projectId/team/'
@@ -447,13 +421,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdEfficiencyIndexRouteImport
       parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
-    '/_authenticated/projects/$projectId/docs/': {
-      id: '/_authenticated/projects/$projectId/docs/'
-      path: '/docs'
-      fullPath: '/projects/$projectId/docs/'
-      preLoaderRoute: typeof AuthenticatedProjectsProjectIdDocsIndexRouteImport
-      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
-    }
     '/_authenticated/projects/$projectId/automation/': {
       id: '/_authenticated/projects/$projectId/automation/'
       path: '/automation'
@@ -487,13 +454,6 @@ declare module '@tanstack/react-router' {
       path: '/docs/wiki'
       fullPath: '/projects/$projectId/docs/wiki'
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdDocsWikiRouteImport
-      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
-    }
-    '/_authenticated/projects/$projectId/docs/$docId': {
-      id: '/_authenticated/projects/$projectId/docs/$docId'
-      path: '/docs/$docId'
-      fullPath: '/projects/$projectId/docs/$docId'
-      preLoaderRoute: typeof AuthenticatedProjectsProjectIdDocsDocIdRouteImport
       parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
     '/_authenticated/projects/$projectId/automation/$workflowId': {
@@ -530,13 +490,11 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedProjectsProjectIdRouteChildren {
   AuthenticatedProjectsProjectIdIndexRoute: typeof AuthenticatedProjectsProjectIdIndexRoute
   AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute: typeof AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute
-  AuthenticatedProjectsProjectIdDocsDocIdRoute: typeof AuthenticatedProjectsProjectIdDocsDocIdRoute
   AuthenticatedProjectsProjectIdDocsWikiRoute: typeof AuthenticatedProjectsProjectIdDocsWikiRoute
   AuthenticatedProjectsProjectIdInteractionsBacklogRoute: typeof AuthenticatedProjectsProjectIdInteractionsBacklogRoute
   AuthenticatedProjectsProjectIdInteractionsTimelineRoute: typeof AuthenticatedProjectsProjectIdInteractionsTimelineRoute
   AuthenticatedProjectsProjectIdTasksTaskIdRoute: typeof AuthenticatedProjectsProjectIdTasksTaskIdRoute
   AuthenticatedProjectsProjectIdAutomationIndexRoute: typeof AuthenticatedProjectsProjectIdAutomationIndexRoute
-  AuthenticatedProjectsProjectIdDocsIndexRoute: typeof AuthenticatedProjectsProjectIdDocsIndexRoute
   AuthenticatedProjectsProjectIdEfficiencyIndexRoute: typeof AuthenticatedProjectsProjectIdEfficiencyIndexRoute
   AuthenticatedProjectsProjectIdSettingsIndexRoute: typeof AuthenticatedProjectsProjectIdSettingsIndexRoute
   AuthenticatedProjectsProjectIdTeamIndexRoute: typeof AuthenticatedProjectsProjectIdTeamIndexRoute
@@ -550,8 +508,6 @@ const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectI
       AuthenticatedProjectsProjectIdIndexRoute,
     AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute:
       AuthenticatedProjectsProjectIdAutomationWorkflowIdRoute,
-    AuthenticatedProjectsProjectIdDocsDocIdRoute:
-      AuthenticatedProjectsProjectIdDocsDocIdRoute,
     AuthenticatedProjectsProjectIdDocsWikiRoute:
       AuthenticatedProjectsProjectIdDocsWikiRoute,
     AuthenticatedProjectsProjectIdInteractionsBacklogRoute:
@@ -562,8 +518,6 @@ const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectI
       AuthenticatedProjectsProjectIdTasksTaskIdRoute,
     AuthenticatedProjectsProjectIdAutomationIndexRoute:
       AuthenticatedProjectsProjectIdAutomationIndexRoute,
-    AuthenticatedProjectsProjectIdDocsIndexRoute:
-      AuthenticatedProjectsProjectIdDocsIndexRoute,
     AuthenticatedProjectsProjectIdEfficiencyIndexRoute:
       AuthenticatedProjectsProjectIdEfficiencyIndexRoute,
     AuthenticatedProjectsProjectIdSettingsIndexRoute:
