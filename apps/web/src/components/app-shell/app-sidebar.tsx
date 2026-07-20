@@ -23,12 +23,14 @@ import {
 	Monitor,
 	Moon,
 	Package,
+	Pencil,
 	Plus,
 	Puzzle,
 	Settings,
 	Shield,
 	Sun,
 	Tag,
+	Trash2,
 	Users,
 	Workflow,
 } from "lucide-react";
@@ -82,6 +84,8 @@ import { projectQueryOptions, projectsQueryOptions } from "@/lib/project-api";
 import { cn } from "@/lib/utils";
 import {
 	createWikiPage,
+	deleteWikiPage,
+	renameWikiPage,
 	type WikiPage,
 	wikiQueryKeys,
 	wikiSpaceQueryOptions,
@@ -120,30 +124,138 @@ function WikiPageNode({
 	projectId,
 	page,
 	depth,
+	canWrite,
 }: {
 	projectId: string;
 	page: WikiPage;
 	depth: number;
+	canWrite: boolean;
 }) {
 	const navigate = useNavigate();
 	const { t } = useTranslation("appShell");
+	const qc = useQueryClient();
+	const [renaming, setRenaming] = useState(false);
+	const [title, setTitle] = useState(page.title);
+	// Two-step delete confirm: first click arms (icon turns red), second fires.
+	const [armed, setArmed] = useState(false);
+
+	const invalidateTree = () =>
+		qc.invalidateQueries({ queryKey: wikiQueryKeys.tree(projectId) });
+
+	const renameMutation = useMutation({
+		mutationFn: (nextTitle: string) =>
+			renameWikiPage(projectId, page.id, nextTitle),
+		onSuccess: () => {
+			setRenaming(false);
+			invalidateTree();
+		},
+	});
+
+	const deleteMutation = useMutation({
+		mutationFn: () => deleteWikiPage(projectId, page.id),
+		onSuccess: invalidateTree,
+	});
+
+	const submitRename = () => {
+		const next = title.trim();
+		if (!next || next === page.title) {
+			setRenaming(false);
+			setTitle(page.title);
+			return;
+		}
+		renameMutation.mutate(next);
+	};
+
 	return (
 		<>
-			<SidebarMenuItem>
-				<SidebarMenuButton
-					className="h-7 text-[13px]"
-					style={{ paddingLeft: `${12 + depth * 14}px` }}
-					onClick={() =>
-						navigate({
-							to: "/projects/$projectId/docs/wiki",
-							params: { projectId },
-							search: { page: page.url },
-						})
-					}
-				>
-					<FileText className="size-3.5 shrink-0 text-sidebar-foreground/50" />
-					<span className="truncate">{page.title || t("docs.untitled")}</span>
-				</SidebarMenuButton>
+			<SidebarMenuItem className="group/wikipage">
+				{renaming ? (
+					<div
+						className="flex h-7 items-center gap-2 pr-2"
+						style={{ paddingLeft: `${12 + depth * 14}px` }}
+					>
+						<FileText className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+						<input
+							// biome-ignore lint/a11y/noAutofocus: rename input should focus on entry
+							autoFocus
+							value={title}
+							onChange={(e) => setTitle(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") submitRename();
+								if (e.key === "Escape") {
+									setRenaming(false);
+									setTitle(page.title);
+								}
+							}}
+							onBlur={submitRename}
+							className="h-6 w-full min-w-0 rounded border border-border/40 bg-background px-1.5 text-[13px] outline-none focus:border-primary/50"
+						/>
+					</div>
+				) : (
+					<div className="relative flex items-center">
+						<SidebarMenuButton
+							className="h-7 flex-1 pr-14 text-[13px]"
+							style={{ paddingLeft: `${12 + depth * 14}px` }}
+							onClick={() =>
+								navigate({
+									to: "/projects/$projectId/docs/wiki",
+									params: { projectId },
+									search: { page: page.url },
+								})
+							}
+						>
+							<FileText className="size-3.5 shrink-0 text-sidebar-foreground/50" />
+							<span className="truncate">
+								{page.title || t("docs.untitled")}
+							</span>
+						</SidebarMenuButton>
+						{canWrite && (
+							<div className="absolute right-1.5 flex items-center gap-0.5 opacity-0 group-hover/wikipage:opacity-100 transition-opacity">
+								<button
+									type="button"
+									title={t("docs.rename", { defaultValue: "Rename" })}
+									onClick={(e) => {
+										e.stopPropagation();
+										setTitle(page.title);
+										setRenaming(true);
+									}}
+									className="flex size-5 items-center justify-center rounded text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+								>
+									<Pencil className="size-3" />
+								</button>
+								<button
+									type="button"
+									title={
+										armed
+											? t("docs.deleteConfirm", {
+													defaultValue: "Click again to delete",
+												})
+											: t("docs.delete", { defaultValue: "Delete" })
+									}
+									onClick={(e) => {
+										e.stopPropagation();
+										if (armed) {
+											deleteMutation.mutate();
+											setArmed(false);
+										} else {
+											setArmed(true);
+											window.setTimeout(() => setArmed(false), 2500);
+										}
+									}}
+									disabled={deleteMutation.isPending}
+									className={cn(
+										"flex size-5 items-center justify-center rounded transition-colors",
+										armed
+											? "bg-destructive/15 text-destructive"
+											: "text-sidebar-foreground/45 hover:bg-sidebar-accent hover:text-destructive",
+									)}
+								>
+									<Trash2 className="size-3" />
+								</button>
+							</div>
+						)}
+					</div>
+				)}
 			</SidebarMenuItem>
 			{(page.children ?? []).map((child) => (
 				<WikiPageNode
@@ -151,6 +263,7 @@ function WikiPageNode({
 					projectId={projectId}
 					page={child}
 					depth={depth + 1}
+					canWrite={canWrite}
 				/>
 			))}
 		</>
@@ -239,6 +352,7 @@ function WikiDocsSidebarSection({ projectId }: { projectId: string }) {
 									projectId={projectId}
 									page={page}
 									depth={0}
+									canWrite={canWrite}
 								/>
 							))}
 							{canWrite && (

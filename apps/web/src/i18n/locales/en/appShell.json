@@ -56,7 +56,10 @@
 			"privateFull": "Private — project members only",
 			"teamReadFull": "Whole company can view",
 			"teamWriteFull": "Whole company can edit"
-		}
+		},
+		"rename": "Rename",
+		"delete": "Delete",
+		"deleteConfirm": "Click again to delete"
 	},
 	"notifications": {
 		"title": "Notifications",

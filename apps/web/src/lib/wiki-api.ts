@@ -88,6 +88,27 @@ export async function createWikiPage(
 	return res.data.data;
 }
 
+export async function renameWikiPage(
+	projectId: string,
+	recordId: string,
+	title: string,
+): Promise<WikiPage> {
+	const res = await apiClient.instance.patch<SuccessEnvelope<WikiPage>>(
+		`/projects/${projectId}/wiki-space/pages/${recordId}`,
+		{ title },
+	);
+	return res.data.data;
+}
+
+export async function deleteWikiPage(
+	projectId: string,
+	recordId: string,
+): Promise<void> {
+	await apiClient.instance.delete(
+		`/projects/${projectId}/wiki-space/pages/${recordId}`,
+	);
+}
+
 export async function listTaskWikiLinks(
 	projectId: string,
 	taskId: string,
