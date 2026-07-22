@@ -51,7 +51,11 @@ export const Route = createFileRoute("/_authenticated")({
 			});
 
 		if (!user) {
-			throw redirect({ to: "/" });
+			// Carry where they were trying to go. Bouncing to "/" threw it away,
+			// so following a deep link (a task link from the phone's morning
+			// brief, say) meant signing in and landing on the home page — which
+			// reads as "the login didn't work".
+			throw redirect({ to: "/", search: { redirect: location.href } });
 		}
 
 		if (user.must_change_password) {

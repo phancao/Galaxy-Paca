@@ -17,6 +17,16 @@ import { FieldError } from "./FieldError";
 /** Browser-navigation target for the OIDC SSO flow (full redirect, not XHR). */
 const OIDC_LOGIN_URL = "/api/v1/auth/oidc/login";
 
+/**
+ * A return path we are willing to hand back to the API — a path on THIS site
+ * and nothing else. "//evil.com" is a protocol-relative URL, not a path, and
+ * would turn our own login into an open redirect. The API re-checks this; a
+ * check here only spares the round trip.
+ */
+function safeReturnPath(v: string | null): boolean {
+	return Boolean(v && v.startsWith("/") && !v.startsWith("//"));
+}
+
 export function LoginFormPanel() {
 	const { t } = useTranslation("auth");
 	const { t: tCommon } = useTranslation("common");
@@ -43,7 +53,15 @@ export function LoginFormPanel() {
 	const ssoRedirect =
 		Boolean(authConfig?.oidc_enabled) && !forceLocal && !justLoggedOut;
 	useEffect(() => {
-		if (ssoRedirect) window.location.replace(OIDC_LOGIN_URL);
+		if (!ssoRedirect) return;
+		// Hand the intended destination to the OIDC round trip. The API signs it
+		// into the state cookie and the callback returns there, so a deep link
+		// survives signing in instead of dumping you on the home page.
+		const want = new URLSearchParams(window.location.search).get("redirect");
+		const target = safeReturnPath(want)
+			? `${OIDC_LOGIN_URL}?redirect=${encodeURIComponent(want as string)}`
+			: OIDC_LOGIN_URL;
+		window.location.replace(target);
 	}, [ssoRedirect]);
 
 	// Avoid flashing the local form while the auth config is still loading.
