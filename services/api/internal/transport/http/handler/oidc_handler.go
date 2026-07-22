@@ -105,6 +105,7 @@ func (h *OIDCHandler) Login(w http.ResponseWriter, r *http.Request) {
 		State:     state,
 		Verifier:  verifier,
 		ExpiresAt: time.Now().Add(oidcStateTTL).Unix(),
+		Return:    safeReturnPath(r.URL.Query().Get("redirect")),
 	})
 	if err != nil {
 		presenter.Error(w, r, err)
@@ -212,7 +213,11 @@ func (h *OIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	h.auth.setTokenCookies(w, pair, pair.RefreshTTL)
 	h.log.Info("oidc: SSO login", "user_id", user.ID, "username", user.Username)
-	http.Redirect(w, r, "/", http.StatusFound)
+	// Back to where they were headed before the login interrupted them. This
+	// used to be a hard-coded "/": following a deep link meant signing in and
+	// arriving at the home page, which reads as a login that did not work.
+	// The path came out of the HMAC-signed state, and is re-checked anyway.
+	http.Redirect(w, r, orRoot(safeReturnPath(loginState.Return)), http.StatusFound)
 }
 
 // exchangeCode redeems the authorization code at the issuer's token endpoint
@@ -264,6 +269,28 @@ func (h *OIDCHandler) exchangeCode(ctx context.Context, code, verifier string) (
 		return "", fmt.Errorf("token response contained no id_token")
 	}
 	return tokenResp.IDToken, nil
+}
+
+// safeReturnPath keeps only a path on THIS site, and returns "" for anything
+// else. Two rules carry the weight: it must start with a single "/" (so
+// "https://evil" and the protocol-relative "//evil" are both rejected, which
+// is what turns a login into an open redirect), and it must not smuggle CR/LF
+// into the Location header.
+func safeReturnPath(v string) string {
+	if v == "" || !strings.HasPrefix(v, "/") || strings.HasPrefix(v, "//") {
+		return ""
+	}
+	if strings.ContainsAny(v, "\r\n") {
+		return ""
+	}
+	return v
+}
+
+func orRoot(v string) string {
+	if v == "" {
+		return "/"
+	}
+	return v
 }
 
 func (h *OIDCHandler) clearStateCookie(w http.ResponseWriter) {

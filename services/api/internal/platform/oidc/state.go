@@ -18,6 +18,10 @@ type LoginState struct {
 	State     string `json:"s"`
 	Verifier  string `json:"v"`
 	ExpiresAt int64  `json:"e"` // unix seconds
+	// Return is the path to send the browser back to once the login completes,
+	// so a deep link survives the round trip. It rides inside the HMAC-signed
+	// payload precisely so the browser cannot rewrite it between the two legs.
+	Return string `json:"r,omitempty"`
 }
 
 // EncodeLoginState serialises st and appends an HMAC-SHA256 tag so the value
