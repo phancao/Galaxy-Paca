@@ -1,0 +1,174 @@
+{
+  "appId": "paca",
+  "appName": "Galaxy Tasks (Paca)",
+  "description": "Quản lý dự án, sprint và công việc — có AI đồng hành trên từng task.",
+  "version": "0.1.0",
+  "generatedAt": "2026-07-28T15:07:48.416Z",
+  "deps": [
+    {
+      "name": "@assistant-ui/react",
+      "version": "0.14.26",
+      "license": "MIT"
+    },
+    {
+      "name": "@assistant-ui/react-markdown",
+      "version": "0.14.5",
+      "license": "MIT"
+    },
+    {
+      "name": "@base-ui/react",
+      "version": "1.4.1",
+      "license": "MIT"
+    },
+    {
+      "name": "@blocknote/core",
+      "version": "0.48.1",
+      "license": "MPL-2.0"
+    },
+    {
+      "name": "@blocknote/react",
+      "version": "0.48.1",
+      "license": "MPL-2.0"
+    },
+    {
+      "name": "@blocknote/shadcn",
+      "version": "0.48.1",
+      "license": "MPL-2.0"
+    },
+    {
+      "name": "@radix-ui/react-slot",
+      "version": "1.2.4",
+      "license": "MIT"
+    },
+    {
+      "name": "@tanstack/react-form",
+      "version": "1.29.0",
+      "license": "MIT"
+    },
+    {
+      "name": "@tanstack/react-query",
+      "version": "5.99.2",
+      "license": "MIT"
+    },
+    {
+      "name": "@tanstack/react-query-devtools",
+      "version": "5.99.2",
+      "license": "MIT"
+    },
+    {
+      "name": "@tanstack/react-router",
+      "version": "1.168.23",
+      "license": "MIT"
+    },
+    {
+      "name": "@tanstack/store",
+      "version": "0.9.3",
+      "license": "MIT"
+    },
+    {
+      "name": "@testing-library/dom",
+      "version": "10.4.1",
+      "license": "MIT"
+    },
+    {
+      "name": "@xyflow/react",
+      "version": "12.11.1",
+      "license": "MIT"
+    },
+    {
+      "name": "axios",
+      "version": "1.15.1",
+      "license": "MIT"
+    },
+    {
+      "name": "class-variance-authority",
+      "version": "0.7.1",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "clsx",
+      "version": "2.1.1",
+      "license": "MIT"
+    },
+    {
+      "name": "date-fns",
+      "version": "4.1.0",
+      "license": "MIT"
+    },
+    {
+      "name": "i18next",
+      "version": "26.3.4",
+      "license": "MIT"
+    },
+    {
+      "name": "i18next-browser-languagedetector",
+      "version": "8.2.1",
+      "license": "MIT"
+    },
+    {
+      "name": "lucide-react",
+      "version": "1.8.0",
+      "license": "ISC"
+    },
+    {
+      "name": "radix-ui",
+      "version": "1.6.2",
+      "license": "MIT"
+    },
+    {
+      "name": "react",
+      "version": "19.2.5",
+      "license": "MIT"
+    },
+    {
+      "name": "react-day-picker",
+      "version": "9.14.0",
+      "license": "MIT"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.2.5",
+      "license": "MIT"
+    },
+    {
+      "name": "react-i18next",
+      "version": "17.0.8",
+      "license": "MIT"
+    },
+    {
+      "name": "remark-gfm",
+      "version": "4.0.1",
+      "license": "MIT"
+    },
+    {
+      "name": "socket.io-client",
+      "version": "4.8.3",
+      "license": "MIT"
+    },
+    {
+      "name": "tailwind-merge",
+      "version": "3.5.0",
+      "license": "MIT"
+    },
+    {
+      "name": "tw-animate-css",
+      "version": "1.4.0",
+      "license": "MIT"
+    },
+    {
+      "name": "tw-shimmer",
+      "version": "0.4.11",
+      "license": "MIT"
+    },
+    {
+      "name": "zod",
+      "version": "4.3.6",
+      "license": "MIT"
+    },
+    {
+      "name": "zustand",
+      "version": "5.0.14",
+      "license": "MIT"
+    }
+  ]
+}
