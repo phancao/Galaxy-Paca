@@ -1,0 +1,25 @@
+# ADR-039 A2 — state-changing routes with no permission check, accepted for now.
+#
+# Every line here is a route where being signed in IS the whole decision, and
+# each one is either an authentication endpoint or scoped to the caller's own
+# record by its path. The list may only SHRINK: fix a route, delete its line.
+# A state-changing route that appears outside this list fails the gate.
+#
+# Regenerate the raw list (then re-add the reasons) with:
+#   go run ./tools/authzgate . --write-baseline
+#
+# ── authentication: there is no caller yet to authorize ──────────────────────
+internal/transport/http/router/router.go::POST /login
+internal/transport/http/router/router.go::POST /refresh
+internal/transport/http/router/router.go::POST /logout
+#
+# ── the caller's own record, identified by the path itself ───────────────────
+# `/me/...` cannot address anyone else, so there is no object to check a
+# permission against. Authn (plus RequireFreshPassword / RequireJWTAuth on some
+# of them) is the correct and complete check.
+internal/transport/http/router/router.go::PATCH /me
+internal/transport/http/router/router.go::PATCH /me/password
+internal/transport/http/router/router.go::POST /me/api-keys
+internal/transport/http/router/router.go::DELETE /me/api-keys/{keyId}
+internal/transport/http/router/router.go::PATCH /me/notifications/{notificationId}/read
+internal/transport/http/router/router.go::POST /me/notifications/read-all
