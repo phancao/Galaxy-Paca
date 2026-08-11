@@ -37,7 +37,7 @@ function verifyHs(token) {
 // ── RS256 (OIDC access token) via Vortex JWKS ────────────────────────────────
 // JWKS lives behind the identity service. Inside galaxy_network the server can
 // reach it directly; configurable for other topologies.
-const JWKS_URL = process.env.NEXUS_JWKS_URL || "http://nexus-identity:8086/.well-known/jwks.json";
+const JWKS_URL = process.env.NEXUS_JWKS_URL || "http://vortex-identity:8086/.well-known/jwks.json";
 let jwksCache = { keys: {}, fetchedAt: 0 };
 
 async function loadJwks(force = false) {

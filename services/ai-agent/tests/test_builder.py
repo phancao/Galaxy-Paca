@@ -354,7 +354,7 @@ def test_galaxy_role_routes_model_and_base_url_to_platform_proxy(catalog, monkey
 
     monkeypatch.setattr(builder.settings, "galaxy_ai_role", "paca-ai")
     monkeypatch.setattr(
-        builder.settings, "galaxy_ai_proxy_url", "http://nexus-identity:8086/ai/v1"
+        builder.settings, "galaxy_ai_proxy_url", "http://vortex-identity:8086/ai/v1"
     )
     config = _agent_config(
         provider="anthropic", model="claude-sonnet-4-6", base_url="https://api.anthropic.com"
@@ -362,7 +362,7 @@ def test_galaxy_role_routes_model_and_base_url_to_platform_proxy(catalog, monkey
     llm = build_llm(config, api_key="minted-act-as-token")
     # model = the AI ROLE — identity resolves it via ai_role_assignments.
     assert llm.model == "openai/paca-ai"
-    assert llm.base_url == "http://nexus-identity:8086/ai/v1"
+    assert llm.base_url == "http://vortex-identity:8086/ai/v1"
     assert llm.api_key is not None
     assert llm.api_key.get_secret_value() == "minted-act-as-token"
 
@@ -372,11 +372,11 @@ def test_galaxy_role_wins_over_llm_base_url_override(catalog, monkeypatch):
 
     monkeypatch.setattr(builder.settings, "galaxy_ai_role", "paca-ai")
     monkeypatch.setattr(
-        builder.settings, "galaxy_ai_proxy_url", "http://nexus-identity:8086/ai/v1"
+        builder.settings, "galaxy_ai_proxy_url", "http://vortex-identity:8086/ai/v1"
     )
     monkeypatch.setattr(builder.settings, "llm_base_url_override", "https://other.example/v1")
     llm = build_llm(_agent_config(), api_key="tok")
-    assert llm.base_url == "http://nexus-identity:8086/ai/v1"
+    assert llm.base_url == "http://vortex-identity:8086/ai/v1"
     assert llm.model == "openai/paca-ai"
 
 

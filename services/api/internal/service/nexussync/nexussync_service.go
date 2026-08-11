@@ -213,7 +213,7 @@ func confirmVortexUserActive(ctx context.Context, userID string) (bool, error) {
 		os.Getenv("NEXUS_IDENTITY_URL"),
 	)
 	if base == "" {
-		base = "http://nexus-identity:8086"
+		base = "http://vortex-identity:8086"
 	}
 	base = strings.TrimRight(base, "/")
 	secret := firstNonEmpty(

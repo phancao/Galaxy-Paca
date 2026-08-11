@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     # src/agent/galaxy_llm.py). Takes precedence over LLM_BASE_URL_OVERRIDE.
     galaxy_ai_role: str = ""
     # Internal (galaxy_network) address of the proxy — split-horizon like OIDC.
-    galaxy_ai_proxy_url: str = "http://nexus-identity:8086/ai/v1"
+    galaxy_ai_proxy_url: str = "http://vortex-identity:8086/ai/v1"
     # Identity base URL for the token mint endpoint. Empty = derived from
     # galaxy_ai_proxy_url by stripping the /ai/v1 suffix.
     galaxy_identity_url: str = ""
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     # primary stack network (comma-separated). In galaxy mode the agent-server
     # containers make the LLM calls themselves (the OpenHands SDK sends the
     # agent spec — LLM config included — into the sandbox), so they must join
-    # galaxy_network to reach nexus-identity. These networks are EXCLUDED when
+    # galaxy_network to reach vortex-identity. These networks are EXCLUDED when
     # picking the sandbox's primary network, keeping `api`/`gateway` hostname
     # resolution on the stack network deterministic.
     sandbox_extra_networks: str = ""

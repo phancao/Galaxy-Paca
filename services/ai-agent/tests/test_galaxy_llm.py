@@ -28,7 +28,7 @@ def _pool_returning(row):
 def _galaxy_settings(monkeypatch, **overrides):
     values = {
         "galaxy_ai_role": "paca-ai",
-        "galaxy_ai_proxy_url": "http://nexus-identity:8086/ai/v1",
+        "galaxy_ai_proxy_url": "http://vortex-identity:8086/ai/v1",
         "galaxy_identity_url": "",
         "galaxy_internal_service_secret": "platform-secret",
         "galaxy_service_subject": "paca-service@galaxy.internal.nexus",
@@ -114,7 +114,7 @@ async def test_lookup_error_resolves_to_none_not_raise():
 
 def test_mint_base_url_derived_from_proxy_url(monkeypatch):
     _galaxy_settings(monkeypatch)
-    assert _mint_base_url() == "http://nexus-identity:8086"
+    assert _mint_base_url() == "http://vortex-identity:8086"
 
 
 def test_mint_base_url_prefers_explicit_identity_url(monkeypatch):
@@ -133,7 +133,7 @@ async def test_mint_sends_attribution_contract(monkeypatch):
 
     assert token == "rs256-token"
     call = fake.calls[0]
-    assert call["url"] == "http://nexus-identity:8086/internal/mint-service-token"
+    assert call["url"] == "http://vortex-identity:8086/internal/mint-service-token"
     assert call["headers"]["X-Service-Secret"] == "platform-secret"
     body = call["json"]
     assert body["sub"] == "paca-service@galaxy.internal.nexus"

@@ -35,7 +35,7 @@ PACA_DATABASE_URL, PACA_PUBLIC_URL, LOG_LEVEL):
                                  matched case-insensitively on users.username).
   AGENTOPS_URL                   default http://agentops-backend:8090
                                  (reachable via agentops-redis-net).
-  GALAXY_IDENTITY_URL            default http://nexus-identity:8086
+  GALAXY_IDENTITY_URL            default http://vortex-identity:8086
                                  (needs galaxy_network).
   GALAXY_INTERNAL_SERVICE_SECRET REQUIRED — authenticates the token mint.
   DOCK_TRIGGER_TIMEOUT_S         default 300 — wall clock per agent run.
@@ -169,7 +169,7 @@ class DockTrigger(bridge_lib.Bridge):
             "AGENTOPS_URL", "http://agentops-backend:8090"
         ).rstrip("/")
         self.identity_url = os.getenv(
-            "GALAXY_IDENTITY_URL", "http://nexus-identity:8086"
+            "GALAXY_IDENTITY_URL", "http://vortex-identity:8086"
         ).rstrip("/")
         self.service_secret = os.getenv("GALAXY_INTERNAL_SERVICE_SECRET", "")
         self.run_timeout_s = float(os.getenv("DOCK_TRIGGER_TIMEOUT_S", "300"))
