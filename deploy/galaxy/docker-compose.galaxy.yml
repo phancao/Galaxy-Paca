@@ -76,7 +76,7 @@ services:
       # proxy. Empty identity/secret disables it (write-with-ai → 503).
       # GALAXY_INTERNAL_SERVICE_SECRET = platform INTERNAL_SERVICE_SECRET,
       # referenced host-side from runtime/galaxy-shared/*.env — NEVER committed.
-      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://nexus-identity:8086}
+      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://vortex-identity:8086}
       GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
       GALAXY_AI_PROXY_URL: ${GALAXY_AI_PROXY_URL:-}
       GALAXY_AI_ROLE: ${GALAXY_AI_ROLE:-paca-ai}
@@ -160,14 +160,14 @@ services:
       # INTERNAL_SERVICE_SECRET, referenced host-side from
       # ~/Nexus/Galaxy-Nexus/runtime/galaxy-shared/*.env — NEVER committed.
       GALAXY_AI_ROLE: ${GALAXY_AI_ROLE:-}
-      GALAXY_AI_PROXY_URL: ${GALAXY_AI_PROXY_URL:-http://nexus-identity:8086/ai/v1}
+      GALAXY_AI_PROXY_URL: ${GALAXY_AI_PROXY_URL:-http://vortex-identity:8086/ai/v1}
       GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-}
       GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
       # Sandboxes make the LLM calls themselves (SDK ships the agent spec into
       # the agent-server) → they must join galaxy_network too. Spawned
       # containers have random names + no aliases: no DNS-collision surface.
       SANDBOX_EXTRA_NETWORKS: ${SANDBOX_EXTRA_NETWORKS:-}
-    # galaxy_network for minting act_as tokens at nexus-identity + reaching
+    # galaxy_network for minting act_as tokens at vortex-identity + reaching
     # the AI proxy. ⚠️ Compose thêm alias ngầm = tên service (`ai-agent`)
     # trên network chung — đã scan 17/07: không container nào khác giữ alias
     # `ai-agent` hay `paca-ai-agent` (gần nhất: galaxy-ai-agent-service với
@@ -232,7 +232,7 @@ services:
   # with paca_* tools and ALWAYS comments the result back. At-most-once
   # delivery (ack-before-dispatch). Idles unless DOCK_TRIGGER_ENABLED=true.
   # Networks: default (valkey/postgres) + agentops-redis-net (agentops-backend
-  # :8090 listens there) + galaxy_network (nexus-identity mint).
+  # :8090 listens there) + galaxy_network (vortex-identity mint).
   dock-trigger:
     build:
       context: ./galaxy/notify-bridge
@@ -242,7 +242,7 @@ services:
       DOCK_TRIGGER_ENABLED: ${DOCK_TRIGGER_ENABLED:-false}
       DOCK_AGENT_TRIGGER_USERNAMES: ${DOCK_AGENT_TRIGGER_USERNAMES:-galaxy-tasks-agent}
       AGENTOPS_URL: ${AGENTOPS_URL:-http://agentops-backend:8090}
-      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://nexus-identity:8086}
+      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://vortex-identity:8086}
       GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
       DOCK_TRIGGER_TIMEOUT_S: ${DOCK_TRIGGER_TIMEOUT_S:-300}
       PACA_VALKEY_URL: ${PACA_VALKEY_URL:-redis://valkey:6379/0}
@@ -266,11 +266,11 @@ services:
   # Same-origin /sdd-api/* backend for the NATIVE com.galaxy.sdd plugin. Caddy
   # (handle_path /sdd-api/*) forwards here; this sidecar gates each request on
   # the caller's Paca session (GET api:8080/api/v1/users/me), mints a short-
-  # lived RS256 service token at nexus-identity /internal/mint-service-token
+  # lived RS256 service token at vortex-identity /internal/mint-service-token
   # (iss=galaxy-nexus, like dock-trigger), and reverse-proxies GET reads to the
   # SDD Coordination Server (sdd-server:4830). Team-wide READ only; no secret
   # ever reaches the browser. Zero-dependency Node image (deploy/galaxy/sdd-proxy).
-  # Networks: default (reach api:8080) + galaxy_network (reach nexus-identity +
+  # Networks: default (reach api:8080) + galaxy_network (reach vortex-identity +
   # sdd-server). Explicit alias paca-sdd-proxy avoids the implicit-name collision
   # class that forced the gateway→paca-edge rename.
   sdd-proxy:
@@ -281,7 +281,7 @@ services:
     environment:
       PORT: ${SDD_PROXY_PORT:-8791}
       SDD_UPSTREAM_URL: ${SDD_UPSTREAM_URL:-http://sdd-server:4830}
-      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://nexus-identity:8086}
+      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://vortex-identity:8086}
       PACA_AUTH_CHECK_URL: ${PACA_AUTH_CHECK_URL:-http://api:8080/api/v1/users/me}
       # RS256 mint auth (primary). Sourced host-side from the shared env; the
       # same secret ai-agent/dock-trigger use. NEVER committed.
@@ -401,8 +401,8 @@ services:
       PGDATABASE: ${SDD_PG_DB:-sdd}
       # Auth: HS256 delegation (ingest) + RS256 OIDC/service tokens via Vortex JWKS.
       JWT_SECRET: ${JWT_SECRET:-}
-      NEXUS_JWKS_URL: ${NEXUS_JWKS_URL:-http://nexus-identity:8086/.well-known/jwks.json}
-      VORTEX_JWKS_URL: ${NEXUS_JWKS_URL:-http://nexus-identity:8086/.well-known/jwks.json}
+      NEXUS_JWKS_URL: ${NEXUS_JWKS_URL:-http://vortex-identity:8086/.well-known/jwks.json}
+      VORTEX_JWKS_URL: ${NEXUS_JWKS_URL:-http://vortex-identity:8086/.well-known/jwks.json}
       # Paca bridge: mirrors SDD tasks into Paca. API key from .env.galaxy (never committed).
       PACA_BRIDGE_ENABLED: ${SDD_PACA_BRIDGE_ENABLED:-true}
       PACA_BASE_URL: ${SDD_PACA_BASE_URL:-http://paca-gateway:80}

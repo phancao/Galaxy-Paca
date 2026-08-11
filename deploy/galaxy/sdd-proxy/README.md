@@ -11,7 +11,7 @@ browser (Paca session cookie)
 paca-edge (Caddy)  handle_path /sdd-api/*  ──►  sdd-proxy:8791
    │
    ├─ 1. session gate:   Cookie ─►  GET api:8080/api/v1/users/me   (2xx? else 401)
-   ├─ 2. service token:  POST nexus-identity:8086/internal/mint-service-token
+   ├─ 2. service token:  POST vortex-identity:8086/internal/mint-service-token
    │                     (X-Service-Secret, iss=galaxy-nexus, RS256, TTL≤900s)
    └─ 3. reverse proxy:  Bearer <token> ─►  GET sdd-server:4830/api/team/overview
                                             └─ JSON streamed back unchanged
@@ -37,7 +37,7 @@ paca-edge (Caddy)  handle_path /sdd-api/*  ──►  sdd-proxy:8791
 |-----|---------|---------|
 | `PORT` | `8791` | listen port |
 | `SDD_UPSTREAM_URL` | `http://sdd-server:4830` | SDD read API (galaxy_network) |
-| `GALAXY_IDENTITY_URL` | `http://nexus-identity:8086` | RS256 mint endpoint |
+| `GALAXY_IDENTITY_URL` | `http://vortex-identity:8086` | RS256 mint endpoint |
 | `PACA_AUTH_CHECK_URL` | `http://api:8080/api/v1/users/me` | session gate |
 | `GALAXY_INTERNAL_SERVICE_SECRET` | — | authenticates the mint (RS256, primary) |
 | `SDD_SERVICE_SUB` | `svc-paca-sdd-fleet` | `sub` claim of the service token |

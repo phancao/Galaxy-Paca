@@ -57,7 +57,7 @@ func (c WikiConfig) Enabled() bool { return c.APIURL != "" && c.APIToken != "" }
 // disabled (write-with-ai returns 503) unless IdentityURL + ServiceSecret set.
 type GalaxyAIConfig struct {
 	// IdentityURL is the base URL of the Vortex identity service used to mint
-	// act_as tokens (GALAXY_IDENTITY_URL), e.g. http://nexus-identity:8086.
+	// act_as tokens (GALAXY_IDENTITY_URL), e.g. http://vortex-identity:8086.
 	IdentityURL string
 	// ServiceSecret is the platform INTERNAL_SERVICE_SECRET
 	// (GALAXY_INTERNAL_SERVICE_SECRET) presented as X-Service-Secret when

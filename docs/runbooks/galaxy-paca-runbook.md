@@ -37,7 +37,7 @@ browser (Paca session cookie)
         │
   paca-edge (Caddy)  handle_path /sdd-api/*  →  sdd-proxy:8791
         │  1. gate: Cookie → GET api:8080/api/v1/users/me (else 401)
-        │  2. mint: POST nexus-identity:8086/internal/mint-service-token
+        │  2. mint: POST vortex-identity:8086/internal/mint-service-token
         │           (X-Service-Secret, iss=galaxy-nexus, aud=sdd-server, RS256)
         └  3. GET-only reverse proxy → sdd-server:4830/api/*   → JSON
 ```

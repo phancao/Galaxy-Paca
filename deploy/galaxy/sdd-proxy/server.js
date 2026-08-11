@@ -43,7 +43,7 @@ const crypto = require("crypto");
 // ── Config (env, with in-cluster defaults) ──────────────────────────────────
 const PORT = parseInt(process.env.PORT || "8791", 10);
 const SDD_UPSTREAM = (process.env.SDD_UPSTREAM_URL || "http://sdd-server:4830").replace(/\/+$/, "");
-const IDENTITY_URL = (process.env.GALAXY_IDENTITY_URL || "http://nexus-identity:8086").replace(/\/+$/, "");
+const IDENTITY_URL = (process.env.GALAXY_IDENTITY_URL || "http://vortex-identity:8086").replace(/\/+$/, "");
 const PACA_AUTH_URL = process.env.PACA_AUTH_CHECK_URL || "http://api:8080/api/v1/users/me";
 const SERVICE_SECRET = process.env.GALAXY_INTERNAL_SERVICE_SECRET || "";
 const SERVICE_SUB = process.env.SDD_SERVICE_SUB || "svc-paca-sdd-fleet";
