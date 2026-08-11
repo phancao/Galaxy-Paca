@@ -17,7 +17,7 @@ concurrency:
 jobs:
   mcp-quality:
     name: Lint, typecheck, build, and test MCP server
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 10
 
     defaults:

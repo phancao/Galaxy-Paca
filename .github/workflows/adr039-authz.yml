@@ -32,7 +32,7 @@ env:
 jobs:
   authz-ratchet:
     name: State-changing routes must carry a permission check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

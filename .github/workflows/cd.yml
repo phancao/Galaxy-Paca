@@ -41,7 +41,7 @@ env:
 jobs:
   api-image:
     name: Build and push API image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 30
 
     steps:
@@ -92,7 +92,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   realtime-image:
     name: Build and push Realtime image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 20
 
     steps:
@@ -146,7 +146,7 @@ jobs:
   # from window.location.origin at runtime.
   web-image:
     name: Build and push Web image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 20
 
     steps:
@@ -197,7 +197,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   ai-agent-image:
     name: Build and push AI Agent image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 30
 
     steps:
@@ -249,7 +249,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   agent-server-image:
     name: Build and push Agent Server image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 30
 
     steps:
@@ -300,7 +300,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   publish-mcp:
     name: Publish MCP package
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 10
     permissions:
       contents: read
@@ -384,7 +384,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   release-assets:
     name: Upload deployment assets to release
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     needs: [api-image, realtime-image, web-image, ai-agent-image, agent-server-image, publish-mcp]
     permissions:
       contents: write
