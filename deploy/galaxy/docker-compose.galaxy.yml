@@ -402,6 +402,7 @@ services:
       # Auth: HS256 delegation (ingest) + RS256 OIDC/service tokens via Vortex JWKS.
       JWT_SECRET: ${JWT_SECRET:-}
       NEXUS_JWKS_URL: ${NEXUS_JWKS_URL:-http://nexus-identity:8086/.well-known/jwks.json}
+      VORTEX_JWKS_URL: ${NEXUS_JWKS_URL:-http://nexus-identity:8086/.well-known/jwks.json}
       # Paca bridge: mirrors SDD tasks into Paca. API key from .env.galaxy (never committed).
       PACA_BRIDGE_ENABLED: ${SDD_PACA_BRIDGE_ENABLED:-true}
       PACA_BASE_URL: ${SDD_PACA_BASE_URL:-http://paca-gateway:80}
