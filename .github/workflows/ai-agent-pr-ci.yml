@@ -24,7 +24,7 @@ jobs:
   # ---------------------------------------------------------------------------
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 10
 
     defaults:
@@ -58,7 +58,7 @@ jobs:
   # ---------------------------------------------------------------------------
   test:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 15
 
     defaults:
@@ -89,7 +89,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     name: Docker build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 20
     needs: [lint, test]
 
@@ -119,7 +119,7 @@ jobs:
   # ---------------------------------------------------------------------------
   test-e2e:
     name: E2E tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, galaxy]
     timeout-minutes: 25
     needs: [lint, test]
 
