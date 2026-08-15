@@ -1,40 +1,30 @@
 /**
  * @file Authentication for the Galaxy SDD Coordination Server.
  *
- * Two token classes, two purposes:
- *   - INGEST (/api/ingest): a Vortex *delegation token* — JWT HS256 signed with
- *     the shared Galaxy JWT_SECRET (token_type="delegation"). Dev machines'
- *     sdd-agents carry it. Verified by shared secret (+ rotation).
- *   - READ API + UI: a Vortex OIDC *access token* — RS256, signed by the Vortex
- *     private key, obtained by the browser via authorization_code + PKCE. Means
- *     "a logged-in Vortex user". Verified against the Vortex JWKS.
+ * ONE signature algorithm: RS256, verified against the Vortex JWKS. Every
+ * token this server accepts is one the identity service minted with a private
+ * key it alone holds.
  *
- * `verifyAny` accepts either, so an authenticated identity (machine OR human)
- * can read; only the agent's HS256 delegation token may ingest.
+ *   - INGEST (/api/ingest): a Vortex *delegation token* — RS256 with
+ *     token_type="delegation". Dev machines' sdd-agents carry it. Gating on
+ *     token_type is what keeps ingest agent-only: a plain OIDC access token
+ *     (an interactive user) can read but never write.
+ *   - READ API + UI: a Vortex OIDC *access token* — RS256, obtained by the
+ *     browser via authorization_code + PKCE. Means "a logged-in Vortex user".
+ *
+ * HS256 IS NOT ACCEPTED, and the reason is specific rather than hygienic.
+ * `JWT_SECRET` is one value shared across the whole Galaxy fleet, so the key
+ * this server used to VERIFY a delegation token was a key a dozen unrelated
+ * containers could SIGN one with. Ingest writes the fleet telemetry every
+ * dashboard reads; "can verify" and "can forge the record" were the same
+ * permission. Under RS256 only identity can mint, and JWKS lets everyone else
+ * check without ever holding a signing key.
  */
 
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 
-// ── HS256 (delegation / session) ────────────────────────────────────────────
-function hsSecrets() {
-  const cur = process.env.NEXUS_JWT_SECRET || process.env.JWT_SECRET || "";
-  const prev = process.env.JWT_SECRET_PREVIOUS || process.env.NEXUS_JWT_SECRET_PREVIOUS || "";
-  return [cur, prev].filter(Boolean);
-}
-
-function verifyHs(token) {
-  for (const key of hsSecrets()) {
-    try {
-      return jwt.verify(token, key, { algorithms: ["HS256"] });
-    } catch {
-      /* try next */
-    }
-  }
-  return null;
-}
-
-// ── RS256 (OIDC access token) via Vortex JWKS ────────────────────────────────
+// ── RS256 (OIDC access token / delegation token) via Vortex JWKS ────────────
 // JWKS lives behind the identity service. Inside galaxy_network the server can
 // reach it directly; configurable for other topologies.
 const JWKS_URL = process.env.NEXUS_JWKS_URL || "http://vortex-identity:8086/.well-known/jwks.json";
@@ -100,17 +90,13 @@ function actorFrom(payload, tokenType) {
 }
 
 // ── Middleware ──────────────────────────────────────────────────────────────
-/** INGEST: delegation (HS256) only. */
+/** INGEST: an RS256 delegation token only. */
 async function requireAuth(req, res, next) {
   const token = bearer(req.headers.authorization);
-  let payload = token && verifyHs(token);
-  // §11 dual-accept: also honor an RS256-signed *delegation* token during the
-  // HS256->RS256 migration. Gate on token_type=delegation so a plain OIDC
-  // access token (an interactive user) can never ingest — ingest stays agent-only.
-  if (!payload && token) {
-    const rs = await verifyRs(token);
-    if (rs && rs.token_type === "delegation") payload = rs;
-  }
+  // Gate on token_type=delegation so a plain OIDC access token (an interactive
+  // user) can never ingest — ingest stays agent-only.
+  const rs = token ? await verifyRs(token) : null;
+  const payload = rs && rs.token_type === "delegation" ? rs : null;
   if (!payload || !payload.sub) {
     return res
       .status(401)
@@ -120,13 +106,12 @@ async function requireAuth(req, res, next) {
   next();
 }
 
-/** READ: a logged-in identity — OIDC access token (RS256) OR HS256. */
+/** READ: a logged-in identity — an RS256 OIDC access token. */
 async function requireRead(req, res, next) {
   const token = bearer(req.headers.authorization);
   if (!token)
     return res.status(401).json({ error: { code: "UNAUTHENTICATED", message: "login required" } });
-  let payload = verifyHs(token);
-  if (!payload) payload = await verifyRs(token);
+  const payload = await verifyRs(token);
   if (!payload || !payload.sub) {
     return res
       .status(401)
@@ -136,4 +121,4 @@ async function requireRead(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireRead, verifyHs, verifyRs };
+module.exports = { requireAuth, requireRead, verifyRs };

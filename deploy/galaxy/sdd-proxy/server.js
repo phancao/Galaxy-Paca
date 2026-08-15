@@ -23,10 +23,14 @@
  *      identity's `/internal/mint-service-token` (iss=galaxy-nexus, TTL<=900s,
  *      verified by SDD via JWKS) — mirroring the dock-trigger mint. A leaked
  *      INTERNAL_SERVICE_SECRET can only mint a non-privileged token, so the
- *      blast radius is a team-wide READ. An optional HS256 fallback (signed
- *      with the fleet-shared JWT_SECRET, which SDD also accepts) keeps the
- *      proxy serving if identity is briefly unreachable — enabled only when
- *      SDD_SHARED_JWT_SECRET is set.
+ *      blast radius is a team-wide READ.
+ *
+ *      There is NO fallback. An earlier version self-signed an HS256 token with
+ *      the fleet-shared JWT_SECRET when the mint failed, so a brief identity
+ *      outage silently swapped an asymmetric credential only identity can issue
+ *      for a symmetric one every container in the fleet can forge — and it did
+ *      so without saying anything. A failed mint now returns 502
+ *      TOKEN_UNAVAILABLE and the SDD panel shows an error.
  *
  *   3. READ-ONLY REVERSE PROXY. `GET /sdd-api/<x>` -> `sdd-server:4830/api/<x>`,
  *      streaming the JSON back unchanged. Only GET/HEAD are allowed: a write
@@ -38,7 +42,6 @@
  */
 
 const http = require("http");
-const crypto = require("crypto");
 
 // ── Config (env, with in-cluster defaults) ──────────────────────────────────
 const PORT = parseInt(process.env.PORT || "8791", 10);
@@ -48,9 +51,6 @@ const PACA_AUTH_URL = process.env.PACA_AUTH_CHECK_URL || "http://api:8080/api/v1
 const SERVICE_SECRET = process.env.GALAXY_INTERNAL_SERVICE_SECRET || "";
 const SERVICE_SUB = process.env.SDD_SERVICE_SUB || "svc-paca-sdd-fleet";
 const SERVICE_AUD = process.env.SDD_SERVICE_AUD || "sdd-server";
-// Optional HS256 fallback secret (the fleet-shared JWT_SECRET that SDD's
-// central/auth.js verifyHs also accepts). Unset by default — RS256 is primary.
-const SHARED_JWT_SECRET = process.env.SDD_SHARED_JWT_SECRET || "";
 const MINT_TTL = 900; // seconds; identity caps at 900 anyway
 
 function log(msg) {
@@ -69,19 +69,7 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
-// ── HS256 fallback signer (pure crypto, no deps) ─────────────────────────────
-function b64url(input) {
-  return Buffer.from(input).toString("base64url");
-}
-function signHs256(payload, secret) {
-  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = b64url(JSON.stringify(payload));
-  const signingInput = `${header}.${body}`;
-  const sig = crypto.createHmac("sha256", secret).update(signingInput).digest("base64url");
-  return `${signingInput}.${sig}`;
-}
-
-// ── Service-token cache (mint RS256 at identity; HS256 fallback) ─────────────
+// ── Service-token cache (RS256 minted at identity; no fallback) ──────────────
 let cached = { token: null, exp: 0 };
 
 async function mintRs256() {
@@ -112,30 +100,15 @@ async function mintRs256() {
   return { token: tok, ttl: (j && j.expires_in) || MINT_TTL };
 }
 
-function mintHs256() {
-  if (!SHARED_JWT_SECRET) return null;
-  const now = Math.floor(Date.now() / 1000);
-  const token = signHs256(
-    {
-      sub: SERVICE_SUB,
-      aud: SERVICE_AUD,
-      name: "Paca SDD Fleet Proxy",
-      iss: "galaxy-nexus",
-      token_type: "session",
-      iat: now,
-      exp: now + MINT_TTL,
-    },
-    SHARED_JWT_SECRET
-  );
-  return { token, ttl: MINT_TTL };
-}
-
 async function getServiceToken() {
   const now = Math.floor(Date.now() / 1000);
   if (cached.token && now < cached.exp - 60) return cached.token;
-  // Primary: RS256 via identity mint (mirrors dock-trigger). Fallback: HS256.
-  let minted = await mintRs256();
-  if (!minted) minted = mintHs256();
+  // RS256 via identity mint (mirrors dock-trigger). If that fails we return
+  // null and the request 502s. We do NOT substitute a weaker credential: a
+  // self-signed HS256 token would keep the panel green while the fleet quietly
+  // ran on a key any container can forge, which is a worse outcome than an
+  // honest error on a read-only telemetry panel.
+  const minted = await mintRs256();
   if (!minted) return null;
   cached = { token: minted.token, exp: now + minted.ttl };
   return cached.token;
@@ -233,6 +206,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  const mintMode = SERVICE_SECRET ? "RS256(identity)" : SHARED_JWT_SECRET ? "HS256(shared)" : "NONE";
+  const mintMode = SERVICE_SECRET ? "RS256(identity)" : "NONE";
   log(`listening on :${PORT} -> ${SDD_UPSTREAM} | auth-check ${PACA_AUTH_URL} | mint ${mintMode}`);
 });

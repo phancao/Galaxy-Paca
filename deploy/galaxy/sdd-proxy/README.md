@@ -26,10 +26,12 @@ paca-edge (Caddy)  handle_path /sdd-api/*  ──►  sdd-proxy:8791
   (ADR-038 T6). Writes → `405`.
 - **No secrets in the browser, none in the logs.** The service secret and the
   minted tokens are never logged.
-- **Resilient.** Tokens are cached and refreshed 60 s before expiry. If
-  identity is briefly unreachable and `SDD_SHARED_JWT_SECRET` is configured,
-  an HS256 token (which SDD's `central/auth.js` also accepts) is minted
-  locally as a fallback.
+- **Fails loudly, never quietly weaker.** Tokens are cached and refreshed 60 s
+  before expiry. If identity is unreachable the proxy returns `502
+  TOKEN_UNAVAILABLE`. It does NOT fall back to self-signing an HS256 token
+  with the fleet-shared secret, as it once did: that swapped a credential only
+  identity can issue for one every container can forge, silently, at exactly
+  the moment nobody was watching.
 
 ## Config (env)
 
@@ -42,7 +44,6 @@ paca-edge (Caddy)  handle_path /sdd-api/*  ──►  sdd-proxy:8791
 | `GALAXY_INTERNAL_SERVICE_SECRET` | — | authenticates the mint (RS256, primary) |
 | `SDD_SERVICE_SUB` | `svc-paca-sdd-fleet` | `sub` claim of the service token |
 | `SDD_SERVICE_AUD` | `sdd-server` | `aud` claim of the service token |
-| `SDD_SHARED_JWT_SECRET` | — | optional HS256 fallback secret |
 
 Wired as the `sdd-proxy` service in `deploy/galaxy/docker-compose.galaxy.yml`
 and routed by `deploy/caddy/Caddyfile` (`handle_path /sdd-api/*`).
