@@ -288,10 +288,8 @@ services:
       GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
       SDD_SERVICE_SUB: ${SDD_SERVICE_SUB:-svc-paca-sdd-fleet}
       SDD_SERVICE_AUD: ${SDD_SERVICE_AUD:-sdd-server}
-      # Optional HS256 fallback (fleet-shared JWT_SECRET, which SDD also
-      # accepts) — set only if you want the proxy to survive identity being
-      # briefly unreachable. Left empty = RS256-only.
-      SDD_SHARED_JWT_SECRET: ${SDD_SHARED_JWT_SECRET:-}
+      # No HS256 fallback secret. If identity is unreachable the proxy returns
+      # 502 rather than self-signing with the fleet-shared key.
     networks:
       default: {}
       galaxy_network:
@@ -399,8 +397,11 @@ services:
       PGUSER: ${SDD_PG_USER:-sdd}
       PGPASSWORD: ${SDD_PG_PASSWORD:-sdd_local_pw}
       PGDATABASE: ${SDD_PG_DB:-sdd}
-      # Auth: HS256 delegation (ingest) + RS256 OIDC/service tokens via Vortex JWKS.
-      JWT_SECRET: ${JWT_SECRET:-}
+      # Auth: RS256 only — delegation tokens (ingest) and OIDC access tokens
+      # (read), both verified against the Vortex JWKS. JWT_SECRET is
+      # deliberately NOT passed: this server verifies, it does not sign, and a
+      # shared symmetric key would let it (and every other holder) forge the
+      # telemetry every dashboard reads.
       NEXUS_JWKS_URL: ${NEXUS_JWKS_URL:-http://vortex-identity:8086/.well-known/jwks.json}
       VORTEX_JWKS_URL: ${NEXUS_JWKS_URL:-http://vortex-identity:8086/.well-known/jwks.json}
       # Paca bridge: mirrors SDD tasks into Paca. API key from .env.galaxy (never committed).
