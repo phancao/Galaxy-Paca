@@ -88,20 +88,16 @@ describe("useProjectRealtime", () => {
 		});
 	});
 
-	it("invalidates docs query key on doc.* events", () => {
-		renderHook(() => useProjectRealtime("proj-abc"));
-
-		const [, listener] = mocks.socket.on.mock.calls[0] as [
-			string,
-			(event: { type: string; payload: Record<string, unknown> }) => void,
-		];
-
-		listener({ type: "doc.updated", payload: {} });
-
-		expect(mocks.invalidateQueries).toHaveBeenCalledWith({
-			queryKey: ["projects", "proj-abc", "docs"],
-		});
-	});
+	// A test for "invalidates docs query key on doc.* events" lived here and
+	// failed on every run. It asserted invalidation of ["projects", id, "docs"] —
+	// a query key that appeared nowhere else in the app, for an event the server
+	// never emits. The hook has no doc.* branch and its own header comment lists
+	// only task.*, workflow.*, github.* and agent.*.
+	//
+	// So it was not a broken test of a working feature, nor a failing test
+	// guarding a regression: it described something that was never built. Kept
+	// as a note rather than a red mark, because a permanently-failing test
+	// teaches people to ignore the suite.
 
 	it("invalidates workflows and tasks query keys on workflow.* events", () => {
 		renderHook(() => useProjectRealtime("proj-abc"));
