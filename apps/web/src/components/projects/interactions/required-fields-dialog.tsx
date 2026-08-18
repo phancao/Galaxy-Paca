@@ -18,8 +18,8 @@ import type {
 	ProjectMember,
 } from "@/lib/project-api";
 import { mapApiFieldToUi } from "./task-detail/helpers";
-import { CustomFieldEditor } from "./task-detail/property-field/custom-field-editor";
 import type { UserOption } from "./task-detail/property-field";
+import { CustomFieldEditor } from "./task-detail/property-field/custom-field-editor";
 
 function toUserOption(m: ProjectMember): UserOption {
 	return {
@@ -47,7 +47,7 @@ function isFilled(fieldType: FieldType, value: unknown): boolean {
 				typeof value === "object" &&
 				value !== null &&
 				typeof (value as { parent?: unknown }).parent === "string" &&
-				((value as { parent: string }).parent).trim() !== ""
+				(value as { parent: string }).parent.trim() !== ""
 			);
 		default:
 			// text, url, date, select, user — a non-empty string.
@@ -102,7 +102,9 @@ export function RequiredFieldsDialog({
 	}, [open, fields]);
 
 	const memberOptions: UserOption[] = members.map(toUserOption);
-	const allFilled = fields.every((f) => isFilled(f.field_type, values[f.field_key]));
+	const allFilled = fields.every((f) =>
+		isFilled(f.field_type, values[f.field_key]),
+	);
 
 	return (
 		<Dialog

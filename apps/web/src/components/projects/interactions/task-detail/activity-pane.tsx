@@ -124,7 +124,9 @@ export function TaskActivityPane({
 					);
 			}
 		},
-		[nameMaps, projectId, t],
+		// projectId is a prop but is not read inside describeActivity, so listing
+		// it only recreated the callback whenever the route changed.
+		[nameMaps, t],
 	);
 
 	const queryKey = [
