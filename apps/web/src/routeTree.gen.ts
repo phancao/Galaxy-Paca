@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedAboutRouteImport } from './routes/_authenticated/about'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedHomeIndexRouteImport } from './routes/_authenticated/home/index'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
@@ -46,6 +47,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAboutRoute = AuthenticatedAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProfileIndexRoute =
   AuthenticatedProfileIndexRouteImport.update({
@@ -170,6 +176,7 @@ const AuthenticatedProjectsProjectIdInteractionsSprintsSprintIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/change-password': typeof ChangePasswordRoute
+  '/about': typeof AuthenticatedAboutRoute
   '/profile/api-keys': typeof AuthenticatedProfileApiKeysRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/home/': typeof AuthenticatedHomeIndexRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/change-password': typeof ChangePasswordRoute
+  '/about': typeof AuthenticatedAboutRoute
   '/profile/api-keys': typeof AuthenticatedProfileApiKeysRoute
   '/home': typeof AuthenticatedHomeIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
+  '/_authenticated/about': typeof AuthenticatedAboutRoute
   '/_authenticated/profile/api-keys': typeof AuthenticatedProfileApiKeysRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/_authenticated/home/': typeof AuthenticatedHomeIndexRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/change-password'
+    | '/about'
     | '/profile/api-keys'
     | '/projects/$projectId'
     | '/home/'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/change-password'
+    | '/about'
     | '/profile/api-keys'
     | '/home'
     | '/profile'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/change-password'
+    | '/_authenticated/about'
     | '/_authenticated/profile/api-keys'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/home/'
@@ -343,6 +355,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/about': {
+      id: '/_authenticated/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AuthenticatedAboutRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/profile/': {
       id: '/_authenticated/profile/'
@@ -536,6 +555,7 @@ const AuthenticatedProjectsProjectIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAboutRoute: typeof AuthenticatedAboutRoute
   AuthenticatedProfileApiKeysRoute: typeof AuthenticatedProfileApiKeysRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRouteWithChildren
   AuthenticatedHomeIndexRoute: typeof AuthenticatedHomeIndexRoute
@@ -547,6 +567,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAboutRoute: AuthenticatedAboutRoute,
   AuthenticatedProfileApiKeysRoute: AuthenticatedProfileApiKeysRoute,
   AuthenticatedProjectsProjectIdRoute:
     AuthenticatedProjectsProjectIdRouteWithChildren,

@@ -380,9 +380,7 @@ function CascadeOptionsBuilder({
 	const removeChild = (i: number, ci: number) => {
 		onChange(
 			value.map((p, j) =>
-				j === i
-					? { ...p, children: p.children.filter((_, k) => k !== ci) }
-					: p,
+				j === i ? { ...p, children: p.children.filter((_, k) => k !== ci) } : p,
 			),
 		);
 	};

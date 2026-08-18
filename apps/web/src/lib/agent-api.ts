@@ -19,9 +19,11 @@ export async function writeTaskDescriptionWithAI(
 	title: string,
 	description: string,
 ): Promise<{ text: string }> {
-	const { data } = await apiClient.instance.post<SuccessEnvelope<{ text: string }>>(
-		`/projects/${projectId}/tasks/${taskId}/write-with-ai`,
-		{ title, description },
-	);
+	const { data } = await apiClient.instance.post<
+		SuccessEnvelope<{ text: string }>
+	>(`/projects/${projectId}/tasks/${taskId}/write-with-ai`, {
+		title,
+		description,
+	});
 	return data.data;
 }

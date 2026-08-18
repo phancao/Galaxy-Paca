@@ -22,7 +22,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import {
 	Table,
 	TableBody,
@@ -31,6 +30,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	createProjectComponent,
 	deleteProjectComponent,
@@ -194,7 +194,11 @@ function ComponentFormDialog({
 				<DialogFooter>
 					<DialogClose
 						render={
-							<Button variant="outline" size="sm" disabled={mutation.isPending} />
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={mutation.isPending}
+							/>
 						}
 					>
 						{t("settings.components.cancel")}
@@ -284,7 +288,11 @@ function DeleteComponentDialog({
 				<DialogFooter>
 					<DialogClose
 						render={
-							<Button variant="outline" size="sm" disabled={mutation.isPending} />
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={mutation.isPending}
+							/>
 						}
 					>
 						{t("settings.components.cancel")}
@@ -384,7 +392,11 @@ export function ComponentsSettings({
 						</p>
 					</div>
 					{canWrite && (
-						<Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setCreateOpen(true)}
+						>
 							<Plus className="size-4 mr-1" />
 							{t("settings.components.empty.createFirst")}
 						</Button>

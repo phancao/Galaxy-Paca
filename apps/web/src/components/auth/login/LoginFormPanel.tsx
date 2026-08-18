@@ -24,7 +24,9 @@ const OIDC_LOGIN_URL = "/api/v1/auth/oidc/login";
  * check here only spares the round trip.
  */
 function safeReturnPath(v: string | null): boolean {
-	return Boolean(v && v.startsWith("/") && !v.startsWith("//"));
+	// `v?.` short-circuits when v is null, so the second call is only reached
+	// with a string — same guard, one less way to read it as two checks.
+	return Boolean(v?.startsWith("/") && !v.startsWith("//"));
 }
 
 export function LoginFormPanel() {

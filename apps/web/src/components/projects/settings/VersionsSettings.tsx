@@ -15,7 +15,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import {
 	Table,
 	TableBody,
@@ -24,6 +23,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/format-date";
 import {
 	createProjectVersion,
@@ -222,7 +222,11 @@ function VersionFormDialog({
 				<DialogFooter>
 					<DialogClose
 						render={
-							<Button variant="outline" size="sm" disabled={mutation.isPending} />
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={mutation.isPending}
+							/>
 						}
 					>
 						{t("settings.versions.cancel")}
@@ -291,9 +295,7 @@ function DeleteVersionDialog({
 					<div className="flex size-10 items-center justify-center rounded-full bg-destructive/10 mb-2">
 						<Trash2 className="size-5 text-destructive" />
 					</div>
-					<DialogTitle>
-						{t("settings.versions.deleteDialog.title")}
-					</DialogTitle>
+					<DialogTitle>{t("settings.versions.deleteDialog.title")}</DialogTitle>
 					<DialogDescription>
 						{t("settings.versions.deleteDialog.confirmTextPrefix")}{" "}
 						<span className="font-semibold text-foreground">
@@ -312,7 +314,11 @@ function DeleteVersionDialog({
 				<DialogFooter>
 					<DialogClose
 						render={
-							<Button variant="outline" size="sm" disabled={mutation.isPending} />
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={mutation.isPending}
+							/>
 						}
 					>
 						{t("settings.versions.cancel")}
@@ -404,7 +410,11 @@ export function VersionsSettings({
 						</p>
 					</div>
 					{canWrite && (
-						<Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setCreateOpen(true)}
+						>
 							<Plus className="size-4 mr-1" />
 							{t("settings.versions.empty.createFirst")}
 						</Button>
