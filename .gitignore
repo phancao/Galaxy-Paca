@@ -44,3 +44,7 @@ __pycache__/
 
 # Galaxy production secrets
 deploy/galaxy/.env.galaxy
+
+# bí mật sinh trên prod (deploy/galaxy/) — không bao giờ commit
+deploy/galaxy/.pilot-credentials
+deploy/galaxy/.service-keys
