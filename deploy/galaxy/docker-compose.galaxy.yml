@@ -56,6 +56,13 @@ services:
       OIDC_AUTO_CREATE_USERS: ${OIDC_AUTO_CREATE_USERS:-true}
       OIDC_DEFAULT_ROLE: ${OIDC_DEFAULT_ROLE:-USER}
       OIDC_BUTTON_LABEL: ${OIDC_BUTTON_LABEL:-Sign in with Vortex}
+      # ADR-058 Đợt 4: the ONE tenant this deployment serves — the callback
+      # refuses an id_token whose chosen tenant differs. Required with
+      # OIDC_ISSUER (the API refuses to boot without it).
+      OIDC_TENANT: ${OIDC_TENANT:-}
+      # Password door: only registered when true. Unset = false whenever OIDC
+      # is configured (break-glass by env, D7).
+      AUTH_LOCAL_LOGIN_ENABLED: ${AUTH_LOCAL_LOGIN_ENABLED:-}
       # Trusted-issuer RS256 bearer auth (act_as contract).
       GALAXY_TRUSTED_ISSUER: ${GALAXY_TRUSTED_ISSUER:-}
       # Extra iss claim values accepted on JWKS-verified bearers — identity's
