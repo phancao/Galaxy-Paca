@@ -39,21 +39,20 @@ export function LoginFormPanel() {
 	);
 	const logoSrc = "/paca-logo.svg";
 
-	// ADR-038 T2 — platform-wide design: apps do NOT show their own login
-	// screen. When the server enables OIDC we bounce straight to Vortex SSO;
-	// the local username/password form stays reachable only via ?local=1
-	// (admin break-glass). If the config fetch fails, the form renders as a
-	// fallback so a broken identity service never locks out break-glass.
+	// ADR-038 T2 / ADR-058 D7 — platform-wide design: apps do NOT show their
+	// own login screen. When the server enables OIDC we bounce straight to
+	// Vortex SSO. The local username/password form exists only when the API
+	// was started with AUTH_LOCAL_LOGIN_ENABLED (break-glass under env): the
+	// old `?local=1` URL switch is gone — a URL is not a control.
 	const searchParams =
 		typeof window !== "undefined"
 			? new URLSearchParams(window.location.search)
 			: new URLSearchParams();
-	const forceLocal = searchParams.get("local") === "1";
+	const localLogin = Boolean(authConfig?.local_login_enabled);
 	// SSO loop-breaker: right after logout the Vortex IdP session is usually
 	// still alive, so auto-redirecting would silently sign the user back in.
 	const justLoggedOut = searchParams.get("logged_out") === "1";
-	const ssoRedirect =
-		Boolean(authConfig?.oidc_enabled) && !forceLocal && !justLoggedOut;
+	const ssoRedirect = Boolean(authConfig?.oidc_enabled) && !justLoggedOut;
 	useEffect(() => {
 		if (!ssoRedirect) return;
 		// Hand the intended destination to the OIDC round trip. The API signs it
@@ -104,6 +103,25 @@ export function LoginFormPanel() {
 						"Đăng xuất khỏi toàn bộ Vortex (mọi ứng dụng)",
 					)}
 				</a>
+			</div>
+		);
+	}
+
+	if (!localLogin) {
+		return (
+			<div className="relative flex flex-col items-center justify-center gap-4 px-8 py-16 text-center sm:px-10">
+				<img src={logoSrc} alt={t("brand.logoAlt")} className="h-auto w-10" />
+				<p className="text-sm text-(--sea-ink-soft)">
+					{t(
+						"login.noLocalLogin",
+						"Đăng nhập chỉ qua Galaxy Vortex. Cửa mật khẩu của ứng dụng đã đóng.",
+					)}
+				</p>
+				{authConfig?.oidc_enabled ? (
+					<a href={OIDC_LOGIN_URL} className={cn(buttonVariants({ size: "lg" }))}>
+						{authConfig.oidc_button_label || t("login.ssoSignIn")}
+					</a>
+				) : null}
 			</div>
 		);
 	}

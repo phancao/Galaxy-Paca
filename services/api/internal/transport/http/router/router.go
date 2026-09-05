@@ -26,6 +26,7 @@ type Deps struct {
 	Health               *handler.HealthHandler
 	Auth                 *handler.AuthHandler
 	OIDC                 *handler.OIDCHandler         // nil unless OIDC SSO is configured (ADR-038)
+	LocalLoginEnabled    bool                         // POST /auth/login exists only when true (ADR-058 D7)
 	NexusWebhook         *handler.NexusWebhookHandler // nil unless VORTEX_WEBHOOK_SECRET is configured (ADR-040)
 	User                 *handler.UserHandler
 	GlobalRole           *handler.GlobalRoleHandler
@@ -71,7 +72,12 @@ func New(deps Deps) http.Handler {
 		r.Route("/v1", func(r chi.Router) {
 			// Auth
 			r.Route("/auth", func(r chi.Router) {
-				r.Post("/login", deps.Auth.Login)
+				// Username/password login is a break-glass door (ADR-058 D7):
+				// unregistered unless AUTH_LOCAL_LOGIN_ENABLED, so it answers
+				// 405 like any route that does not exist — not 401.
+				if deps.LocalLoginEnabled {
+					r.Post("/login", deps.Auth.Login)
+				}
 				r.Post("/refresh", deps.Auth.Refresh)
 				r.Get("/config", deps.Auth.GetConfig)
 				r.With(httpmw.Authn(deps.TokenManager)).Post("/logout", deps.Auth.Logout)
@@ -553,7 +559,6 @@ func New(deps Deps) http.Handler {
 							Patch("/", deps.Wiki.SetVisibility)
 					})
 				}
-
 
 				// Agents
 				if deps.Agent != nil {

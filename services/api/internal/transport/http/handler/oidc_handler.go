@@ -39,6 +39,9 @@ type OIDCOptions struct {
 	ClientSecret string
 	RedirectURL  string
 	Scopes       string
+	// Tenant is the one Vortex tenant this deployment serves (ADR-058): the
+	// callback refuses an id_token that names another tenant, or none.
+	Tenant string
 }
 
 // SessionIssuer mints a session token pair for an already-authenticated user.
@@ -187,6 +190,20 @@ func (h *OIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ADR-058 Đợt 4: the token names the tenant the person CHOSE at the
+	// portal. This deployment serves exactly one tenant, so anything else —
+	// or a token naming none — is refused here, before a local user exists.
+	tenant := effectiveTenant(claims)
+	if tenant == "" {
+		presenter.Error(w, r, apierr.New(apierr.CodeUnauthenticated, "TENANT_REQUIRED: the Vortex session names no tenant"))
+		return
+	}
+	if tenant != h.opts.Tenant {
+		h.log.Warn("oidc: tenant mismatch", "token_tenant", tenant, "deployment_tenant", h.opts.Tenant)
+		presenter.Error(w, r, apierr.New(apierr.CodeForbidden, "this workspace serves tenant "+h.opts.Tenant+", the session is for "+tenant))
+		return
+	}
+
 	identity := galaxyauth.Identity{
 		Subject:           stringClaim(claims, "sub"),
 		Email:             stringClaim(claims, "email"),
@@ -308,4 +325,17 @@ func (h *OIDCHandler) clearStateCookie(w http.ResponseWriter) {
 func stringClaim(claims map[string]any, key string) string {
 	v, _ := claims[key].(string)
 	return v
+}
+
+// effectiveTenant mirrors galaxy_auth.effective_tenant: `act_as_tenant`, else
+// `tenant`, trimmed and lower-cased. Whitespace counts as absent, and the home
+// tenant (`primary_org_id`) is never read — that fallback is what ADR-058
+// removes.
+func effectiveTenant(claims map[string]any) string {
+	for _, key := range []string{"act_as_tenant", "tenant"} {
+		if v := strings.ToLower(strings.TrimSpace(stringClaim(claims, key))); v != "" {
+			return v
+		}
+	}
+	return ""
 }

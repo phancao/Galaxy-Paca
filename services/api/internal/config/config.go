@@ -5,17 +5,22 @@ import "time"
 
 // Config holds all runtime configuration for the service.
 type Config struct {
-	Server     ServerConfig
-	Database   DatabaseConfig
-	Redis      RedisConfig
-	Cache      CacheConfig
-	JWT        JWTConfig
-	Admin      AdminConfig
-	Storage    StorageConfig
-	Security   SecurityConfig
-	Plugins    PluginsConfig
-	OIDC       OIDCConfig
-	AIAgentURL string // base URL of the ai-agent service, e.g. http://ai-agent:8080
+	Server   ServerConfig
+	Database DatabaseConfig
+	Redis    RedisConfig
+	Cache    CacheConfig
+	JWT      JWTConfig
+	Admin    AdminConfig
+	Storage  StorageConfig
+	Security SecurityConfig
+	Plugins  PluginsConfig
+	OIDC     OIDCConfig
+	// LocalLoginEnabled keeps POST /auth/login (username/password) registered
+	// (AUTH_LOCAL_LOGIN_ENABLED). ADR-058 D7: once OIDC is configured it
+	// defaults to false — break-glass lives in the environment, never on the
+	// UI; without OIDC it stays on so a bare deployment can still sign in.
+	LocalLoginEnabled bool
+	AIAgentURL        string // base URL of the ai-agent service, e.g. http://ai-agent:8080
 	// GalaxyDockSrc is the Galaxy chat dock bundle URL advertised to the SPA
 	// on the public /auth/config endpoint (GALAXY_DOCK_SRC, ADR-038 P3.2),
 	// e.g. https://ai.skyplatform.net/dock.js or /dock.js (same-origin via
@@ -98,6 +103,11 @@ type OIDCConfig struct {
 	// ButtonLabel is the label the SPA shows on the SSO button
 	// (OIDC_BUTTON_LABEL, default "Sign in with Vortex").
 	ButtonLabel string
+	// Tenant is the Vortex tenant this Paca deployment serves (OIDC_TENANT).
+	// ADR-058 Đợt 4: the id_token names the tenant the person CHOSE at the
+	// portal (`act_as_tenant`, else `tenant`); a login naming another tenant —
+	// or none — is refused instead of landing in this workspace.
+	Tenant string
 }
 
 // Enabled reports whether OIDC SSO login is configured.

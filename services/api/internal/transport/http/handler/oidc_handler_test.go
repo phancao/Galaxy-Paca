@@ -158,6 +158,7 @@ func newOIDCTestHandler(t *testing.T, fi *fakeIssuer, resolver *fakeResolver, se
 			ClientSecret: "test-client-secret",
 			RedirectURL:  "http://paca.local/api/v1/auth/oidc/callback",
 			Scopes:       "openid profile email",
+			Tenant:       "galaxy",
 		},
 		resolver,
 		sessions,
@@ -228,6 +229,7 @@ func TestOIDCCallbackHappyPath(t *testing.T) {
 		"email":              "cao@example.com",
 		"name":               "Cao Phan",
 		"preferred_username": "cao.phan",
+		"tenant":             "galaxy",
 	}
 
 	resolver := &fakeResolver{user: &userdom.User{
@@ -297,6 +299,55 @@ func TestOIDCCallbackHappyPath(t *testing.T) {
 	}
 	if !stateCleared {
 		t.Error("oidc_state cookie was not cleared")
+	}
+}
+
+// ADR-058: a token that names no tenant is refused (401) — never resolved
+// into a local user by way of a home-tenant fallback.
+func TestOIDCCallbackRejectsTokenWithoutTenant(t *testing.T) {
+	fi := newFakeIssuer(t, "paca-client")
+	fi.idClaims = jwt.MapClaims{"email": "cao@example.com", "primary_org_id": "galaxy"}
+	resolver := &fakeResolver{user: &userdom.User{ID: uuid.New(), Username: "cao.phan", Role: "USER"}}
+	sessions := &fakeSessionIssuer{}
+	h := newOIDCTestHandler(t, fi, resolver, sessions)
+
+	loc, stateCookie := doLogin(t, h)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
+	req.AddCookie(stateCookie)
+	rec := httptest.NewRecorder()
+	h.Callback(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "TENANT_REQUIRED") {
+		t.Errorf("body should name TENANT_REQUIRED: %s", rec.Body.String())
+	}
+	if resolver.lastIdentity.Subject != "" || sessions.lastUser != nil {
+		t.Error("no user must be resolved and no session issued for a tenant-less token")
+	}
+}
+
+// ADR-058: the chosen tenant (act_as_tenant, else tenant) must be the one
+// this deployment serves; another tenant is refused (403).
+func TestOIDCCallbackRejectsOtherTenant(t *testing.T) {
+	fi := newFakeIssuer(t, "paca-client")
+	fi.idClaims = jwt.MapClaims{"email": "cao@example.com", "tenant": "galaxy", "act_as_tenant": "vietjet"}
+	resolver := &fakeResolver{user: &userdom.User{ID: uuid.New(), Username: "cao.phan", Role: "USER"}}
+	sessions := &fakeSessionIssuer{}
+	h := newOIDCTestHandler(t, fi, resolver, sessions)
+
+	loc, stateCookie := doLogin(t, h)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
+	req.AddCookie(stateCookie)
+	rec := httptest.NewRecorder()
+	h.Callback(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	if sessions.lastUser != nil {
+		t.Error("no session must be issued for another tenant's session")
 	}
 }
 

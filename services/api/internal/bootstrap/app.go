@@ -20,7 +20,6 @@ import (
 	"github.com/Paca-AI/api/internal/platform/cache"
 	"github.com/Paca-AI/api/internal/platform/database"
 	"github.com/Paca-AI/api/internal/platform/galaxyai"
-	"github.com/Paca-AI/api/internal/platform/wiki"
 	"github.com/Paca-AI/api/internal/platform/logger"
 	"github.com/Paca-AI/api/internal/platform/messaging"
 	oidcplatform "github.com/Paca-AI/api/internal/platform/oidc"
@@ -28,6 +27,7 @@ import (
 	"github.com/Paca-AI/api/internal/platform/secret"
 	"github.com/Paca-AI/api/internal/platform/storage"
 	jwttoken "github.com/Paca-AI/api/internal/platform/token"
+	"github.com/Paca-AI/api/internal/platform/wiki"
 	pgRepo "github.com/Paca-AI/api/internal/repository/postgres"
 	redisRepo "github.com/Paca-AI/api/internal/repository/redis"
 	agentsvc "github.com/Paca-AI/api/internal/service/agent"
@@ -45,8 +45,8 @@ import (
 	tasksvc "github.com/Paca-AI/api/internal/service/task"
 	usersvc "github.com/Paca-AI/api/internal/service/user"
 	versionsvc "github.com/Paca-AI/api/internal/service/version"
-	workflowsvc "github.com/Paca-AI/api/internal/service/workflow"
 	wikispacesvc "github.com/Paca-AI/api/internal/service/wikispace"
+	workflowsvc "github.com/Paca-AI/api/internal/service/workflow"
 	worklogsvc "github.com/Paca-AI/api/internal/service/worklog"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	httpmw "github.com/Paca-AI/api/internal/transport/http/middleware"
@@ -312,6 +312,9 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	authHandler := handler.NewAuthHandler(authService, cookieCfg)
+	if cfg.LocalLoginEnabled {
+		authHandler = authHandler.WithLocalLogin()
+	}
 
 	// Galaxy chat dock (ADR-038 P3.2): advertise the dock bundle URL on the
 	// public /auth/config endpoint so the SPA mounts it after login.
@@ -331,6 +334,7 @@ func New(cfg *config.Config) (*App, error) {
 			oidcProvider,
 			handler.OIDCOptions{
 				ClientID:     cfg.OIDC.ClientID,
+				Tenant:       cfg.OIDC.Tenant,
 				ClientSecret: cfg.OIDC.ClientSecret,
 				RedirectURL:  cfg.OIDC.RedirectURL,
 				Scopes:       cfg.OIDC.Scopes,
@@ -385,6 +389,7 @@ func New(cfg *config.Config) (*App, error) {
 		Authorizer:           authorizer,
 		Health:               handler.NewHealthHandler(),
 		Auth:                 authHandler,
+		LocalLoginEnabled:    cfg.LocalLoginEnabled,
 		OIDC:                 oidcHandler,
 		NexusWebhook:         nexusWebhookHandler,
 		User:                 handler.NewUserHandler(userService, authService),

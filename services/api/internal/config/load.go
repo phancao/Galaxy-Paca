@@ -138,7 +138,11 @@ func Load() (*Config, error) {
 	oidcIssuer := strings.TrimRight(env("OIDC_ISSUER", ""), "/")
 	oidcRedirectURL := env("OIDC_REDIRECT_URL", "")
 	publicURL := env("PUBLIC_URL", "")
+	oidcTenant := strings.ToLower(strings.TrimSpace(env("OIDC_TENANT", "")))
 	if oidcIssuer != "" {
+		if oidcTenant == "" {
+			errs = append(errs, fmt.Errorf("config: OIDC_TENANT must be set when OIDC_ISSUER is set (ADR-058: the deployment names the one tenant it serves)"))
+		}
 		if oidcRedirectURL == "" && publicURL != "" {
 			oidcRedirectURL = strings.TrimRight(publicURL, "/") + "/api/v1/auth/oidc/callback"
 		}
@@ -151,6 +155,17 @@ func Load() (*Config, error) {
 		if oidcRedirectURL == "" {
 			errs = append(errs, fmt.Errorf("config: OIDC_REDIRECT_URL (or PUBLIC_URL) must be set when OIDC_ISSUER is set"))
 		}
+	}
+
+	// ADR-058 D7: with SSO configured the password door is closed unless the
+	// operator opens it explicitly; without SSO it is the only door.
+	localLoginDefault := "true"
+	if oidcIssuer != "" {
+		localLoginDefault = "false"
+	}
+	localLogin, err := strconv.ParseBool(env("AUTH_LOCAL_LOGIN_ENABLED", localLoginDefault))
+	if err != nil {
+		return nil, fmt.Errorf("config: AUTH_LOCAL_LOGIN_ENABLED: %w", err)
 	}
 
 	if len(errs) > 0 {
@@ -250,8 +265,10 @@ func Load() (*Config, error) {
 			AutoCreateUsers: oidcAutoCreate,
 			DefaultRole:     env("OIDC_DEFAULT_ROLE", "USER"),
 			ButtonLabel:     env("OIDC_BUTTON_LABEL", "Sign in with Vortex"),
+			Tenant:          oidcTenant,
 		},
-		AIAgentURL: env("AI_AGENT_URL", "http://ai-agent:8080"),
+		LocalLoginEnabled: localLogin,
+		AIAgentURL:        env("AI_AGENT_URL", "http://ai-agent:8080"),
 		// Galaxy chat dock (ADR-038 P3.2) — empty keeps the dock disabled.
 		GalaxyDockSrc: env("GALAXY_DOCK_SRC", ""),
 		// Galaxy platform AI for one-shot write-with-ai (ADR-038). Empty

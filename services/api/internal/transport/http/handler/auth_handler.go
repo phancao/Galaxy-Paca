@@ -39,6 +39,9 @@ type AuthHandler struct {
 	// Galaxy chat dock advertisement for the public /auth/config endpoint
 	// (ADR-038 P3.2).  Empty means the dock stays unmounted in the SPA.
 	dockSrc string
+	// localLogin reports whether POST /auth/login is registered at all
+	// (ADR-058 D7: break-glass under env, never advertised as a UI path).
+	localLogin bool
 }
 
 // NewAuthHandler returns an AuthHandler wired to the provided auth service.
@@ -50,6 +53,14 @@ func NewAuthHandler(svc domainauth.Service, cookie CookieConfig) *AuthHandler {
 func (h *AuthHandler) WithOIDC(buttonLabel string) *AuthHandler {
 	h.oidcEnabled = true
 	h.oidcButtonLabel = buttonLabel
+	return h
+}
+
+// WithLocalLogin advertises that the username/password door is open
+// (AUTH_LOCAL_LOGIN_ENABLED). The router registers the route on the same
+// switch, so the SPA never renders a form the API would 404.
+func (h *AuthHandler) WithLocalLogin() *AuthHandler {
+	h.localLogin = true
 	return h
 }
 
@@ -65,10 +76,11 @@ func (h *AuthHandler) WithGalaxyDock(src string) *AuthHandler {
 // Galaxy chat dock should be mounted after login.
 func (h *AuthHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	presenter.OK(w, r, map[string]any{
-		"oidc_enabled":      h.oidcEnabled,
-		"oidc_button_label": h.oidcButtonLabel,
-		"dock_enabled":      h.dockSrc != "",
-		"dock_src":          h.dockSrc,
+		"oidc_enabled":        h.oidcEnabled,
+		"oidc_button_label":   h.oidcButtonLabel,
+		"local_login_enabled": h.localLogin,
+		"dock_enabled":        h.dockSrc != "",
+		"dock_src":            h.dockSrc,
 	})
 }
 
