@@ -150,11 +150,48 @@ func New(cfg *config.Config) (*App, error) {
 	return &App{server: srv, tenants: apps, mux: mux, log: log}, nil
 }
 
+// poolBudget divides the API's share of Postgres connections among the
+// tenants. The total is deliberately well under a default max_connections of
+// 100: the bridges, the backup job and psql itself all need to get in, and a
+// server that refuses the backup because the API took every slot has traded a
+// small problem for a large one.
+//
+// The floor matters more than the ceiling. Below about four connections a
+// pool serialises requests, so past sixteen tenants this is no longer the
+// right shape and the answer is a bigger max_connections or a pooler, not a
+// thinner slice.
+func poolBudget(tenants int) (open, idle int) {
+	const budget = 60
+	if tenants < 1 {
+		tenants = 1
+	}
+	open = budget / tenants
+	if open < 4 {
+		open = 4
+	}
+	if open > 25 {
+		open = 25
+	}
+	idle = open / 2
+	if idle < 2 {
+		idle = 2
+	}
+	return open, idle
+}
+
 // newTenant builds the whole dependency graph for exactly one tenant.
 func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*tenantApp, error) {
 	// --- Platform -----------------------------------------------------------
+	// Split ONE connection budget across the tenants rather than giving each
+	// the single-pool default: N pools of 25 against a server that allows 100
+	// is an outage waiting for the day someone adds the fifth tenant, and it
+	// would arrive as "too many connections" under load — never in a test,
+	// because a test never runs seven pools at once.
+	open, idle := poolBudget(len(cfg.Tenants))
 	db, err := database.Open(database.Config{
-		DSN: tc.DSN,
+		DSN:          tc.DSN,
+		MaxOpenConns: open,
+		MaxIdleConns: idle,
 	}, log)
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap: %w", err)

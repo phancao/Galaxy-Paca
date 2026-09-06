@@ -19,7 +19,24 @@ import (
 type Config struct {
 	// DSN is the PostgreSQL connection string.
 	DSN string
+	// MaxOpenConns caps this pool. It matters because a pool is no longer
+	// alone: one process opens one pool PER TENANT against the same server,
+	// and Postgres has a global max_connections. A pool sized as if it were
+	// the only one is fine until the day a second tenant is added, and then
+	// it is a "too many connections" outage under load — the kind that does
+	// not appear in any test because tests never run seven pools at once.
+	//
+	// Zero means the old single-pool default.
+	MaxOpenConns int
+	// MaxIdleConns caps the idle half. Zero means the old default.
+	MaxIdleConns int
 }
+
+// Default pool sizes, used when Config leaves them at zero.
+const (
+	defaultMaxOpenConns = 25
+	defaultMaxIdleConns = 10
+)
 
 // Open establishes a sqlx PostgreSQL connection using the settings in cfg.
 func Open(cfg Config, log *slog.Logger) (*sqlx.DB, error) {
@@ -28,9 +45,7 @@ func Open(cfg Config, log *slog.Logger) (*sqlx.DB, error) {
 		return nil, fmt.Errorf("database: open: %w", err)
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(10)
-	db.SetConnMaxLifetime(30 * time.Minute)
+	applyPoolLimits(db, cfg)
 
 	if err := db.PingContext(context.Background()); err != nil {
 		// A tenant added to the configuration has no database yet. Creating
@@ -56,9 +71,7 @@ func Open(cfg Config, log *slog.Logger) (*sqlx.DB, error) {
 		if err != nil {
 			return nil, fmt.Errorf("database: reopen: %w", err)
 		}
-		db.SetMaxOpenConns(25)
-		db.SetMaxIdleConns(10)
-		db.SetConnMaxLifetime(30 * time.Minute)
+		applyPoolLimits(db, cfg)
 		if err := db.PingContext(context.Background()); err != nil {
 			return nil, fmt.Errorf("database: ping after create: %w", err)
 		}
@@ -66,6 +79,23 @@ func Open(cfg Config, log *slog.Logger) (*sqlx.DB, error) {
 
 	log.Info("database connected")
 	return db, nil
+}
+
+func applyPoolLimits(db *sqlx.DB, cfg Config) {
+	open := cfg.MaxOpenConns
+	if open <= 0 {
+		open = defaultMaxOpenConns
+	}
+	idle := cfg.MaxIdleConns
+	if idle <= 0 {
+		idle = defaultMaxIdleConns
+	}
+	if idle > open {
+		idle = open
+	}
+	db.SetMaxOpenConns(open)
+	db.SetMaxIdleConns(idle)
+	db.SetConnMaxLifetime(30 * time.Minute)
 }
 
 // isUndefinedDatabase reports whether err is Postgres 3D000, the code for a
