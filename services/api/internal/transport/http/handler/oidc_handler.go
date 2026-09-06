@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -29,6 +30,11 @@ const (
 	oidcStateCookiePath = "/api/v1/auth/oidc"
 	// oidcStateTTL bounds how long a login attempt may take.
 	oidcStateTTL = 10 * time.Minute
+	// portalOrigin is where the Vortex session actually lives — the one place
+	// a person can change which tenant they are working for. Hard-coded, like
+	// every other app in the fleet does it: a door that disappears because a
+	// variable was unset is the hardest kind of breakage to notice.
+	portalOrigin = "https://ai.skyplatform.net"
 )
 
 // OIDCOptions carries the OIDC client settings the handler needs (a transport
@@ -200,7 +206,11 @@ func (h *OIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	if tenant != h.opts.Tenant {
 		h.log.Warn("oidc: tenant mismatch", "token_tenant", tenant, "deployment_tenant", h.opts.Tenant)
-		presenter.Error(w, r, apierr.New(apierr.CodeForbidden, "this workspace serves tenant "+h.opts.Tenant+", the session is for "+tenant))
+		// Người dùng đang ở TRÌNH DUYỆT, giữa một lần đăng nhập. Trả JSON
+		// {"code":"FORBIDDEN"} ra màn hình là đúng sự thật mà vô dụng: nó
+		// không nói vì sao, và không có lối ra. Câu trả lời đúng là một
+		// trang nói rõ chuyện gì đã xảy ra kèm đường quay lại.
+		h.renderTenantMismatch(w, tenant)
 		return
 	}
 
@@ -301,6 +311,62 @@ func safeReturnPath(v string) string {
 		return ""
 	}
 	return v
+}
+
+// renderTenantMismatch answers the browser with a readable page instead of an
+// error envelope. Status stays 403 — the request really was refused — but the
+// body is for the person, not for a client library.
+//
+// This deployment serves exactly one tenant (ADR-058). Someone who switched
+// workspace at the portal and then opened this app is not doing anything
+// wrong; they are simply somewhere that does not exist for them yet. So the
+// page names both tenants and offers the only two moves that help: change
+// workspace back, or go to the portal.
+func (h *OIDCHandler) renderTenantMismatch(w http.ResponseWriter, sessionTenant string) {
+	switchURL := portalOrigin + "/nexus/switch-workspace?return_url=" + url.QueryEscape(h.publicOrigin())
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusForbidden)
+	fmt.Fprintf(w, `<!doctype html><html lang="vi"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sai nơi làm việc</title>
+<style>
+:root{color-scheme:light dark}
+body{margin:0;min-height:100vh;display:grid;place-items:center;
+ font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+ background:#0b0e14;color:#e6e8ee}
+.card{max-width:34rem;padding:2.5rem;text-align:center}
+h1{font-size:1.5rem;margin:0 0 1rem}
+p{margin:0 0 1.25rem;color:#a9b0c0}
+b{color:#e6e8ee;font-weight:600}
+a.btn{display:inline-block;padding:.7rem 1.4rem;border-radius:.6rem;
+ background:#4f7cff;color:#fff;text-decoration:none;font-weight:600}
+a.sub{display:inline-block;margin-top:1rem;color:#8f97a8;font-size:.9rem}
+</style>
+<div class="card">
+<h1>Không gian này phục vụ một nơi làm việc khác</h1>
+<p>Ứng dụng đang chạy cho <b>%s</b>, còn phiên của bạn đang ở <b>%s</b>.
+Đổi nơi làm việc rồi quay lại là xong.</p>
+<a class="btn" href="%s">Đổi nơi làm việc</a>
+<div><a class="sub" href="%s">Về Vortex</a></div>
+</div>`,
+		html.EscapeString(h.opts.Tenant),
+		html.EscapeString(sessionTenant),
+		html.EscapeString(switchURL),
+		portalOrigin,
+	)
+}
+
+// publicOrigin is where a browser reaches THIS deployment — derived from the
+// configured redirect URL, which is the one absolute URL of ours that identity
+// already had to be told about.
+func (h *OIDCHandler) publicOrigin() string {
+	u, err := url.Parse(h.opts.RedirectURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return portalOrigin
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 func orRoot(v string) string {
