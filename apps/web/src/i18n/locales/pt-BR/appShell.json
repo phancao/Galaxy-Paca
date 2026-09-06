@@ -66,6 +66,8 @@
 		"myProfile": "Meu Perfil",
 		"apiKeys": "Chaves de API",
 		"logOut": "Sair",
-		"loggingOut": "Saindo…"
+		"loggingOut": "Saindo…",
+		"switchWorkspace": "Mudar espaço de trabalho",
+		"switchAccount": "Trocar de conta"
 	}
 }

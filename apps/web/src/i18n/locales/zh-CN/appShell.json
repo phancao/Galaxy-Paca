@@ -66,6 +66,8 @@
 		"myProfile": "个人资料",
 		"apiKeys": "API 密钥",
 		"logOut": "退出登录",
-		"loggingOut": "正在退出登录…"
+		"loggingOut": "正在退出登录…",
+		"switchWorkspace": "切换工作区",
+		"switchAccount": "切换账号"
 	}
 }

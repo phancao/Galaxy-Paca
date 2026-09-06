@@ -66,6 +66,8 @@
 		"myProfile": "マイプロフィール",
 		"apiKeys": "APIキー",
 		"logOut": "ログアウト",
-		"loggingOut": "ログアウト中…"
+		"loggingOut": "ログアウト中…",
+		"switchWorkspace": "ワークスペースを変更",
+		"switchAccount": "アカウントを切り替え"
 	}
 }

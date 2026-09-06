@@ -1,6 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { ChevronsUpDown, Key, Languages, LogOut, User } from "lucide-react";
+import {
+	Building2,
+	ChevronsUpDown,
+	Key,
+	Languages,
+	LogOut,
+	User,
+	UsersRound,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -36,6 +44,12 @@ function getInitials(name: string): string {
 		.slice(0, 2);
 }
 
+/**
+ * Origin portal. Cùng giá trị mà galaxy-dock.tsx và màn đăng nhập đã dùng —
+ * ba chỗ nói cùng một câu, và không chỗ nào lặng lẽ biến mất khi thiếu cấu hình.
+ */
+const PORTAL_ORIGIN = "https://ai.skyplatform.net";
+
 export function UserMenu() {
 	const { t } = useTranslation("appShell");
 	const navigate = useNavigate();
@@ -65,6 +79,30 @@ export function UserMenu() {
 
 	const displayName = user.full_name || user.username;
 	const initials = getInitials(displayName);
+
+	/**
+	 * Rời Paca sang portal: đổi NƠI LÀM VIỆC hoặc đổi DANH TÍNH.
+	 *
+	 * Cùng trình tự dọn dẹp như handleLogout ngay dưới, và vì đúng lý do đã ghi
+	 * ở đó: để lại phiên thì lúc quay về, Paca vẫn mở tenant cũ với danh tính
+	 * cũ và người dùng thấy một màn hình nói rằng chẳng có gì thay đổi.
+	 *
+	 * Cố ý KHÔNG đi qua /auth/logout của identity: nó kết thúc luôn phiên
+	 * Zitadel, mà phiên ấy chính là thứ giữ nhiều danh tính song song để chọn.
+	 */
+	const leaveToPortal = async (target: string) => {
+		setIsLoggingOut(true);
+		try {
+			await logout();
+			queryClient.clear();
+			window.location.assign(target);
+		} finally {
+			setIsLoggingOut(false);
+		}
+	};
+
+	const backHere = () =>
+		window.location.origin + window.location.pathname + window.location.search;
 
 	const handleLogout = async () => {
 		setIsLoggingOut(true);
@@ -148,6 +186,34 @@ export function UserMenu() {
 								<LocaleRadioGroup value={locale} onValueChange={setLocale} />
 							</DropdownMenuSubContent>
 						</DropdownMenuSub>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem
+							onClick={() =>
+								void leaveToPortal(
+									`${PORTAL_ORIGIN}/nexus/switch-workspace?return_url=${encodeURIComponent(backHere())}`,
+								)
+							}
+							disabled={isLoggingOut}
+						>
+							<Building2 className="size-4" />
+							{t("userMenu.switchWorkspace")}
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							onClick={() =>
+								void leaveToPortal(
+									// KHÔNG kèm `tenant`: ghim org Zitadel theo tenant thì danh
+									// sách chỉ còn danh tính của org ấy — đúng cái vòng người
+									// dùng đang muốn bước ra.
+									`${PORTAL_ORIGIN}/api/identity/auth/sso/zitadel/init?prompt=select_account&redirect_uri=${encodeURIComponent(
+										`${PORTAL_ORIGIN}/auth/callback?return_url=${encodeURIComponent(backHere())}`,
+									)}`,
+								)
+							}
+							disabled={isLoggingOut}
+						>
+							<UsersRound className="size-4" />
+							{t("userMenu.switchAccount")}
+						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							variant="destructive"

@@ -66,6 +66,8 @@
 		"myProfile": "내 프로필",
 		"apiKeys": "API 키",
 		"logOut": "로그아웃",
-		"loggingOut": "로그아웃 중…"
+		"loggingOut": "로그아웃 중…",
+		"switchWorkspace": "워크스페이스 변경",
+		"switchAccount": "계정 전환"
 	}
 }

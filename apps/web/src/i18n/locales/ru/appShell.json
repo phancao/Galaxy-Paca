@@ -66,6 +66,8 @@
 		"myProfile": "Мой профиль",
 		"apiKeys": "API-ключи",
 		"logOut": "Выйти",
-		"loggingOut": "Выход…"
+		"loggingOut": "Выход…",
+		"switchWorkspace": "Сменить рабочее пространство",
+		"switchAccount": "Сменить аккаунт"
 	}
 }

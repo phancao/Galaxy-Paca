@@ -66,6 +66,8 @@
 		"myProfile": "Mon profil",
 		"apiKeys": "Clés API",
 		"logOut": "Se déconnecter",
-		"loggingOut": "Déconnexion en cours…"
+		"loggingOut": "Déconnexion en cours…",
+		"switchWorkspace": "Changer d'espace de travail",
+		"switchAccount": "Changer de compte"
 	}
 }

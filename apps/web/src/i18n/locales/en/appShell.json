@@ -82,6 +82,8 @@
 		"myProfile": "My Profile",
 		"apiKeys": "API Keys",
 		"logOut": "Log out",
-		"loggingOut": "Logging out…"
+		"loggingOut": "Logging out…",
+		"switchWorkspace": "Change workspace",
+		"switchAccount": "Switch account"
 	}
 }

@@ -82,6 +82,8 @@
 		"myProfile": "Hồ sơ của tôi",
 		"apiKeys": "Khóa API",
 		"logOut": "Đăng xuất",
-		"loggingOut": "Đang đăng xuất…"
+		"loggingOut": "Đang đăng xuất…",
+		"switchWorkspace": "Đổi nơi làm việc",
+		"switchAccount": "Đổi tài khoản"
 	}
 }
