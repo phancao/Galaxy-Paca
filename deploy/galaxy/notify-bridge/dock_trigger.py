@@ -51,6 +51,7 @@ import logging
 import os
 import signal
 import socket
+import threading
 import time
 import uuid as uuidlib
 from dataclasses import dataclass
@@ -459,7 +460,9 @@ class DockTrigger(bridge_lib.Bridge):
 def main() -> int:
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        # Threads are named after their tenant, so %(threadName)s is what
+        # tells eight otherwise identical lines apart.
+        format="%(asctime)s %(levelname)s %(name)s [%(threadName)s] %(message)s",
     )
     triggers = [
         DockTrigger(tenant=code, valkey_url=valkey, database_url=db)
@@ -487,10 +490,14 @@ def main() -> int:
         triggers[0].agentops_url, sorted(triggers[0].trigger_usernames),
     )
     if len(triggers) == 1:
+        # Runs on the main thread, so name it too — otherwise the one
+        # tenant's lines would read "MainThread" while the many-tenant
+        # case reads its code.
+        threading.current_thread().name = (
+            f"dock-{triggers[0].tenant or 'default'}"
+        )
         triggers[0].run()
         return 0
-
-    import threading
 
     threads = []
     for t in triggers:

@@ -64,6 +64,7 @@ import os
 import re
 import signal
 import socket
+import threading
 import time
 import uuid as uuidlib
 from dataclasses import dataclass
@@ -712,7 +713,9 @@ class Bridge:
 def main() -> int:
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        # Threads are named after their tenant, so %(threadName)s is what
+        # tells eight otherwise identical lines apart.
+        format="%(asctime)s %(levelname)s %(name)s [%(threadName)s] %(message)s",
     )
     bridges = [
         Bridge(tenant=code, valkey_url=valkey, database_url=db)
@@ -748,10 +751,14 @@ def main() -> int:
     # Valkey, so they do not contend; a crash in one must not take the others
     # down, which is why each run() is wrapped rather than left to propagate.
     if len(bridges) == 1:
+        # Runs on the main thread, so name it too — otherwise the one
+        # tenant's lines would read "MainThread" while the many-tenant
+        # case reads its code.
+        threading.current_thread().name = (
+            f"bridge-{bridges[0].tenant or 'default'}"
+        )
         bridges[0].run()
         return 0
-
-    import threading
 
     threads = []
     for b in bridges:
