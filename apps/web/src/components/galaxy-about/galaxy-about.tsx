@@ -1,6 +1,6 @@
 "use client";
 
-// GalaxyAbout — the ONE About/EULA/License surface for every Galaxy app.
+// GalaxyAbout — the ONE About/EULA/License surface for every app.
 //
 // CANONICAL COPY: Galaxy-Nexus/packages/galaxy-about/galaxy-about.tsx
 // Apps embed a copy of this file (cross-repo imports don't survive each app's
@@ -244,7 +244,7 @@ function EulaSection() {
 				Thỏa thuận cấp phép người dùng cuối (EULA)
 			</h3>
 			<p className="mt-1 text-xs opacity-60">
-				Áp dụng chung cho mọi ứng dụng thuộc nền tảng Galaxy Vortex.
+				Áp dụng chung cho mọi ứng dụng thuộc nền tảng Vortex.
 			</p>
 			<div className="mt-3 flex flex-col gap-3 leading-relaxed">
 				{EULA_VI.map(([h, body]) => (
