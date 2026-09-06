@@ -269,7 +269,10 @@ func (h *OIDCHandler) completeLogin(w http.ResponseWriter, r *http.Request, clai
 	}
 
 	h.auth.setTokenCookies(w, pair, pair.RefreshTTL)
-	h.log.Info("oidc: SSO login", "tenant", h.opts.Tenant, "user_id", user.ID, "username", user.Username)
+	// h.log is already scoped to this tenant by bootstrap, so naming the
+	// tenant again here emitted the key twice in one JSON object — which
+	// parser keeps which copy is anybody's guess.
+	h.log.Info("oidc: SSO login", "user_id", user.ID, "username", user.Username)
 	// Back to where they were headed before the login interrupted them. This
 	// used to be a hard-coded "/": following a deep link meant signing in and
 	// arriving at the home page, which reads as a login that did not work.
