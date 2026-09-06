@@ -22,7 +22,11 @@
 import Redis from "ioredis";
 import type { Logger } from "pino";
 import type { Server } from "socket.io";
-import { eventNamespace, projectRoomName } from "./permissions.ts";
+import {
+	eventNamespace,
+	projectRoomName,
+	userNotificationRoom,
+} from "./permissions.ts";
 
 // CHANNEL is the Valkey Pub/Sub channel the API publishes to.
 // Must stay in sync with events.ChannelRealtime in services/api.
@@ -37,7 +41,13 @@ interface RealtimeMessage {
 // createSubscriber connects a dedicated ioredis client in subscriber mode,
 // subscribes to CHANNEL, and wires incoming messages to Socket.IO rooms.
 // Returns the ioredis client so the caller can disconnect it on shutdown.
+// `tenant` is the workspace this connection speaks for. Every event that
+// arrives on it belongs to that workspace and nowhere else, because it is a
+// different Valkey database from every other tenant's — the tenant is not
+// read from the message, it is a property of the socket the message came in
+// on, and therefore cannot be spoofed by a payload.
 export function createSubscriber(
+	tenant: string,
 	valkeyUrl: string,
 	io: Server,
 	logger: Logger,
@@ -51,23 +61,23 @@ export function createSubscriber(
 	});
 
 	client.on("connect", () => {
-		logger.info("valkey subscriber connected");
+		logger.info({ tenant }, "valkey subscriber connected");
 	});
 
 	client.on("reconnecting", () => {
-		logger.warn("valkey subscriber reconnecting");
+		logger.warn({ tenant }, "valkey subscriber reconnecting");
 	});
 
 	client.on("error", (err: unknown) => {
-		logger.error({ err }, "valkey subscriber error");
+		logger.error({ tenant, err }, "valkey subscriber error");
 	});
 
 	client.subscribe(CHANNEL, (err, count) => {
 		if (err) {
-			logger.error({ err }, `failed to subscribe to ${CHANNEL}`);
+			logger.error({ tenant, err }, `failed to subscribe to ${CHANNEL}`);
 		} else {
 			logger.info(
-				{ channel: CHANNEL, subscriptions: count },
+				{ tenant, channel: CHANNEL, subscriptions: count },
 				"subscribed to valkey channel",
 			);
 		}
@@ -82,13 +92,18 @@ export function createSubscriber(
 			return;
 		}
 
-		routeEvent(io, msg, logger);
+		routeEvent(tenant, io, msg, logger);
 	});
 
 	return client;
 }
 
-function routeEvent(io: Server, msg: RealtimeMessage, logger: Logger): void {
+function routeEvent(
+	tenant: string,
+	io: Server,
+	msg: RealtimeMessage,
+	logger: Logger,
+): void {
 	const { type } = msg;
 	const payload = eventPayload(msg);
 	if (!payload) {
@@ -106,8 +121,8 @@ function routeEvent(io: Server, msg: RealtimeMessage, logger: Logger): void {
 			);
 			return;
 		}
-		const room = `user:${recipientUserId}:notifications`;
-		logger.debug({ type, room }, "routing notification to user room");
+		const room = userNotificationRoom(tenant, recipientUserId);
+		logger.debug({ tenant, type, room }, "routing notification to user room");
 		io.to(room).emit("notification", { type, payload });
 		return;
 	}
@@ -126,8 +141,8 @@ function routeEvent(io: Server, msg: RealtimeMessage, logger: Logger): void {
 		return;
 	}
 
-	const room = projectRoomName(projectId, ns);
-	logger.debug({ type, room }, "routing event to room");
+	const room = projectRoomName(tenant, projectId, ns);
+	logger.debug({ tenant, type, room }, "routing event to room");
 	io.to(room).emit("event", { type, payload });
 }
 

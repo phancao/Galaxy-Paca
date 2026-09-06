@@ -1,8 +1,24 @@
-# Instance-per-tenant Paca (ADR-038 T7)
+# Instance-per-tenant Paca (ADR-038 T7) — the ALTERNATIVE path
+
+> **Read this first (amended 07/09/2026).** This is no longer the default way
+> to add a tenant. The default is **one process, one database per tenant**:
+> add the code to `PACA_TENANTS` on the shared stack and the database, schema
+> and seed roles appear on the next start. See ADR-038 T7.
+>
+> Both shapes give the SAME data isolation — a separate database either way.
+> They differ in what else must exist per tenant. This one needs a hostname, a
+> DNS record, a Cloudflare ingress rule and its own OIDC client; and because
+> the portal launcher stores one address per application, a tenant deployed
+> this way also needs its tile pointed somewhere else, which the platform
+> cannot express today.
+>
+> **Use this path when a tenant needs its own blast radius at the process
+> level** — a regulator asking for separate infrastructure, a different
+> upgrade cadence, or a contract that says so. Otherwise use `PACA_TENANTS`.
 
 Paca upstream has no tenant column — every table assumes one organization.
 Rather than retrofitting RLS across the whole schema (the ADR-036 path for
-multi-tenant-aware apps), ADR-038 T7 isolates tenants at the *stack* level:
+multi-tenant-aware apps), this path isolates tenants at the *stack* level:
 **one full Paca stack per tenant, same repo, same images, same compose
 files** — only the env file and the Docker Compose *project name* differ.
 Hard isolation (separate Postgres, Valkey, MinIO, gateway) with zero fork

@@ -329,9 +329,21 @@ into Paca (`email`+`oidc_sub`) by an out-of-band reconcile job
 (`galaxy-app-admin-reconcile` → `reconcile/paca_user_sync.py`, in the
 Galaxy-Authz repo — **not** this stack), hard-guarded to the `galaxy` tenant and
 never touching `is_service=true` accounts (`deploy/galaxy/README.md:44-64`).
-A per-instance-per-tenant deploy is anticipated (`GATEWAY_NETWORK_ALIAS` →
-`paca-<tenant>-gateway`, `docker-compose.galaxy.yml:335-347`) but not the
-current pilot topology.
+**Amended 07/09/2026 — one process, one database per tenant.** `PACA_TENANTS`
+lists the tenants a single API serves; each gets its own Postgres database,
+Valkey logical database and bucket, and the primary keeps the bare
+`DATABASE_URL`/`REDIS_URL`/`STORAGE_BUCKET` it already runs on. Requests route
+by the `tenant` claim, and every tenant graph re-verifies it, so a session
+cannot cross workspaces. See ADR-038 T7.
+
+Instance-per-tenant is still supported (`GATEWAY_NETWORK_ALIAS` →
+`paca-<tenant>-gateway`, `deploy/galaxy/tenant-template/`) for a tenant that
+needs its own process-level blast radius.
+
+⚠️ The out-of-band reconcile above still pre-links only the `galaxy` tenant.
+Users of the other tenants are created on first login by
+`OIDC_AUTO_CREATE_USERS`, which is how they get an account at all — extending
+the reconcile to the remaining tenants is a separate change in Galaxy-Authz.
 
 ---
 

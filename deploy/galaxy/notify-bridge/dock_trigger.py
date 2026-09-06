@@ -157,9 +157,17 @@ def build_prompt(job: TriggerJob, base_url: str) -> str:
 class DockTrigger(bridge_lib.Bridge):
     """Reuses the Bridge's lazy connections/resolvers; own group + handling."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.consumer = f"{CONSUMER_GROUP}.{socket.gethostname() or uuidlib.uuid4()}"
+    def __init__(
+        self, tenant: str = "", valkey_url: str = "", database_url: str = ""
+    ) -> None:
+        super().__init__(
+            tenant=tenant, valkey_url=valkey_url, database_url=database_url
+        )
+        host = socket.gethostname() or str(uuidlib.uuid4())
+        # Per tenant, for the same reason as the bridge: two readers sharing a
+        # consumer name look like one consumer resuming, and would inherit
+        # each other's pending ids on a database where those ids mean nothing.
+        self.consumer = f"{CONSUMER_GROUP}.{host}" + (f".{tenant}" if tenant else "")
         self.trigger_usernames = {
             u.strip().lower()
             for u in os.getenv("DOCK_AGENT_TRIGGER_USERNAMES", "galaxy-tasks-agent").split(",")
@@ -453,28 +461,56 @@ def main() -> int:
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    trigger = DockTrigger()
+    triggers = [
+        DockTrigger(tenant=code, valkey_url=valkey, database_url=db)
+        for code, valkey, db in bridge_lib.tenant_connections()
+    ]
 
     def _stop(signum: int, _frame: Any) -> None:
         log.info("signal %d — stopping", signum)
-        trigger.stopping = True
+        for t in triggers:
+            t.stopping = True
 
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 
     if os.getenv("DOCK_TRIGGER_ENABLED", "false").strip().lower() != "true":
         log.info("DOCK_TRIGGER_ENABLED != true — dock-trigger idle")
-        while not trigger.stopping:
+        while not triggers[0].stopping:
             time.sleep(5)
         return 0
 
     log.info(
-        "starting: streams=%s,%s group=%s agentops=%s trigger_usernames=%s",
+        "starting: tenants=%s streams=%s,%s group=%s agentops=%s trigger_usernames=%s",
+        [t.tenant or "(default)" for t in triggers],
         STREAM_ASSIGNMENTS, STREAM_PLUGIN_EVENTS, CONSUMER_GROUP,
-        trigger.agentops_url, sorted(trigger.trigger_usernames),
+        triggers[0].agentops_url, sorted(triggers[0].trigger_usernames),
     )
-    trigger.run()
+    if len(triggers) == 1:
+        triggers[0].run()
+        return 0
+
+    import threading
+
+    threads = []
+    for t in triggers:
+        th = threading.Thread(
+            target=_run_guarded, args=(t,), name=f"dock-{t.tenant or 'default'}",
+            daemon=True,
+        )
+        th.start()
+        threads.append(th)
+    for th in threads:
+        while th.is_alive():
+            th.join(timeout=1.0)
     return 0
+
+
+def _run_guarded(trigger: "DockTrigger") -> None:
+    try:
+        trigger.run()
+    except Exception:  # noqa: BLE001 — one tenant failing must not silence the rest
+        log.exception("dock-trigger for tenant %r stopped", trigger.tenant or "default")
 
 
 if __name__ == "__main__":

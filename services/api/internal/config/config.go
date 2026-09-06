@@ -32,7 +32,57 @@ type Config struct {
 	// Wiki configures the Wiki-backed Documentation surface (ADR-042).
 	// Empty APIURL/APIToken disables it (routes stay unregistered).
 	Wiki WikiConfig
-	Env  string // development | production
+	// Tenants are the Vortex tenants this ONE process serves, in declaration
+	// order; the first is the primary. Never empty — a deployment with no
+	// OIDC still gets a single tenant so there is exactly one shape of the
+	// code to reason about, not two.
+	Tenants []TenantConfig
+	Env     string // development | production
+}
+
+// TenantConfig names one tenant and the three connections that ARE its
+// isolation: its database, its Valkey logical database, and its object
+// storage bucket. Nothing else about a tenant is configurable, because
+// nothing else about a tenant differs — same schema, same code, same
+// migrations. Tenancy in Paca is a choice of connection, not a column.
+//
+// The PRIMARY tenant keeps the bare, unsuffixed values the deployment
+// already runs on (DATABASE_URL, REDIS_URL, STORAGE_BUCKET verbatim), so
+// turning multi-tenancy on moves nobody's data. Additional tenants get
+// suffixed names derived from the same base.
+type TenantConfig struct {
+	// Code is the Vortex tenant code, lowercase, e.g. "galaxy".
+	Code string
+	// DSN is this tenant's Postgres database.
+	DSN string
+	// RedisURL is this tenant's Valkey URL, differing from the others only
+	// in the logical database index. Separate indexes keep every stream and
+	// channel constant in internal/events untouched: two tenants publishing
+	// to "paca.task_activities" never see each other because they are not
+	// talking to the same database.
+	RedisURL string
+	// Bucket is this tenant's object storage bucket.
+	Bucket string
+}
+
+// Primary returns the tenant a request falls back to when it names none —
+// health checks, the login redirect, static errors.
+func (c *Config) Primary() TenantConfig {
+	if len(c.Tenants) == 0 {
+		return TenantConfig{}
+	}
+	return c.Tenants[0]
+}
+
+// Tenant returns the configuration for code, and whether this deployment
+// serves it at all.
+func (c *Config) Tenant(code string) (TenantConfig, bool) {
+	for _, t := range c.Tenants {
+		if t.Code == code {
+			return t, true
+		}
+	}
+	return TenantConfig{}, false
 }
 
 // WikiConfig configures the Galaxy AI Wiki integration (ADR-042): Paca

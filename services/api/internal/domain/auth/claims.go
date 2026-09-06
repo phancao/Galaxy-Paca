@@ -24,4 +24,16 @@ type Claims struct {
 	// AgentID is optionally set when authenticating via agent API key with
 	// X-Agent-ID header to identify which agent is performing the action.
 	AgentID *string `json:"agent_id,omitempty"`
+	// Tenant names the workspace this session belongs to. One process serves
+	// several tenants, each with its own database, so the claim is what tells
+	// a request which one to go to.
+	//
+	// It is read UNVERIFIED to pick the tenant, and then verified twice over:
+	// the signature covers it, and that tenant's own middleware refuses a
+	// token naming anyone else. Flipping it therefore buys nothing — the
+	// forged request lands in a graph whose verification it cannot pass.
+	//
+	// Empty on tokens minted before this claim existed; those belong to the
+	// primary tenant, which is where they were issued.
+	Tenant string `json:"tenant,omitempty"`
 }

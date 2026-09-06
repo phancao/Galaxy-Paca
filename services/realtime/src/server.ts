@@ -51,6 +51,7 @@ import {
 	hasProjectPermission,
 	NAMESPACE_PERMISSIONS,
 	projectRoomName,
+	userNotificationRoom,
 } from "./permissions.ts";
 import {
 	deleteSession,
@@ -63,6 +64,7 @@ import {
 declare module "socket.io" {
 	interface SocketData {
 		userId: string;
+		tenant: string;
 		username: string;
 		// rawToken is kept in memory only (never persisted) so the socket can
 		// re-call the API when joining a project room.
@@ -138,6 +140,7 @@ export function createSocketServer(
 			// (e.g. project join calls).  The raw token is NEVER written to Valkey.
 			socket.data.userId = authResult.userId;
 			socket.data.username = authResult.username;
+			socket.data.tenant = authResult.tenant;
 			socket.data.rawToken = token;
 
 			next();
@@ -150,16 +153,17 @@ export function createSocketServer(
 	// ── Connection lifecycle ───────────────────────────────────────────────────
 
 	io.on("connection", (socket) => {
-		const { userId, username } = socket.data;
-		logger.info({ userId, username, socketId: socket.id }, "client connected");
+		const { userId, username, tenant } = socket.data;
+		logger.info(
+			{ tenant, userId, username, socketId: socket.id },
+			"client connected",
+		);
 
 		// Auto-join the user's personal notification room so notification.* events
 		// can be delivered without an explicit join from the client.
-		socket.join(`user:${userId}:notifications`);
-		logger.debug(
-			{ userId, room: `user:${userId}:notifications` },
-			"joined user notification room",
-		);
+		const notifRoom = userNotificationRoom(tenant, userId);
+		socket.join(notifRoom);
+		logger.debug({ tenant, userId, room: notifRoom }, "joined user notification room");
 
 		// Join namespace-scoped rooms for a project.  Fetches project permissions
 		// once and joins only the rooms the user is allowed to see:
@@ -192,7 +196,7 @@ export function createSocketServer(
 					NAMESPACE_PERMISSIONS,
 				)) {
 					if (hasProjectPermission(perms, requiredPerm)) {
-						socket.join(projectRoomName(projectId, ns as EventNamespace));
+						socket.join(projectRoomName(tenant, projectId, ns as EventNamespace));
 						joinedNamespaces.push(ns);
 					}
 				}
@@ -210,7 +214,7 @@ export function createSocketServer(
 			const projectId = data?.projectId;
 			if (!projectId || typeof projectId !== "string") return;
 			for (const ns of Object.keys(NAMESPACE_PERMISSIONS)) {
-				socket.leave(projectRoomName(projectId, ns as EventNamespace));
+				socket.leave(projectRoomName(tenant, projectId, ns as EventNamespace));
 			}
 			logger.debug({ userId, projectId }, "left project rooms");
 		});

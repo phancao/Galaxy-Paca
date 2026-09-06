@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -157,6 +158,20 @@ func Load() (*Config, error) {
 		}
 	}
 
+	// ADR-058, mở rộng: MỘT tiến trình phục vụ NHIỀU tenant.
+	//
+	// PACA_TENANTS liệt kê các tenant, tenant đầu tiên là tenant CHÍNH và
+	// mặc định là OIDC_TENANT. Tenant chính giữ nguyên xi ba giá trị mà bản
+	// triển khai đang chạy — DATABASE_URL, REDIS_URL, STORAGE_BUCKET nguyên
+	// văn — nên bật đa tenant KHÔNG dời dữ liệu của ai. Tenant thêm vào lấy
+	// tên dẫn xuất từ chính ba giá trị ấy.
+	//
+	// Có thể ghi đè từng tenant khi tên dẫn xuất không hợp:
+	//   PACA_TENANT_DSN_<CODE>     PACA_TENANT_REDIS_<CODE>
+	//   PACA_TENANT_BUCKET_<CODE>
+	tenants, tenantErrs := buildTenants(oidcTenant, dsn, redisURL, env("STORAGE_BUCKET", "paca"))
+	errs = append(errs, tenantErrs...)
+
 	// ADR-058 D7: with SSO configured the password door is closed unless the
 	// operator opens it explicitly; without SSO it is the only door.
 	localLoginDefault := "true"
@@ -293,7 +308,153 @@ func Load() (*Config, error) {
 			APIToken:  env("WIKI_API_TOKEN", ""),
 			PublicURL: env("WIKI_PUBLIC_URL", ""),
 		},
+		Tenants: tenants,
 	}, nil
+}
+
+// buildTenants turns PACA_TENANTS into one TenantConfig per tenant.
+//
+// The primary tenant is the list's first entry and keeps baseDSN, baseRedis
+// and baseBucket verbatim. Every other tenant gets a derived name — database
+// `<base>_<code>`, Valkey logical database index N, bucket `<base>-<code>` —
+// unless an explicit override says otherwise.
+//
+// Deliberately strict: an unparseable DSN or a tenant list longer than the
+// Valkey index space is a startup error, not a warning. A tenant silently
+// sharing another tenant's database is the one failure this whole design
+// exists to prevent, so it must not be reachable by misconfiguration.
+func buildTenants(primary, baseDSN, baseRedis, baseBucket string) ([]TenantConfig, []error) {
+	var errs []error
+
+	codes := splitList(env("PACA_TENANTS", primary))
+	if len(codes) == 0 {
+		// No OIDC and no tenant list: one NAMELESS tenant holding the bare
+		// values. Deliberately not an error — the rest of the code then has
+		// exactly one shape to reason about, never "zero or more".
+		codes = []string{""}
+	}
+	if primary != "" {
+		// The OIDC tenant is the primary whatever order the list is written
+		// in — it is the one holding the data that already exists.
+		codes = moveToFront(codes, primary)
+		if !containsStr(codes, primary) {
+			codes = append([]string{primary}, codes...)
+		}
+	}
+
+	seen := map[string]bool{}
+	out := make([]TenantConfig, 0, len(codes))
+	for i, code := range codes {
+		// An empty code is legitimate ONLY as the single nameless tenant of
+		// a deployment with no SSO; anywhere else it is a stray comma.
+		if seen[code] || (code == "" && i > 0) {
+			continue
+		}
+		seen[code] = true
+		t := TenantConfig{Code: code}
+		up := strings.ToUpper(strings.ReplaceAll(code, "-", "_"))
+
+		if v := env("PACA_TENANT_DSN_"+up, ""); v != "" {
+			t.DSN = v
+		} else if i == 0 {
+			t.DSN = baseDSN
+		} else {
+			d, err := deriveDSN(baseDSN, code)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("config: tenant %q: %w", code, err))
+				continue
+			}
+			t.DSN = d
+		}
+
+		if v := env("PACA_TENANT_REDIS_"+up, ""); v != "" {
+			t.RedisURL = v
+		} else if i == 0 {
+			t.RedisURL = baseRedis
+		} else {
+			rd, err := deriveRedisDB(baseRedis, i)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("config: tenant %q: %w", code, err))
+				continue
+			}
+			t.RedisURL = rd
+		}
+
+		if v := env("PACA_TENANT_BUCKET_"+up, ""); v != "" {
+			t.Bucket = v
+		} else if i == 0 {
+			t.Bucket = baseBucket
+		} else {
+			t.Bucket = baseBucket + "-" + code
+		}
+
+		out = append(out, t)
+	}
+	if len(out) == 0 {
+		errs = append(errs, fmt.Errorf("config: PACA_TENANTS resolved to no tenant at all"))
+	}
+	return out, errs
+}
+
+// deriveDSN returns baseDSN pointing at the database `<name>_<code>`.
+func deriveDSN(baseDSN, code string) (string, error) {
+	u, err := url.Parse(baseDSN)
+	if err != nil {
+		return "", fmt.Errorf("DATABASE_URL is not a URL: %w", err)
+	}
+	name := strings.TrimPrefix(u.Path, "/")
+	if name == "" {
+		return "", fmt.Errorf("DATABASE_URL names no database")
+	}
+	u.Path = "/" + name + "_" + strings.ReplaceAll(code, "-", "_")
+	return u.String(), nil
+}
+
+// deriveRedisDB returns baseRedis pointing at logical database `index`.
+// Valkey ships 16 by default; asking for more is refused here rather than
+// discovered as a runtime SELECT error under load.
+func deriveRedisDB(baseRedis string, index int) (string, error) {
+	if index > 15 {
+		return "", fmt.Errorf("more tenants than Valkey logical databases (index %d > 15); give this tenant an explicit PACA_TENANT_REDIS_<CODE>", index)
+	}
+	u, err := url.Parse(baseRedis)
+	if err != nil {
+		return "", fmt.Errorf("REDIS_URL is not a URL: %w", err)
+	}
+	u.Path = "/" + strconv.Itoa(index)
+	return u.String(), nil
+}
+
+func splitList(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.ToLower(strings.TrimSpace(p)); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func containsStr(list []string, want string) bool {
+	for _, v := range list {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
+func moveToFront(list []string, want string) []string {
+	out := make([]string, 0, len(list))
+	for _, v := range list {
+		if v == want {
+			out = append([]string{v}, out...)
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
 }
 
 // env returns the environment variable value or a fallback default.

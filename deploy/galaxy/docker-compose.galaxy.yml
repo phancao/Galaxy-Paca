@@ -56,10 +56,20 @@ services:
       OIDC_AUTO_CREATE_USERS: ${OIDC_AUTO_CREATE_USERS:-true}
       OIDC_DEFAULT_ROLE: ${OIDC_DEFAULT_ROLE:-USER}
       OIDC_BUTTON_LABEL: ${OIDC_BUTTON_LABEL:-Sign in with Vortex}
-      # ADR-058 Đợt 4: the ONE tenant this deployment serves — the callback
-      # refuses an id_token whose chosen tenant differs. Required with
-      # OIDC_ISSUER (the API refuses to boot without it).
+      # ADR-058 Đợt 4: the PRIMARY tenant — the one already holding this
+      # deployment's data. Required with OIDC_ISSUER (the API refuses to boot
+      # without it), and it keeps DATABASE_URL/REDIS_URL/STORAGE_BUCKET
+      # verbatim so turning multi-tenancy on moves nobody.
       OIDC_TENANT: ${OIDC_TENANT:-}
+      # Every tenant this ONE process serves, comma-separated, primary first
+      # (it is moved to the front anyway). Each gets its own database, its own
+      # Valkey logical database and its own bucket, derived from the three
+      # above; a tenant not listed here is refused at login with a page
+      # naming the workspaces this deployment does serve.
+      #
+      # Unset = just OIDC_TENANT, i.e. exactly the single-tenant deployment
+      # this used to be.
+      PACA_TENANTS: ${PACA_TENANTS:-}
       # Password door: only registered when true. Unset = false whenever OIDC
       # is configured (break-glass by env, D7).
       AUTH_LOCAL_LOGIN_ENABLED: ${AUTH_LOCAL_LOGIN_ENABLED:-}
@@ -116,6 +126,13 @@ services:
   realtime:
     mem_limit: 512m
     memswap_limit: 512m
+    environment:
+      # Same list the API reads, from the same environment: realtime opens one
+      # subscriber per tenant on the matching Valkey database. If the two ever
+      # disagree the API publishes where nobody is listening and live updates
+      # stop — noticeable, unlike delivering to the wrong workspace.
+      PACA_TENANTS: ${PACA_TENANTS:-}
+      OIDC_TENANT: ${OIDC_TENANT:-}
 
   # Mediates the ai-agent's Docker access (ADR-038): the raw docker.sock is
   # mounted read-only HERE only, and ai-agent talks to it over tcp with just
@@ -211,6 +228,9 @@ services:
       BRIDGE_ENABLED: ${BRIDGE_ENABLED:-false}
       PACA_VALKEY_URL: ${PACA_VALKEY_URL:-redis://valkey:6379/0}
       PACA_DATABASE_URL: ${PACA_DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      # One consumer loop per tenant, on that tenant's own Valkey + database.
+      PACA_TENANTS: ${PACA_TENANTS:-}
+      OIDC_TENANT: ${OIDC_TENANT:-}
       GALAXY_NOTIFY_REDIS_URL: ${GALAXY_NOTIFY_REDIS_URL:-redis://agentops-redis:6379/0}
       NOTIFY_FANOUT_CHANNEL: ${NOTIFY_FANOUT_CHANNEL:-notify.fan-out}
       PACA_PUBLIC_URL: ${PUBLIC_URL:-https://tasks.skyplatform.net}
@@ -254,6 +274,9 @@ services:
       DOCK_TRIGGER_TIMEOUT_S: ${DOCK_TRIGGER_TIMEOUT_S:-300}
       PACA_VALKEY_URL: ${PACA_VALKEY_URL:-redis://valkey:6379/0}
       PACA_DATABASE_URL: ${PACA_DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      # One consumer loop per tenant, on that tenant's own Valkey + database.
+      PACA_TENANTS: ${PACA_TENANTS:-}
+      OIDC_TENANT: ${OIDC_TENANT:-}
       PACA_PUBLIC_URL: ${PUBLIC_URL:-https://tasks.skyplatform.net}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:

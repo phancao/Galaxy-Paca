@@ -21,12 +21,29 @@ export const NAMESPACE_PERMISSIONS: Record<EventNamespace, string> = {
 	workflows: "workflows.read",
 };
 
+// Every room name begins with the tenant it belongs to.
+//
+// Project and user ids are UUIDs, so two tenants would almost certainly never
+// collide by accident — and "almost certainly never" is not isolation, it is
+// a coincidence we would be relying on. One process now fans out events for
+// several workspaces over one Socket.IO server; the tenant in the room name
+// is what makes a cross-tenant delivery impossible rather than improbable.
+export function tenantRoomPrefix(tenant: string): string {
+	return tenant ? `t:${tenant}|` : "";
+}
+
 // projectRoomName returns the Socket.IO room name for a project + namespace pair.
 export function projectRoomName(
+	tenant: string,
 	projectId: string,
 	namespace: EventNamespace,
 ): string {
-	return `project:${projectId}:${namespace}`;
+	return `${tenantRoomPrefix(tenant)}project:${projectId}:${namespace}`;
+}
+
+// userNotificationRoom returns the room a person's notifications land in.
+export function userNotificationRoom(tenant: string, userId: string): string {
+	return `${tenantRoomPrefix(tenant)}user:${userId}:notifications`;
 }
 
 // eventNamespace infers the namespace from the event type prefix.

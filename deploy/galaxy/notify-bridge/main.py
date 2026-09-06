@@ -440,21 +440,88 @@ WHERE pm.project_id = %s::uuid
 """
 
 
+def tenant_connections() -> list[tuple[str, str, str]]:
+    """(tenant, valkey_url, database_url) for every tenant this process serves.
+
+    Derived the same way services/api derives them, from the same environment:
+    the primary keeps PACA_VALKEY_URL and PACA_DATABASE_URL verbatim, and each
+    further tenant moves to the next Valkey logical database and to the
+    database named `<base>_<tenant>`.
+
+    Both sides reading PACA_TENANTS is what keeps them pointed at the same
+    place. If they ever disagree the bridge listens where nothing is
+    published and notifications simply stop — which is noticeable, unlike
+    reading the wrong tenant's stream.
+    """
+    base_valkey = os.getenv("PACA_VALKEY_URL", "redis://valkey:6379/0")
+    base_db = os.getenv(
+        "PACA_DATABASE_URL",
+        "postgres://paca:changeme@postgres:5432/paca?sslmode=disable",
+    )
+    codes = [c.strip().lower() for c in os.getenv("PACA_TENANTS", "").split(",")]
+    codes = [c for c in codes if c]
+    primary = os.getenv("OIDC_TENANT", "").strip().lower()
+    if primary:
+        codes = [primary] + [c for c in codes if c != primary]
+    if not codes:
+        return [("", base_valkey, base_db)]
+
+    out: list[tuple[str, str, str]] = []
+    for i, code in enumerate(codes):
+        if i == 0:
+            out.append((code, base_valkey, base_db))
+            continue
+        up = code.replace("-", "_").upper()
+        valkey = os.getenv(f"PACA_TENANT_REDIS_{up}") or _with_redis_db(base_valkey, i)
+        db = os.getenv(f"PACA_TENANT_DSN_{up}") or _with_db_suffix(base_db, code)
+        out.append((code, valkey, db))
+    return out
+
+
+def _with_redis_db(url: str, index: int) -> str:
+    from urllib.parse import urlparse, urlunparse
+
+    p = urlparse(url)
+    return urlunparse(p._replace(path=f"/{index}"))
+
+
+def _with_db_suffix(dsn: str, code: str) -> str:
+    from urllib.parse import urlparse, urlunparse
+
+    p = urlparse(dsn)
+    name = p.path.lstrip("/")
+    return urlunparse(p._replace(path=f"/{name}_{code.replace('-', '_')}"))
+
+
 class Bridge:
     """Wires the pure mapping onto real Valkey/Postgres/Redis connections."""
 
-    def __init__(self) -> None:
-        self.paca_valkey_url = os.getenv("PACA_VALKEY_URL", "redis://valkey:6379/0")
+    def __init__(
+        self, tenant: str = "", valkey_url: str = "", database_url: str = ""
+    ) -> None:
+        # One bridge per tenant, each reading that tenant's own Valkey and
+        # database. The arguments exist so the caller can say which; leaving
+        # them empty keeps the original single-tenant behaviour, which is
+        # exactly what a deployment with one tenant still wants.
+        self.tenant = tenant
+        self.paca_valkey_url = valkey_url or os.getenv(
+            "PACA_VALKEY_URL", "redis://valkey:6379/0"
+        )
         self.galaxy_redis_url = os.getenv(
             "GALAXY_NOTIFY_REDIS_URL", "redis://agentops-redis:6379/0"
         )
         self.channel = os.getenv("NOTIFY_FANOUT_CHANNEL", "notify.fan-out")
-        self.database_url = os.getenv(
+        self.database_url = database_url or os.getenv(
             "PACA_DATABASE_URL",
             "postgres://paca:changeme@postgres:5432/paca?sslmode=disable",
         )
         self.public_url = os.getenv("PACA_PUBLIC_URL", "https://tasks.skyplatform.net")
-        self.consumer = f"{CONSUMER_GROUP}.{socket.gethostname() or uuidlib.uuid4()}"
+        host = socket.gethostname() or str(uuidlib.uuid4())
+        # The consumer name must differ per tenant: two bridges in one process
+        # reading with the SAME name would be treated by Valkey as one
+        # consumer resuming, and each would inherit the other's pending
+        # entries — on a different database, where those ids mean nothing.
+        self.consumer = f"{CONSUMER_GROUP}.{host}" + (f".{tenant}" if tenant else "")
         self._paca: Any = None
         self._galaxy: Any = None
         self._db: Any = None
@@ -647,11 +714,15 @@ def main() -> int:
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    bridge = Bridge()
+    bridges = [
+        Bridge(tenant=code, valkey_url=valkey, database_url=db)
+        for code, valkey, db in tenant_connections()
+    ]
 
     def _stop(signum: int, _frame: Any) -> None:
         log.info("signal %d — stopping", signum)
-        bridge.stopping = True
+        for b in bridges:
+            b.stopping = True
 
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
@@ -661,19 +732,46 @@ def main() -> int:
             "BRIDGE_ENABLED != true — bridge idle "
             "(set BRIDGE_ENABLED=true, or --scale notify-bridge=0 to remove)"
         )
-        while not bridge.stopping:
+        while not bridges[0].stopping:
             time.sleep(5)
         return 0
 
     log.info(
-        "starting: streams=%s,%s group=%s channel=%s",
+        "starting: tenants=%s streams=%s,%s group=%s channel=%s",
+        [b.tenant or "(default)" for b in bridges],
         STREAM_ASSIGNMENTS,
         STREAM_PLUGIN_EVENTS,
         CONSUMER_GROUP,
-        bridge.channel,
+        bridges[0].channel,
     )
-    bridge.run()
+    # One thread per tenant. Each blocks on XREADGROUP against its own
+    # Valkey, so they do not contend; a crash in one must not take the others
+    # down, which is why each run() is wrapped rather than left to propagate.
+    if len(bridges) == 1:
+        bridges[0].run()
+        return 0
+
+    import threading
+
+    threads = []
+    for b in bridges:
+        t = threading.Thread(
+            target=_run_guarded, args=(b,), name=f"bridge-{b.tenant or 'default'}",
+            daemon=True,
+        )
+        t.start()
+        threads.append(t)
+    for t in threads:
+        while t.is_alive():
+            t.join(timeout=1.0)
     return 0
+
+
+def _run_guarded(bridge: "Bridge") -> None:
+    try:
+        bridge.run()
+    except Exception:  # noqa: BLE001 — one tenant failing must not silence the rest
+        log.exception("bridge for tenant %r stopped", bridge.tenant or "default")
 
 
 if __name__ == "__main__":

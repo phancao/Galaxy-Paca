@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -72,6 +73,20 @@ type OIDCHandler struct {
 	auth        *AuthHandler // reused for session cookie writing
 	stateSecret []byte
 	log         *slog.Logger
+	// peers maps every tenant this PROCESS serves to that tenant's own
+	// handler. One process now serves several workspaces, and the callback
+	// is the one request that cannot know which one it belongs to until the
+	// id_token has been exchanged and verified — the answer is inside it.
+	// So whichever handler the router reaches finishes the login by handing
+	// it to the right peer.
+	peers map[string]*OIDCHandler
+}
+
+// WithPeers tells this handler which tenants the process serves, so a login
+// that turns out to belong to another one can be completed there instead of
+// refused. Called once at startup, after every tenant graph exists.
+func (h *OIDCHandler) WithPeers(peers map[string]*OIDCHandler) {
+	h.peers = peers
 }
 
 // NewOIDCHandler returns an OIDCHandler.  stateSecret signs the short-lived
@@ -197,23 +212,38 @@ func (h *OIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ADR-058 Đợt 4: the token names the tenant the person CHOSE at the
-	// portal. This deployment serves exactly one tenant, so anything else —
-	// or a token naming none — is refused here, before a local user exists.
+	// portal. A session naming none cannot be placed in any workspace.
 	tenant := effectiveTenant(claims)
 	if tenant == "" {
 		presenter.Error(w, r, apierr.New(apierr.CodeUnauthenticated, "TENANT_REQUIRED: the Vortex session names no tenant"))
 		return
 	}
+	// Finish the login in the tenant the person chose — its database, its
+	// users, its session. This handler may not be that tenant's: the router
+	// could not know which one to reach before the exchange, because the
+	// answer only exists inside the id_token it just verified.
+	target := h
 	if tenant != h.opts.Tenant {
-		h.log.Warn("oidc: tenant mismatch", "token_tenant", tenant, "deployment_tenant", h.opts.Tenant)
-		// Người dùng đang ở TRÌNH DUYỆT, giữa một lần đăng nhập. Trả JSON
-		// {"code":"FORBIDDEN"} ra màn hình là đúng sự thật mà vô dụng: nó
-		// không nói vì sao, và không có lối ra. Câu trả lời đúng là một
-		// trang nói rõ chuyện gì đã xảy ra kèm đường quay lại.
-		h.renderTenantMismatch(w, tenant)
-		return
+		peer, ok := h.peers[tenant]
+		if !ok {
+			// A workspace this deployment does not serve at all. Not the
+			// person's mistake — say which workspace this is and offer the
+			// way back, rather than a JSON error envelope mid-login.
+			h.log.Warn("oidc: tenant not served here", "token_tenant", tenant, "serving", h.servedTenants())
+			h.renderTenantMismatch(w, tenant)
+			return
+		}
+		target = peer
 	}
+	target.completeLogin(w, r, claims, loginState)
+}
 
+// completeLogin turns a verified id_token into a session in THIS handler's
+// tenant: its user table, its session issuer, its cookies. Split out of
+// Callback because the exchange is tenant-agnostic and this half is not —
+// the callback that did the exchange is often not the tenant that owns the
+// person logging in.
+func (h *OIDCHandler) completeLogin(w http.ResponseWriter, r *http.Request, claims map[string]any, loginState *oidc.LoginState) {
 	identity := galaxyauth.Identity{
 		Subject:           stringClaim(claims, "sub"),
 		Email:             stringClaim(claims, "email"),
@@ -239,7 +269,7 @@ func (h *OIDCHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.auth.setTokenCookies(w, pair, pair.RefreshTTL)
-	h.log.Info("oidc: SSO login", "user_id", user.ID, "username", user.Username)
+	h.log.Info("oidc: SSO login", "tenant", h.opts.Tenant, "user_id", user.ID, "username", user.Username)
 	// Back to where they were headed before the login interrupted them. This
 	// used to be a hard-coded "/": following a deep link meant signing in and
 	// arriving at the home page, which reads as a login that did not work.
@@ -311,6 +341,21 @@ func safeReturnPath(v string) string {
 		return ""
 	}
 	return v
+}
+
+// servedTenants lists the workspaces this process can finish a login for.
+// Used only for logging a refusal, so the log says what was possible rather
+// than only what failed.
+func (h *OIDCHandler) servedTenants() []string {
+	out := make([]string, 0, len(h.peers)+1)
+	for code := range h.peers {
+		out = append(out, code)
+	}
+	if len(out) == 0 {
+		out = append(out, h.opts.Tenant)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // renderTenantMismatch answers the browser with a readable page instead of an

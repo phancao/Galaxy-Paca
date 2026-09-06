@@ -9,6 +9,10 @@ export interface AuthResult {
 	userId: string;
 	username: string;
 	role: string;
+	// tenant is the workspace this session belongs to. Empty on sessions
+	// minted before the claim existed — those belong to the primary tenant,
+	// and its rooms carry no prefix, so they keep working unchanged.
+	tenant: string;
 	globalPermissions: string[];
 }
 
@@ -50,12 +54,13 @@ export async function verifyTokenWithAPI(
 
 	// Decode identity claims from the JWT payload (no signature check — the
 	// API call above is the verification).
-	const { sub, username, role } = decodePayload(token);
+	const { sub, username, role, tenant } = decodePayload(token);
 
 	return {
 		userId: sub,
 		username,
 		role,
+		tenant,
 		globalPermissions: Array.isArray(envelope.data?.permissions)
 			? envelope.data.permissions
 			: [],
@@ -95,6 +100,7 @@ interface JwtPayload {
 	sub: string;
 	username: string;
 	role: string;
+	tenant: string;
 }
 
 function decodePayload(token: string): JwtPayload {
@@ -113,6 +119,9 @@ function decodePayload(token: string): JwtPayload {
 	const sub = payload.sub;
 	const username = payload.username;
 	const role = payload.role;
+	// Absent on older sessions; the API has already verified the signature,
+	// so whatever is here is what the API itself will route on.
+	const tenant = typeof payload.tenant === "string" ? payload.tenant : "";
 
 	if (typeof sub !== "string" || !sub)
 		throw new Error("JWT payload missing sub");
@@ -121,5 +130,5 @@ function decodePayload(token: string): JwtPayload {
 	if (typeof role !== "string" || !role)
 		throw new Error("JWT payload missing role");
 
-	return { sub, username, role };
+	return { sub, username, role, tenant };
 }

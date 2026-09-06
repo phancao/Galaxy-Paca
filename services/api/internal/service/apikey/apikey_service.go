@@ -31,11 +31,40 @@ type Service struct {
 	// agentHeaderImpersonation re-enables the legacy AGENT_API_KEY +
 	// X-Agent-ID header impersonation path (ADR-038: off by default).
 	agentHeaderImpersonation bool
+	// tenant is stamped into every key this service mints, so a presented
+	// key names the database that can recognise it. Empty on a
+	// single-tenant deployment, which keeps the original key shape.
+	tenant string
 }
 
 // New returns a configured API key Service.
 func New(repo apikeydom.Repository) *Service {
 	return &Service{repo: repo}
+}
+
+// WithTenant makes new keys carry the tenant that minted them, as
+// `paca_<tenant>_<random>`.
+//
+// A key is opaque and only its own tenant's database can recognise it, so a
+// request presenting one has to say where to look BEFORE anyone can look it
+// up. Searching every tenant for a match would be the alternative, and that
+// is an oracle: it would tell an attacker which workspace a key belongs to,
+// one lookup at a time.
+//
+// Keys minted before this keep the two-part `paca_<random>` shape and are
+// read as the primary tenant's, which is where they were created and the
+// only place they hash to a row.
+func (s *Service) WithTenant(code string) *Service {
+	s.tenant = code
+	return s
+}
+
+// keyPrefixFor returns the literal a new key starts with.
+func (s *Service) keyPrefixFor() string {
+	if s.tenant == "" {
+		return keyPrefix
+	}
+	return keyPrefix + s.tenant + "_"
 }
 
 // WithAgentKey configures a static pre-shared key for the AI agent service.
@@ -70,7 +99,7 @@ func (s *Service) Create(ctx context.Context, in apikeydom.CreateInput) (*apikey
 		return nil, "", fmt.Errorf("api key svc: generate key: %w", err)
 	}
 	rawHex := hex.EncodeToString(rawBytes)
-	rawKey := keyPrefix + rawHex
+	rawKey := s.keyPrefixFor() + rawHex
 
 	hash := sha256.Sum256([]byte(rawKey))
 	keyHash := hex.EncodeToString(hash[:])

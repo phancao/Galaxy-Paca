@@ -39,7 +39,12 @@ sessionRedis.on("error", (err: unknown) =>
 );
 
 const { httpServer, io } = createSocketServer(config, sessionRedis, logger);
-const subscriber = createSubscriber(config.valkey.url, io, logger);
+// One subscriber per tenant. They listen on different Valkey databases, so an
+// event published by one workspace is not merely filtered away from another —
+// it never reaches the other's connection at all.
+const subscribers = config.valkey.tenants.map((t) =>
+	createSubscriber(t.tenant, t.url, io, logger),
+);
 
 httpServer.listen(config.port, () => {
 	logger.info({ port: config.port }, "realtime service listening");
@@ -54,7 +59,7 @@ function shutdown(signal: string): void {
 	// then close the HTTP server so it stops accepting new connections.
 	io.close(() => {
 		httpServer.close(() => {
-			subscriber.disconnect();
+			subscribers.forEach((s) => s.disconnect());
 			sessionRedis.disconnect();
 			logger.info("shutdown complete");
 			process.exit(0);

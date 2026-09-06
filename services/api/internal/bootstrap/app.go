@@ -67,28 +67,100 @@ var agentBotUserID = userdom.SystemActorUserID
 
 // App holds the HTTP server and any resources that need graceful shutdown.
 type App struct {
-	server               *http.Server
+	server  *http.Server
+	tenants []*tenantApp
+	mux     *tenantMux
+	log     *slog.Logger
+}
+
+// tenantApp is one tenant's entire dependency graph: its own database, its
+// own Valkey logical database, its own bucket, its own repositories,
+// services, router and background consumers.
+//
+// Nothing is shared between two tenantApps except the HTTP listener and the
+// JWT signing secret. That is the whole isolation story, and it is worth
+// stating plainly: two tenants cannot see each other's rows because they are
+// not talking to the same database, not because a WHERE clause remembered to
+// filter. A forgotten filter is a leak; a different connection cannot leak.
+type tenantApp struct {
+	code                 string
+	handler              http.Handler
+	oidc                 *handler.OIDCHandler
 	publisher            *messaging.Publisher
 	activityConsumer     *worker.ActivityConsumer
 	notificationConsumer *worker.NotificationConsumer
 	pluginEventConsumer  *worker.PluginEventConsumer
 	workflowConsumer     *worker.WorkflowConsumer
-	log                  *slog.Logger
 }
 
-// New builds all dependencies and returns a ready-to-run App.
+// New builds one dependency graph per configured tenant and puts a single
+// HTTP server in front of them.
 func New(cfg *config.Config) (*App, error) {
 	log := logger.New(cfg.Env)
 
+	apps := make([]*tenantApp, 0, len(cfg.Tenants))
+	byCode := make(map[string]*tenantApp, len(cfg.Tenants))
+	for _, tc := range cfg.Tenants {
+		tlog := log
+		if tc.Code != "" {
+			tlog = log.With("tenant", tc.Code)
+		}
+		app, err := newTenant(cfg, tc, tlog)
+		if err != nil {
+			return nil, fmt.Errorf("bootstrap: tenant %q: %w", tc.Code, err)
+		}
+		apps = append(apps, app)
+		byCode[tc.Code] = app
+	}
+	if len(apps) == 0 {
+		return nil, fmt.Errorf("bootstrap: no tenant configured")
+	}
+
+	// The OIDC callback arrives before anyone knows which tenant it belongs
+	// to — the answer is inside the id_token, which only the exchange can
+	// read. So every tenant's OIDC handler can hand a finished login to any
+	// other tenant's, and the primary's is the one the router reaches.
+	peers := make(map[string]*handler.OIDCHandler, len(apps))
+	for _, a := range apps {
+		if a.oidc != nil {
+			peers[a.code] = a.oidc
+		}
+	}
+	for _, a := range apps {
+		if a.oidc != nil {
+			a.oidc.WithPeers(peers)
+		}
+	}
+
+	mux := newTenantMux(apps[0], byCode, log)
+	srv := &http.Server{
+		Addr:         ":" + cfg.Server.Port,
+		Handler:      mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	codes := make([]string, 0, len(apps))
+	for _, a := range apps {
+		codes = append(codes, a.code)
+	}
+	log.Info("tenants ready", "tenants", codes, "primary", apps[0].code)
+
+	return &App{server: srv, tenants: apps, mux: mux, log: log}, nil
+}
+
+// newTenant builds the whole dependency graph for exactly one tenant.
+func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*tenantApp, error) {
 	// --- Platform -----------------------------------------------------------
 	db, err := database.Open(database.Config{
-		DSN: cfg.Database.DSN,
+		DSN: tc.DSN,
 	}, log)
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap: %w", err)
 	}
 
-	redisClient, err := cache.NewClient(cfg.Redis.URL, log)
+	redisClient, err := cache.NewClient(tc.RedisURL, log)
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap: %w", err)
 	}
@@ -97,7 +169,14 @@ func New(cfg *config.Config) (*App, error) {
 
 	publisher := messaging.NewPublisher(redisClient, log)
 
-	tokenManager := jwttoken.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	// Every tenant in the process signs with the SAME secret, so a valid
+	// signature proves only "we minted this", never "this workspace minted
+	// this". Binding the manager to a tenant is what closes the gap: it
+	// stamps the claim on the way out and refuses a foreign one on the way
+	// in. The primary additionally accepts sessions minted before the claim
+	// existed — they were all issued by it.
+	tokenManager := jwttoken.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL).
+		ForTenant(tc.Code, tc.Code == cfg.Primary().Code)
 	permissionStore := pgRepo.NewAuthzPermissionStore(db)
 	authorizer := authz.NewAuthorizer(permissionStore).WithAgentRoleResolver(permissionStore)
 
@@ -191,7 +270,7 @@ func New(cfg *config.Config) (*App, error) {
 		Endpoint:        cfg.Storage.Endpoint,
 		PublicURL:       cfg.Storage.PublicURL,
 		Region:          cfg.Storage.Region,
-		Bucket:          cfg.Storage.Bucket,
+		Bucket:          tc.Bucket,
 		AccessKeyID:     cfg.Storage.AccessKeyID,
 		SecretAccessKey: cfg.Storage.SecretAccessKey,
 		UseSSL:          cfg.Storage.UseSSL,
@@ -201,16 +280,16 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("bootstrap: storage client: %w", err)
 	}
 	if cfg.Storage.Provider != "s3" {
-		if err := storageClient.EnsureBucket(context.Background(), cfg.Storage.Bucket); err != nil {
+		if err := storageClient.EnsureBucket(context.Background(), tc.Bucket); err != nil {
 			return nil, fmt.Errorf("bootstrap: ensure storage bucket: %w", err)
 		}
 	}
 
-	attachmentService := attachmentsvc.New(attachmentRepo, attachmentsvc.NewTaskOwnerChecker(taskRepo), storageClient, cfg.Storage.Bucket)
+	attachmentService := attachmentsvc.New(attachmentRepo, attachmentsvc.NewTaskOwnerChecker(taskRepo), storageClient, tc.Bucket)
 
 	// --- API Key management -------------------------------------------------
 	apiKeyRepo := pgRepo.NewAPIKeyRepository(db)
-	apiKeyService := apikeysvc.New(apiKeyRepo)
+	apiKeyService := apikeysvc.New(apiKeyRepo).WithTenant(tc.Code)
 	// Configure the static agent API key so the AI agent service can
 	// authenticate without a database-stored key entry.
 	if cfg.Security.AgentAPIKey != "" {
@@ -231,7 +310,7 @@ func New(cfg *config.Config) (*App, error) {
 	pluginStore, err := pluginrt.NewStore(context.Background(), pluginrt.StoreConfig{
 		Store:    cfg.Plugins.Store,
 		WASMDir:  cfg.Plugins.WASMDir,
-		S3Bucket: cfg.Storage.Bucket,
+		S3Bucket: tc.Bucket,
 		S3Prefix: cfg.Plugins.S3Prefix,
 		S3Region: cfg.Storage.Region,
 	})
@@ -334,7 +413,7 @@ func New(cfg *config.Config) (*App, error) {
 			oidcProvider,
 			handler.OIDCOptions{
 				ClientID:     cfg.OIDC.ClientID,
-				Tenant:       cfg.OIDC.Tenant,
+				Tenant:       tc.Code,
 				ClientSecret: cfg.OIDC.ClientSecret,
 				RedirectURL:  cfg.OIDC.RedirectURL,
 				Scopes:       cfg.OIDC.Scopes,
@@ -419,37 +498,42 @@ func New(cfg *config.Config) (*App, error) {
 
 	engine := router.New(deps)
 
-	srv := &http.Server{
-		Addr:         ":" + cfg.Server.Port,
-		Handler:      engine,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	return &App{server: srv, publisher: publisher, activityConsumer: activityConsumer, notificationConsumer: notificationConsumer, pluginEventConsumer: pluginEventConsumer, workflowConsumer: workflowConsumer, log: log}, nil
+	return &tenantApp{
+		code:                 tc.Code,
+		handler:              engine,
+		oidc:                 oidcHandler,
+		publisher:            publisher,
+		activityConsumer:     activityConsumer,
+		notificationConsumer: notificationConsumer,
+		pluginEventConsumer:  pluginEventConsumer,
+		workflowConsumer:     workflowConsumer,
+	}, nil
 }
 
-// Run starts the activity consumers and the HTTP server.
+// Run starts every tenant's consumers and then the one HTTP server.
 // It returns when the server stops.
 func (a *App) Run() error {
-	a.log.Info("starting server", "addr", a.server.Addr)
-	a.activityConsumer.Start(context.Background())
-	a.notificationConsumer.Start(context.Background())
-	a.pluginEventConsumer.Start(context.Background())
-	a.workflowConsumer.Start(context.Background())
+	a.log.Info("starting server", "addr", a.server.Addr, "tenants", len(a.tenants))
+	for _, t := range a.tenants {
+		t.activityConsumer.Start(context.Background())
+		t.notificationConsumer.Start(context.Background())
+		t.pluginEventConsumer.Start(context.Background())
+		t.workflowConsumer.Start(context.Background())
+	}
 	return a.server.ListenAndServe()
 }
 
 // Shutdown gracefully stops the server with the given timeout.
 func (a *App) Shutdown(ctx context.Context) error {
 	a.log.Info("shutting down server")
-	a.activityConsumer.Stop()
-	a.notificationConsumer.Stop()
-	a.pluginEventConsumer.Stop()
-	a.workflowConsumer.Stop()
-	if a.publisher != nil {
-		a.publisher.Close()
+	for _, t := range a.tenants {
+		t.activityConsumer.Stop()
+		t.notificationConsumer.Stop()
+		t.pluginEventConsumer.Stop()
+		t.workflowConsumer.Stop()
+		if t.publisher != nil {
+			t.publisher.Close()
+		}
 	}
 	return a.server.Shutdown(ctx)
 }
