@@ -38,6 +38,13 @@ env:
 # ─────────────────────────────────────────────────────────────────────────────
 # API service image
 # ─────────────────────────────────────────────────────────────────────────────
+# GALAXY: chot chan hang doi cho luong TRIEN KHAI. cancel-in-progress la
+# false co chu dich: huy mot lan deploy dang chay giua chung se de lai he
+# thong nua moi nua cu. O day ta xep hang chu khong cat ngang.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   api-image:
     name: Build and push API image
