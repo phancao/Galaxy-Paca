@@ -83,8 +83,14 @@ type App struct {
 // not talking to the same database, not because a WHERE clause remembered to
 // filter. A forgotten filter is a leak; a different connection cannot leak.
 type tenantApp struct {
-	code                 string
-	handler              http.Handler
+	code    string
+	handler http.Handler
+	// users / globalRoles are this tenant's OWN repositories, exposed only so
+	// the platform bootstrap route (tenant_admin.go) can appoint a tenant's
+	// first admin without opening a second connection to its database. Nothing
+	// else may reach across tenants through them.
+	users                *pgRepo.UserRepository
+	globalRoles          *pgRepo.GlobalRoleRepository
 	oidc                 *handler.OIDCHandler
 	publisher            *messaging.Publisher
 	activityConsumer     *worker.ActivityConsumer
@@ -133,6 +139,9 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	mux := newTenantMux(apps[0], byCode, log)
+	// ADR-038 T7: the one route that may act on a tenant it was not routed to.
+	// Off unless the platform secret is configured — see tenant_admin.go.
+	mux.internal = newTenantAdminHandler(byCode, cfg.GalaxyAI.ServiceSecret, log)
 	srv := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
 		Handler:      mux,
@@ -538,6 +547,8 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	return &tenantApp{
 		code:                 tc.Code,
 		handler:              engine,
+		users:                userRepo,
+		globalRoles:          globalRoleRepo,
 		oidc:                 oidcHandler,
 		publisher:            publisher,
 		activityConsumer:     activityConsumer,
