@@ -89,8 +89,12 @@ type tenantApp struct {
 	// the platform bootstrap route (tenant_admin.go) can appoint a tenant's
 	// first admin without opening a second connection to its database. Nothing
 	// else may reach across tenants through them.
-	users                *pgRepo.UserRepository
-	globalRoles          *pgRepo.GlobalRoleRepository
+	users       *pgRepo.UserRepository
+	globalRoles *pgRepo.GlobalRoleRepository
+	// userService is the SAME use-case the admin API uses, borrowed by the
+	// platform user plane (tenant_users.go) so both go through one set of
+	// invariants rather than two that can drift.
+	userService          userdom.Service
 	oidc                 *handler.OIDCHandler
 	publisher            *messaging.Publisher
 	activityConsumer     *worker.ActivityConsumer
@@ -142,6 +146,7 @@ func New(cfg *config.Config) (*App, error) {
 	// ADR-038 T7: the one route that may act on a tenant it was not routed to.
 	// Off unless the platform secret is configured — see tenant_admin.go.
 	mux.internal = newTenantAdminHandler(byCode, cfg.GalaxyAI.ServiceSecret, log)
+	mux.internalUsers = &tenantUsersHandler{h: mux.internal}
 	srv := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
 		Handler:      mux,
@@ -549,6 +554,7 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 		handler:              engine,
 		users:                userRepo,
 		globalRoles:          globalRoleRepo,
+		userService:          userService,
 		oidc:                 oidcHandler,
 		publisher:            publisher,
 		activityConsumer:     activityConsumer,

@@ -75,6 +75,13 @@ func newTenantAdminHandler(byCode map[string]*tenantApp, secret string, log *slo
 
 func (h *tenantAdminHandler) enabled() bool { return h != nil && h.secret != "" }
 
+// secretOK is the ONE comparison every internal route goes through. Constant
+// time, and shared so a second route cannot grow a weaker copy of it.
+func (h *tenantAdminHandler) secretOK(r *http.Request) bool {
+	given := r.Header.Get("X-Service-Secret")
+	return subtle.ConstantTimeCompare([]byte(given), []byte(h.secret)) == 1
+}
+
 func (h *tenantAdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !h.enabled() {
 		writeEnvelope(w, http.StatusNotFound, nil, "NOT_FOUND", "not found")
@@ -84,8 +91,7 @@ func (h *tenantAdminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeEnvelope(w, http.StatusMethodNotAllowed, nil, "METHOD_NOT_ALLOWED", "POST only")
 		return
 	}
-	given := r.Header.Get("X-Service-Secret")
-	if subtle.ConstantTimeCompare([]byte(given), []byte(h.secret)) != 1 {
+	if !h.secretOK(r) {
 		// The same answer as a deployment without the route: an unauthenticated
 		// caller learns nothing about whether this door exists here.
 		writeEnvelope(w, http.StatusNotFound, nil, "NOT_FOUND", "not found")

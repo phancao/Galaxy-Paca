@@ -33,6 +33,10 @@ type tenantMux struct {
 	// instead of a tenant session — see tenant_admin.go for why that door has
 	// to exist at all.
 	internal *tenantAdminHandler
+	// internalUsers is the same door's user plane — list/create/update/
+	// soft-delete inside a NAMED tenant, so keeping a tenant's people in step
+	// with Vortex no longer needs a long-lived admin key per tenant.
+	internalUsers *tenantUsersHandler
 }
 
 func newTenantMux(primary *tenantApp, byCode map[string]*tenantApp, log *slog.Logger) *tenantMux {
@@ -46,6 +50,10 @@ func (m *tenantMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/internal/") {
 		if r.URL.Path == "/internal/tenant-admin" && m.internal != nil {
 			m.internal.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == "/internal/tenant-users" && m.internalUsers != nil {
+			m.internalUsers.ServeHTTP(w, r)
 			return
 		}
 		http.NotFound(w, r)
