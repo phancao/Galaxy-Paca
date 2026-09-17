@@ -27,6 +27,12 @@ type tenantMux struct {
 	primary *tenantApp
 	byCode  map[string]*tenantApp
 	log     *slog.Logger
+	// internal serves the platform bootstrap route. It is the one handler that
+	// may act on a tenant the request was not routed to, because it names its
+	// tenant in the body and proves itself with the platform service secret
+	// instead of a tenant session — see tenant_admin.go for why that door has
+	// to exist at all.
+	internal *tenantAdminHandler
 }
 
 func newTenantMux(primary *tenantApp, byCode map[string]*tenantApp, log *slog.Logger) *tenantMux {
@@ -34,6 +40,17 @@ func newTenantMux(primary *tenantApp, byCode map[string]*tenantApp, log *slog.Lo
 }
 
 func (m *tenantMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// /internal/* is deliberately outside every tenant graph: it carries no
+	// tenant credential, so picking a tenant for it would pick the wrong one.
+	// It is not under /api/, so the public gateway never forwards it.
+	if strings.HasPrefix(r.URL.Path, "/internal/") {
+		if r.URL.Path == "/internal/tenant-admin" && m.internal != nil {
+			m.internal.ServeHTTP(w, r)
+			return
+		}
+		http.NotFound(w, r)
+		return
+	}
 	m.pick(r).handler.ServeHTTP(w, r)
 }
 
