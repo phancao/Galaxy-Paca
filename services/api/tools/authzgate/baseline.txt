@@ -23,3 +23,17 @@ internal/transport/http/router/router.go::POST /me/api-keys
 internal/transport/http/router/router.go::DELETE /me/api-keys/{keyId}
 internal/transport/http/router/router.go::PATCH /me/notifications/{notificationId}/read
 internal/transport/http/router/router.go::POST /me/notifications/read-all
+#
+# ── the caller is a service, proven by a signature, not a session ────────────
+# The Vortex identity-sync webhook (ADR-040 §3.1) authenticates its CALLER
+# cryptographically inside the handler: hex HMAC-SHA256 over "<ts>." + the raw
+# body, compared with hmac.Equal, with a timestamp window and a replay cache;
+# an empty secret rejects every delivery, and the route is only registered when
+# the secret is configured. There is no principal and no session, so there is
+# no subject for a permission check to be about — the check that matters is the
+# signature, and it is not skippable.
+#
+# It landed without this line, which left the gate red on galaxy-main for every
+# PR afterwards. A gate that is always red is a gate nobody reads, and that
+# costs more than the one route it was meant to catch.
+internal/transport/http/router/router.go::POST /nexus/webhook
