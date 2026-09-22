@@ -257,3 +257,46 @@ func setLoadDefaults(t *testing.T) {
 	t.Setenv("STORAGE_ACCESS_KEY_ID", "access-key")
 	t.Setenv("STORAGE_SECRET_ACCESS_KEY", "secret-key")
 }
+
+func TestPortalOrigin(t *testing.T) {
+	cases := []struct {
+		name     string
+		dockSrc  string
+		explicit string
+		want     string
+	}{
+		{
+			name:    "derives from absolute dock src",
+			dockSrc: "https://ai.spaxeai.com/dock.js",
+			want:    "https://ai.spaxeai.com",
+		},
+		{
+			name:     "explicit override wins even with a dock src set",
+			dockSrc:  "https://ai.spaxeai.com/dock.js",
+			explicit: "https://ai.example-tenant.com",
+			want:     "https://ai.example-tenant.com",
+		},
+		{
+			name:     "explicit override strips a trailing slash",
+			explicit: "https://ai.example-tenant.com/",
+			want:     "https://ai.example-tenant.com",
+		},
+		{
+			name: "relative dock src falls back to the historical default",
+			// A same-origin bridge path carries no scheme/host to derive from.
+			dockSrc: "/dock.js",
+			want:    "https://ai.skyplatform.net",
+		},
+		{
+			name: "empty everything falls back to the historical default",
+			want: "https://ai.skyplatform.net",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := portalOrigin(tc.dockSrc, tc.explicit); got != tc.want {
+				t.Fatalf("portalOrigin(%q, %q) = %q, want %q", tc.dockSrc, tc.explicit, got, tc.want)
+			}
+		})
+	}
+}

@@ -39,6 +39,10 @@ type AuthHandler struct {
 	// Galaxy chat dock advertisement for the public /auth/config endpoint
 	// (ADR-038 P3.2).  Empty means the dock stays unmounted in the SPA.
 	dockSrc string
+	// portalOrigin is the platform portal's origin, advertised so the SPA never
+	// hardcodes which estate's portal it logs out to or reads a dock session
+	// from (T7 — see config.PortalOrigin for why).
+	portalOrigin string
 	// localLogin reports whether POST /auth/login is registered at all
 	// (ADR-058 D7: break-glass under env, never advertised as a UI path).
 	localLogin bool
@@ -71,6 +75,13 @@ func (h *AuthHandler) WithGalaxyDock(src string) *AuthHandler {
 	return h
 }
 
+// WithPortalOrigin advertises the platform portal's origin on the public
+// auth config endpoint, so the SPA stops hardcoding it (T7).
+func (h *AuthHandler) WithPortalOrigin(origin string) *AuthHandler {
+	h.portalOrigin = origin
+	return h
+}
+
 // GetConfig handles GET /auth/config (public).  It tells the SPA which login
 // methods are available before any authentication happens, plus whether the
 // Galaxy chat dock should be mounted after login.
@@ -81,6 +92,7 @@ func (h *AuthHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"local_login_enabled": h.localLogin,
 		"dock_enabled":        h.dockSrc != "",
 		"dock_src":            h.dockSrc,
+		"portal_origin":       h.portalOrigin,
 	})
 }
 

@@ -32,7 +32,11 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useLocale } from "@/hooks/use-locale";
-import { currentUserOptionalQueryOptions, logout } from "@/lib/auth-api";
+import {
+	authConfigQueryOptions,
+	currentUserOptionalQueryOptions,
+	logout,
+} from "@/lib/auth-api";
 
 function getInitials(name: string): string {
 	return name
@@ -45,16 +49,18 @@ function getInitials(name: string): string {
 }
 
 /**
- * Origin portal. Cùng giá trị mà galaxy-dock.tsx và màn đăng nhập đã dùng —
- * ba chỗ nói cùng một câu, và không chỗ nào lặng lẽ biến mất khi thiếu cấu hình.
+ * Origin portal MẶC ĐỊNH — chỉ dùng khi API chưa quảng cáo portal_origin
+ * (T7). Cùng giá trị mặc định mà galaxy-dock.tsx và màn đăng nhập dùng.
  */
-const PORTAL_ORIGIN = "https://ai.skyplatform.net";
+const DEFAULT_PORTAL_ORIGIN = "https://ai.skyplatform.net";
 
 export function UserMenu() {
 	const { t } = useTranslation("appShell");
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { data: user } = useQuery(currentUserOptionalQueryOptions);
+	const { data: authConfig } = useQuery(authConfigQueryOptions);
+	const PORTAL_ORIGIN = authConfig?.portal_origin || DEFAULT_PORTAL_ORIGIN;
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const { locale, set: setLocale } = useLocale();
 

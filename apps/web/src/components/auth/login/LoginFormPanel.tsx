@@ -92,10 +92,12 @@ export function LoginFormPanel() {
 				{/* ADR-027 single logout — also ends the platform (Zitadel) session.
 				    NO post_logout_redirect_uri: Zitadel only accepts URIs registered
 				    on the portal client (tasks.* is not), so let identity fall back
-				    to its default dest (the portal login page). TODO: derive the
-				    identity origin from server config for tenant deploys (T7). */}
+				    to its default dest (the portal login page). Origin now comes
+				    from authConfig.portal_origin (T7) instead of a hardcoded
+				    constant — every tenant deploy before 22/09/2026 pointed this
+				    link at Galaxy's own portal regardless of which estate it ran on. */}
 				<a
-					href="https://ai.skyplatform.net/api/identity/auth/logout"
+					href={`${authConfig?.portal_origin || "https://ai.skyplatform.net"}/api/identity/auth/logout`}
 					className="text-xs text-(--sea-ink-soft) underline underline-offset-2"
 				>
 					{t(

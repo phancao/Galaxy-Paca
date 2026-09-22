@@ -73,6 +73,11 @@ export interface AuthConfig {
 	dock_enabled: boolean;
 	/** Dock bundle URL, e.g. https://ai.skyplatform.net/dock.js or /dock.js. */
 	dock_src: string;
+	/** Platform portal origin (scheme://host[:port], no path) — where the
+	 *  logout link and the dock's own-session lookup point (T7). Empty on
+	 *  an older API that predates this field; callers fall back to the
+	 *  same hardcoded default the API itself uses in that case. */
+	portal_origin: string;
 }
 
 export async function getAuthConfig(): Promise<AuthConfig> {

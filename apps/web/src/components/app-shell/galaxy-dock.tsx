@@ -37,6 +37,10 @@ const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 const GUARD_KEY = "galaxy-dock-sso-attempted";
 const HASH_PREFIX = "#dock_sso=";
+// Ultimate fallback — only reached when BOTH the API's own portal_origin
+// (T7, GALAXY_DOCK_SRC-derived) is unavailable AND dockSrc is relative.
+// An API old enough to lack portal_origin is old enough that this estate
+// is almost certainly Galaxy's own, so this default stays correct for it.
 const DEFAULT_PORTAL = "https://ai.skyplatform.net";
 
 declare module "react" {
@@ -155,13 +159,13 @@ function relayThroughPortal(portalOrigin: string): void {
 }
 
 /** Portal origin hosting the /dock-sso relay, derived from the dock src. */
-function portalOriginFor(dockSrc: string): string {
+function portalOriginFor(dockSrc: string, configuredOrigin: string): string {
 	try {
 		return new URL(dockSrc).origin;
 	} catch {
-		// Relative dock src (same-origin gateway bridge) — use the default
-		// portal origin, mirroring the wiki bootstrap's fallback.
-		return DEFAULT_PORTAL;
+		// Relative dock src (same-origin gateway bridge) — fall back to what
+		// the API itself advertises (T7), then to the historical default.
+		return configuredOrigin || DEFAULT_PORTAL;
 	}
 }
 
@@ -195,7 +199,7 @@ export function GalaxyChatDock() {
 			// One bounce per browser session through the portal SSO relay;
 			// comes back to this exact URL with a #dock_sso fragment that
 			// consumeDockSsoRelayHash() (main.tsx) stores at boot.
-			relayThroughPortal(portalOriginFor(dockSrc));
+			relayThroughPortal(portalOriginFor(dockSrc, config?.portal_origin ?? ""));
 			return;
 		}
 		loadDockScript(dockSrc);
