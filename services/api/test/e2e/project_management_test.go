@@ -255,10 +255,27 @@ func TestE2EProjectRoles_FullLifecycle(t *testing.T) {
 
 	var roleID string
 
+	t.Run("create_role_rejects_unknown_permission_key", func(t *testing.T) {
+		// "read" trần không có trong từ vựng quyền. Trước đây API trả 201 và
+		// đẻ ra một vai không ai gán nổi; nay nó phải trả 400 kèm tên khoá.
+		body := jsonBody(t, map[string]any{
+			"role_name":   "vai-rac",
+			"permissions": map[string]any{"read": true},
+		})
+		url := fmt.Sprintf("%s/api/v1/projects/%s/roles", env.base, projID)
+		req := mustRequest(env.ctx, t, http.MethodPost, url, body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp := mustDo(t, client, req)
+		defer func() { _ = resp.Body.Close() }()
+		assertStatus(t, resp, http.StatusBadRequest)
+		assertErrorCode(t, resp, "PROJECT_ROLE_PERMISSIONS_INVALID")
+	})
+
 	t.Run("create_role", func(t *testing.T) {
 		body := jsonBody(t, map[string]any{
 			"role_name":   "viewer",
-			"permissions": map[string]any{"read": true},
+			"permissions": map[string]any{"project.members.read": true},
 		})
 		url := fmt.Sprintf("%s/api/v1/projects/%s/roles", env.base, projID)
 		req := mustRequest(env.ctx, t, http.MethodPost, url, body)
@@ -309,7 +326,7 @@ func TestE2EProjectRoles_FullLifecycle(t *testing.T) {
 	t.Run("update_role", func(t *testing.T) {
 		body := jsonBody(t, map[string]any{
 			"role_name":   "contributor",
-			"permissions": map[string]any{"read": true, "write": true},
+			"permissions": map[string]any{"project.members.read": true, "tasks.write": true},
 		})
 		url := fmt.Sprintf("%s/api/v1/projects/%s/roles/%s", env.base, projID, roleID)
 		req := mustRequest(env.ctx, t, http.MethodPatch, url, body)

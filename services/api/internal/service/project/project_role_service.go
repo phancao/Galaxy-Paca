@@ -36,6 +36,14 @@ func (s *Service) CreateRole(ctx context.Context, projectID uuid.UUID, in projec
 		return nil, err
 	}
 
+	// A role created here is nothing but its permission map, and a key outside
+	// every known vocabulary makes the role unassignable by anyone but a "*"
+	// holder (the PACA-4 ceiling demands the assigner COVER each key). Nothing
+	// is grandfathered on create: the role does not exist yet.
+	if err := s.validateRolePermissions(ctx, in.Permissions, nil); err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	r := &projectdom.ProjectRole{
 		ID:          uuid.New(),
@@ -82,6 +90,13 @@ func (s *Service) UpdateRole(ctx context.Context, projectID, roleID uuid.UUID, i
 
 	r.RoleName = name
 	if in.Permissions != nil {
+		// Keys the role already carried are grandfathered: an old role written
+		// before this check existed must stay editable (renameable, and above
+		// all fixable) instead of becoming a write-locked record. Any key being
+		// ADDED is validated.
+		if err := s.validateRolePermissions(ctx, in.Permissions, grantedKeySet(r.Permissions)); err != nil {
+			return nil, err
+		}
 		r.Permissions = cloneSettings(in.Permissions)
 	}
 	r.UpdatedAt = time.Now()

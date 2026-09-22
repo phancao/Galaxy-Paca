@@ -6,47 +6,48 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
 	"github.com/Paca-AI/api/internal/platform/authz"
 )
 
 // ---------------------------------------------------------------------------
-// GHIM HÀNH VI HIỆN TẠI — KHÔNG PHẢI HÀNH VI MONG MUỐN
+// BẤT ĐỐI XỨNG ĐÃ ĐƯỢC VÁ — tệp này giờ ghim HÀNH VI MỚI
 //
-// Phép kiểm trong tệp này KHÔNG khẳng định hệ thống đang đúng. Nó ghim lại một
-// bất đối xứng đã được chứng minh, để nó thôi vô hình và có người canh. Đang
-// chờ anh Cao cho hướng.
+// Giữ lại phần mô tả vì nó là lý do bản vá tồn tại.
 //
-// BẤT ĐỐI XỨNG
+// BẤT ĐỐI XỨNG (hành vi CŨ, trước bản vá)
 //
 // Hai đầu của cùng một vòng đời vai project được canh khác nhau:
 //
-//   • TẠO vai — project_role_service.go:23-52 (CreateRole): KHÔNG có ceiling,
-//     KHÔNG kiểm khoá quyền so với từ vựng. Nhận thẳng map người gọi đưa vào,
-//     kể cả khoá rác như {"read": true} hay {"toan_quyen": true}.
-//   • GÁN vai — project_member_service.go:19-27 (enforceRoleGrantCeiling, PACA-4):
+//   • TẠO vai — project_role_service.go (CreateRole): KHÔNG có ceiling, KHÔNG
+//     kiểm khoá quyền so với từ vựng. Nhận thẳng map người gọi đưa vào, kể cả
+//     khoá rác như {"read": true} hay {"toan_quyen": true}.
+//   • GÁN vai — project_member_service.go (enforceRoleGrantCeiling, PACA-4):
 //     CÓ ceiling. Người gọi phải BAO được mọi quyền của vai.
 //
 // Hệ quả: tạo được một vai mà sau đó KHÔNG AI ngoài người giữ "*" gán nổi. Vai
 // chết từ lúc sinh ra, im lặng — API trả 201, vai hiện trong danh sách, và chỉ
 // khi ai đó thử gán mới nhận 403 không giải thích được. Không có cảnh báo lúc
-// tạo, không log, không cổng nào đỏ.
+// tạo, không log, không cổng nào đỏ. Đây đúng là thứ đã làm phép kiểm E2E
+// TestE2EProjectMembers_FullLifecycle đỏ suốt.
 //
-// Đây đúng là thứ đã làm phép kiểm E2E TestE2EProjectMembers_FullLifecycle đỏ
-// suốt: helper tạo vai với {"read": true} rồi ngạc nhiên vì không gán được.
+// QUYẾT ĐỊNH (đã làm)
 //
-// HƯỚNG CÓ THỂ ĐI (cần quyết định, chưa làm gì):
-//   - kiểm khoá quyền lúc TẠO vai, từ chối khoá ngoài từ vựng
-//     (internal/platform/authz/permissions.go);
-//   - hoặc áp luôn ceiling lúc tạo, để không tạo được vai rộng hơn chính mình;
-//   - hoặc giữ nguyên và cảnh báo ở tầng giao diện.
-// Lưu ý: hai hướng đầu SIẾT LẠI, nên phải rà dữ liệu vai đang có trước khi bật.
+// Siết ở đầu TẠO/SỬA: khoá quyền phải nằm trong một từ vựng có thật — 35 hằng
+// dựng sẵn (internal/platform/authz/permissions.go) HỢP với khoá do plugin
+// đang cài khai (PluginManifest.CustomPermissions) — nếu không, 400 kèm TÊN
+// khoá sai. KHÔNG đụng tới ceiling và KHÔNG nới trần: đây là siết thêm.
+//
+// Ceiling vẫn giữ nguyên, nên nửa sau của phép kiểm dưới đây vẫn đúng: một vai
+// CŨ đã lỡ mang khoá rác (ghi trước bản vá, nằm sẵn trong DB) vẫn không ai gán
+// nổi. Bản vá chặn nguồn, nó không dọn dữ liệu cũ.
 // ---------------------------------------------------------------------------
 
-// TestCreateRole_AcceptsJunkPermissionKeys_ThenNobodyCanAssign ghim cả hai đầu
-// trong MỘT phép kiểm, để thấy rõ chúng bất đối xứng.
-func TestCreateRole_AcceptsJunkPermissionKeys_ThenNobodyCanAssign(t *testing.T) {
+// TestCreateRole_RejectsJunkPermissionKeys ghim đầu TẠO: khoá rác giờ bị từ
+// chối, và lỗi phải GỌI TÊN khoá sai chứ không im lặng.
+func TestCreateRole_RejectsJunkPermissionKeys(t *testing.T) {
 	projectID := uuid.New()
 	ctx := context.Background()
 
@@ -57,31 +58,56 @@ func TestCreateRole_AcceptsJunkPermissionKeys_ThenNobodyCanAssign(t *testing.T) 
 	}
 	svc := New(repo, nil)
 
-	// ĐẦU 1 — TẠO: khoá "read" không có trong từ vựng quyền (mọi khoá thật đều
-	// có không gian tên: projects.read, project.members.read …). Vẫn được nhận.
+	// "read" trần không có trong từ vựng quyền: mọi khoá thật đều có không gian
+	// tên (projects.read, project.members.read …).
 	role, err := svc.CreateRole(ctx, projectID, projectdom.CreateRoleInput{
 		RoleName:    "vai-rac",
 		Permissions: map[string]any{"read": true},
 	})
-	assert.NoError(t, err, "HÀNH VI ĐÃ ĐỔI: CreateRole giờ từ chối khoá rác. "+
-		"Nếu đây là bản vá có chủ ý cho bất đối xứng mô tả ở đầu tệp, hãy xoá "+
-		"phép kiểm này và ghi lại quyết định.")
-	assert.NotNil(t, role, "vai phải được tạo")
-	assert.Equal(t, map[string]any{"read": true}, role.Permissions,
-		"khoá rác được lưu nguyên vẹn, không chuẩn hoá, không cảnh báo")
 
-	// ĐẦU 2 — GÁN: cùng vai ấy, người gọi giữ TOÀN BỘ từ vựng quyền project vẫn
-	// không gán nổi, vì "read" không nằm trong bất kỳ khoá thật nào.
-	repo.findRoleByID = func(_ context.Context, id uuid.UUID) (*projectdom.ProjectRole, error) {
-		r := *role
-		r.ID = id
-		return &r, nil
+	assert.Nil(t, role, "không được tạo vai mang khoá rác")
+	require.ErrorIs(t, err, projectdom.ErrRolePermissionsInvalid)
+
+	var unknown *projectdom.UnknownPermissionsError
+	require.ErrorAs(t, err, &unknown)
+	assert.Equal(t, []string{"read"}, unknown.Keys,
+		"lỗi phải gọi tên đúng khoá sai, để người dùng sửa được")
+	assert.Contains(t, err.Error(), "read",
+		"thông điệp trả về client phải chứa tên khoá sai")
+}
+
+// TestLegacyJunkRole_StillCannotBeAssigned ghim đầu GÁN: ceiling KHÔNG đổi.
+// Một vai cũ đã nằm trong DB với khoá rác (ghi trước bản vá — bản vá chặn
+// nguồn, không dọn dữ liệu) vẫn không gán nổi, trừ người giữ "*".
+func TestLegacyJunkRole_StillCannotBeAssigned(t *testing.T) {
+	projectID := uuid.New()
+	ctx := context.Background()
+
+	// Vai này được dựng THẲNG như một hàng DB cũ, không qua CreateRole — vì
+	// CreateRole giờ đã từ chối nó.
+	legacy := &projectdom.ProjectRole{
+		ID:          uuid.New(),
+		ProjectID:   &projectID,
+		RoleName:    "vai-rac-cu",
+		Permissions: map[string]any{"read": true},
 	}
+
 	added := false
-	repo.addMember = func(_ context.Context, _ *projectdom.ProjectMember) error {
-		added = true
-		return nil
+	repo := &memberServiceRepoMock{
+		findByID: func(_ context.Context, id uuid.UUID) (*projectdom.Project, error) {
+			return &projectdom.Project{ID: id}, nil
+		},
+		findRoleByID: func(_ context.Context, id uuid.UUID) (*projectdom.ProjectRole, error) {
+			r := *legacy
+			r.ID = id
+			return &r, nil
+		},
+		addMember: func(_ context.Context, _ *projectdom.ProjectMember) error {
+			added = true
+			return nil
+		},
 	}
+	svc := New(repo, nil)
 
 	richCaller := callerWith(
 		authz.PermissionProjectsAll,
@@ -93,7 +119,7 @@ func TestCreateRole_AcceptsJunkPermissionKeys_ThenNobodyCanAssign(t *testing.T) 
 		authz.PermissionAgentsAll,
 		authz.PermissionWorkflowsAll,
 	)
-	_, err = svc.AddMember(ctx, projectID, projectdom.AddMemberInput{
+	_, err := svc.AddMember(ctx, projectID, projectdom.AddMemberInput{
 		UserID:        uuid.New(),
 		ProjectRoleID: uuid.New(),
 	}, richCaller)
