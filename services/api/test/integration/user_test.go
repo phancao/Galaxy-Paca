@@ -30,12 +30,15 @@ func buildUserTestRouter(repo *fakeUserRepo) http.Handler {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	return router.New(router.Deps{
-		TokenManager: tm,
-		Authorizer:   authz.NewAuthorizer(nil),
-		Health:       handler.NewHealthHandler(),
-		Auth:         handler.NewAuthHandler(authService, testCookieCfg),
-		User:         handler.NewUserHandler(userService),
-		Log:          log,
+		// ADR-058 D7: POST /auth/login chỉ được đăng ký khi cờ này bật
+		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
+		LocalLoginEnabled: true,
+		TokenManager:      tm,
+		Authorizer:        authz.NewAuthorizer(nil),
+		Health:            handler.NewHealthHandler(),
+		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
+		User:              handler.NewUserHandler(userService),
+		Log:               log,
 	})
 }
 
@@ -641,12 +644,15 @@ func TestAdminResetPassword_SetsMustChangePassword(t *testing.T) {
 	userService := usersvc.New(repo, repo)
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	r := router.New(router.Deps{
-		TokenManager: tm,
-		Authorizer:   authz.NewAuthorizer(nil),
-		Health:       handler.NewHealthHandler(),
-		Auth:         handler.NewAuthHandler(authService, testCookieCfg),
-		User:         handler.NewUserHandler(userService, authService),
-		Log:          log,
+		// ADR-058 D7: POST /auth/login chỉ được đăng ký khi cờ này bật
+		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
+		LocalLoginEnabled: true,
+		TokenManager:      tm,
+		Authorizer:        authz.NewAuthorizer(nil),
+		Health:            handler.NewHealthHandler(),
+		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
+		User:              handler.NewUserHandler(userService, authService),
+		Log:               log,
 	})
 
 	body, _ := json.Marshal(map[string]string{"new_password": "brandnewpass"})
@@ -741,12 +747,15 @@ func TestMustChangePassword_ChangeAllowedAndUnblocks(t *testing.T) {
 	userService := usersvc.New(repo, repo)
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	r := router.New(router.Deps{
-		TokenManager: tm,
-		Authorizer:   authz.NewAuthorizer(nil),
-		Health:       handler.NewHealthHandler(),
-		Auth:         handler.NewAuthHandler(authService, testCookieCfg),
-		User:         handler.NewUserHandler(userService, authService),
-		Log:          log,
+		// ADR-058 D7: POST /auth/login chỉ được đăng ký khi cờ này bật
+		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
+		LocalLoginEnabled: true,
+		TokenManager:      tm,
+		Authorizer:        authz.NewAuthorizer(nil),
+		Health:            handler.NewHealthHandler(),
+		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
+		User:              handler.NewUserHandler(userService, authService),
+		Log:               log,
 	})
 
 	// Login.
