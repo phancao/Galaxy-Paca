@@ -312,3 +312,132 @@ func TestReplaceUserRoles_GrantCeiling_AllowsSubset(t *testing.T) {
 		t.Fatalf("unexpected roles result: %+v", roles)
 	}
 }
+
+// ── Tên vai dành riêng ────────────────────────────────────────────────────
+//
+// Chừng nào `authz.LegacyPermissionsForRole` còn sống, TÊN vai là một đặc
+// quyền: `claims.Role` được viết hoa rồi tra, và "ADMIN" trả về `*`. Trần cấp
+// phát không thấy đường ấy vì nó chỉ đọc BẢNG quyền — nên một vai RỖNG đặt
+// đúng tên là chìa khoá vạn năng.
+//
+// FAIL-BEFORE: trước bản vá, cả bốn phép kiểm dưới đây đều tạo/đổi tên THÀNH
+// CÔNG, vì kiểm trùng tên dùng `WHERE name = $1` (phân biệt hoa thường) nên
+// "Admin" trông như một tên chưa ai dùng.
+
+// delegatedRoleManager là người được uỷ quyền quản lý vai mà KHÔNG có `*` —
+// đúng đối tượng mà trần cấp phát sinh ra để chặn.
+func delegatedRoleManager() authz.PermissionSet {
+	return permSet(authz.PermissionGlobalRolesWrite, authz.PermissionGlobalRolesAssign)
+}
+
+func TestCreate_RejectsReservedName_AnyCasing(t *testing.T) {
+	for _, name := range []string{"ADMIN", "Admin", "admin", "  admin  ", "SUPER_ADMIN", "Super_Admin", "user"} {
+		t.Run(name, func(t *testing.T) {
+			created := false
+			svc := globalrolesvc.New(&stubRepo{
+				create: func(_ context.Context, _ *globalroledom.GlobalRole) error {
+					created = true
+					return nil
+				},
+			})
+			// Quyền RỖNG: trần cấp phát không có gì để phản đối. Nếu chặn
+			// được thì phải là nhờ cái TÊN, không nhờ bảng quyền.
+			_, err := svc.Create(context.Background(),
+				globalroledom.CreateInput{Name: name, Permissions: map[string]any{}},
+				delegatedRoleManager())
+			if !errors.Is(err, globalroledom.ErrReservedName) {
+				t.Fatalf("tên %q: mong ErrReservedName, nhận %v", name, err)
+			}
+			if created {
+				t.Fatalf("tên %q: vai KHÔNG được ghi xuống", name)
+			}
+		})
+	}
+}
+
+func TestCreate_AllowsOrdinaryName(t *testing.T) {
+	created := false
+	svc := globalrolesvc.New(&stubRepo{
+		create: func(_ context.Context, _ *globalroledom.GlobalRole) error {
+			created = true
+			return nil
+		},
+	})
+	_, err := svc.Create(context.Background(),
+		globalroledom.CreateInput{Name: "ANALYST", Permissions: map[string]any{}},
+		delegatedRoleManager())
+	if err != nil {
+		t.Fatalf("tên thường phải qua, nhận %v", err)
+	}
+	if !created {
+		t.Fatal("vai phải được ghi xuống")
+	}
+}
+
+// Người giữ `*` vẫn đặt được tên dành riêng: họ đã toàn quyền nên không leo
+// thang thêm được, và một môi trường bị xoá mất vai gốc phải có đường dựng lại.
+func TestCreate_SuperAdminMayUseReservedName(t *testing.T) {
+	created := false
+	svc := globalrolesvc.New(&stubRepo{
+		create: func(_ context.Context, _ *globalroledom.GlobalRole) error {
+			created = true
+			return nil
+		},
+	})
+	_, err := svc.Create(context.Background(),
+		globalroledom.CreateInput{Name: "ADMIN", Permissions: map[string]any{}},
+		superAdmin())
+	if err != nil {
+		t.Fatalf("người giữ * phải đặt được, nhận %v", err)
+	}
+	if !created {
+		t.Fatal("vai phải được ghi xuống")
+	}
+}
+
+// Đổi tên là đường lách thứ hai, cùng một cái lỗ.
+func TestUpdate_RejectsRenameToReservedName(t *testing.T) {
+	id := uuid.New()
+	updated := false
+	svc := globalrolesvc.New(&stubRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*globalroledom.GlobalRole, error) {
+			return &globalroledom.GlobalRole{ID: id, Name: "ANALYST", Permissions: map[string]any{}}, nil
+		},
+		update: func(_ context.Context, _ *globalroledom.GlobalRole) error {
+			updated = true
+			return nil
+		},
+	})
+	_, err := svc.Update(context.Background(), id,
+		globalroledom.UpdateInput{Name: "Admin"}, delegatedRoleManager())
+	if !errors.Is(err, globalroledom.ErrReservedName) {
+		t.Fatalf("mong ErrReservedName, nhận %v", err)
+	}
+	if updated {
+		t.Fatal("vai KHÔNG được ghi xuống")
+	}
+}
+
+// Vai ĐANG mang tên dành riêng vẫn phải sửa được (ví dụ chỉnh quyền của chính
+// vai ADMIN dựng sẵn) — phép chặn chỉ áp cho việc ĐỔI SANG một tên dành riêng.
+func TestUpdate_ReservedRoleKeepingItsOwnNameIsAllowed(t *testing.T) {
+	id := uuid.New()
+	updated := false
+	svc := globalrolesvc.New(&stubRepo{
+		findByID: func(_ context.Context, _ uuid.UUID) (*globalroledom.GlobalRole, error) {
+			return &globalroledom.GlobalRole{ID: id, Name: "ADMIN", Permissions: map[string]any{}}, nil
+		},
+		update: func(_ context.Context, _ *globalroledom.GlobalRole) error {
+			updated = true
+			return nil
+		},
+	})
+	_, err := svc.Update(context.Background(), id,
+		globalroledom.UpdateInput{Name: "admin"}, delegatedRoleManager())
+	if err != nil {
+		t.Fatalf("giữ nguyên tên mình phải qua, nhận %v", err)
+	}
+	if !updated {
+		t.Fatal("vai phải được ghi xuống")
+	}
+}
