@@ -112,8 +112,6 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusConflict, apierr.CodeGlobalRoleNameTaken
 	case errors.Is(err, globalroledom.ErrInvalidName):
 		return http.StatusBadRequest, apierr.CodeGlobalRoleNameInvalid
-	case errors.Is(err, globalroledom.ErrReservedName):
-		return http.StatusBadRequest, apierr.CodeGlobalRoleNameReserved
 	case errors.Is(err, globalroledom.ErrHasAssignedUsers):
 		return http.StatusConflict, apierr.CodeGlobalRoleHasUsers
 	case errors.Is(err, globalroledom.ErrPermissionCeilingExceeded):

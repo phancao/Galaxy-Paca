@@ -124,7 +124,9 @@ func TestGetByID_NotFound(t *testing.T) {
 	}
 }
 
-func TestListGlobalPermissions_LegacyOnly(t *testing.T) {
+// Không có kho quyền thì danh sách rỗng — TÊN vai (userdom.RoleUser) không
+// còn tự cấp users.read nữa. Trước 22/09/2026 phép kiểm này mong [users.read].
+func TestListGlobalPermissions_KhongCoKhoThiRong(t *testing.T) {
 	id := uuid.New()
 	svc := usersvc.New(&stubRepo{
 		findByID: func(_ context.Context, got uuid.UUID) (*userdom.User, error) {
@@ -139,9 +141,8 @@ func TestListGlobalPermissions_LegacyOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := []string{string(authz.PermissionUsersRead)}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("unexpected permissions: want %v got %v", want, got)
+	if len(got) != 0 {
+		t.Fatalf("mong rỗng, nhận %v — tên vai đang tự cấp quyền", got)
 	}
 }
 

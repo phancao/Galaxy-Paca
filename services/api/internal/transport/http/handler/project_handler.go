@@ -66,7 +66,7 @@ func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasGlobalRead, authzErr := h.authorizer.HasPermissions(
-		r.Context(), userID, nil, claims.Role, authz.PermissionProjectsRead,
+		r.Context(), userID, nil, authz.PermissionProjectsRead,
 	)
 	if authzErr != nil {
 		presenter.Error(w, r, authzErr)

@@ -73,6 +73,26 @@ func (r *fakeUserRepo) FindByName(_ context.Context, name string) (*globalroledo
 	}
 }
 
+// ListGlobalPermissions mô phỏng đúng cái DB thật làm: quyền lấy từ HÀNG vai
+// trong global_roles, không suy ra từ tên vai trong claims. `DefaultGlobalRoles`
+// chính là bộ quyền mà seed ghi xuống cho ba vai dựng sẵn.
+func (r *fakeUserRepo) ListGlobalPermissions(_ context.Context, id uuid.UUID) ([]authz.Permission, error) {
+	u, ok := r.byID[id]
+	if !ok {
+		return nil, nil
+	}
+	for _, def := range authz.DefaultGlobalRoles() {
+		if def.Name == u.Role {
+			return append([]authz.Permission(nil), def.Permissions...), nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *fakeUserRepo) ListProjectPermissions(context.Context, uuid.UUID, uuid.UUID) ([]authz.Permission, error) {
+	return nil, nil
+}
+
 func (r *fakeUserRepo) Create(_ context.Context, u *userdom.User) error {
 	r.byUsername[u.Username] = u
 	r.byID[u.ID] = u

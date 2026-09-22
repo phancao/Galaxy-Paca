@@ -48,11 +48,14 @@ var ErrRoleResolverRequired = errors.New("user svc: role resolver required")
 // Pass optional GlobalPermissionReader and RoleByNameFinder as variadic args.
 func New(repo userdom.Repository, opts ...any) *Service {
 	s := &Service{repo: repo}
+	// Mỗi tuỳ chọn được thử với TỪNG vai nó có thể đảm nhiệm. Dùng `switch`
+	// ở đây thì một giá trị thoả cả hai giao diện chỉ điền được ô đầu tiên,
+	// ô còn lại im lặng bỏ trống — hỏng lúc chạy chứ không lúc biên dịch.
 	for _, opt := range opts {
-		switch v := opt.(type) {
-		case GlobalPermissionReader:
+		if v, ok := opt.(GlobalPermissionReader); ok {
 			s.globalPermissionReader = v
-		case RoleByNameFinder:
+		}
+		if v, ok := opt.(RoleByNameFinder); ok {
 			s.roleRepo = v
 		}
 	}
@@ -78,15 +81,13 @@ func (s *Service) List(ctx context.Context, page, pageSize int) ([]*userdom.User
 
 // ListGlobalPermissions returns effective global permissions for the user.
 func (s *Service) ListGlobalPermissions(ctx context.Context, id uuid.UUID) ([]string, error) {
-	u, err := s.repo.FindByID(ctx, id)
-	if err != nil {
+	// Đọc để xác nhận người dùng có thật (trả 404 cho id lạ) — quyền thì chỉ
+	// đến từ bảng, không còn suy ra từ `u.Role`.
+	if _, err := s.repo.FindByID(ctx, id); err != nil {
 		return nil, err
 	}
 
 	seen := map[string]struct{}{}
-	for _, p := range authz.LegacyPermissionsForRole(u.Role) {
-		seen[string(p)] = struct{}{}
-	}
 
 	if s.globalPermissionReader != nil {
 		perms, err := s.globalPermissionReader.ListGlobalPermissions(ctx, id)

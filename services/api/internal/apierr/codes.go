@@ -32,10 +32,6 @@ const (
 	CodeGlobalRoleNameTaken Code = "GLOBAL_ROLE_NAME_TAKEN"
 	// CodeGlobalRoleNameInvalid represents an invalid global role name.
 	CodeGlobalRoleNameInvalid Code = "GLOBAL_ROLE_NAME_INVALID"
-	// CodeGlobalRoleNameReserved represents a global role name that the
-	// authorization layer still treats as a privilege by name alone.
-	CodeGlobalRoleNameReserved Code = "GLOBAL_ROLE_NAME_RESERVED"
-
 	// CodeGlobalRoleHasUsers indicates the role cannot be deleted because it
 	// still has assigned users.
 	CodeGlobalRoleHasUsers Code = "GLOBAL_ROLE_HAS_ASSIGNED_USERS"

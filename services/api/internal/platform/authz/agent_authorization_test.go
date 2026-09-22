@@ -11,24 +11,10 @@ import (
 	"github.com/Paca-AI/api/internal/platform/authz"
 )
 
-type mockAgentRoleResolver struct {
-	roles map[uuid.UUID]map[uuid.UUID]string // project_id -> agent_id -> role_name
-}
-
-func (m *mockAgentRoleResolver) GetAgentProjectRoleName(_ context.Context, agentID, projectID uuid.UUID) (string, error) {
-	if projectMap, ok := m.roles[projectID]; ok {
-		if role, ok := projectMap[agentID]; ok {
-			return role, nil
-		}
-	}
-	return "", assert.AnError
-}
-
 type mockPermissionStore struct {
 	globalPerms  map[uuid.UUID][]authz.Permission
 	projectPerms map[uuid.UUID]map[uuid.UUID][]authz.Permission // project_id -> user_id -> permissions
 	agentPerms   map[uuid.UUID]map[uuid.UUID][]authz.Permission // project_id -> agent_id -> permissions
-	legacyPerms  map[string][]authz.Permission
 }
 
 func (m *mockPermissionStore) ListGlobalPermissions(_ context.Context, userID uuid.UUID) ([]authz.Permission, error) {
@@ -54,26 +40,15 @@ func TestAgentAuthorization(t *testing.T) {
 	agentID := uuid.New()
 	userID := uuid.New()
 
-	agentRoleResolver := &mockAgentRoleResolver{
-		roles: map[uuid.UUID]map[uuid.UUID]string{
-			projectID: {
-				agentID: "agent_developer",
-			},
-		},
-	}
-
 	permissionStore := &mockPermissionStore{
 		agentPerms: map[uuid.UUID]map[uuid.UUID][]authz.Permission{
 			projectID: {
 				agentID: {authz.PermissionTasksRead, authz.PermissionTasksWrite},
 			},
 		},
-		legacyPerms: map[string][]authz.Permission{
-			"agent_developer": {authz.PermissionTasksRead, authz.PermissionTasksWrite},
-		},
 	}
 
-	authorizer := authz.NewAuthorizer(permissionStore).WithAgentRoleResolver(agentRoleResolver)
+	authorizer := authz.NewAuthorizer(permissionStore)
 
 	t.Run("agent has correct project permissions", func(t *testing.T) {
 		allowed, err := authorizer.HasPermissionsForAgent(context.Background(), agentID, projectID, authz.PermissionTasksRead)
@@ -88,7 +63,7 @@ func TestAgentAuthorization(t *testing.T) {
 	})
 
 	t.Run("user permissions remain unchanged", func(t *testing.T) {
-		allowed, err := authorizer.HasPermissions(context.Background(), userID, &projectID, "user", authz.PermissionTasksRead)
+		allowed, err := authorizer.HasPermissions(context.Background(), userID, &projectID, authz.PermissionTasksRead)
 		require.NoError(t, err)
 		assert.False(t, allowed)
 	})
@@ -99,17 +74,6 @@ func TestAgentAuthorizationWithMultipleProjects(t *testing.T) {
 	project2 := uuid.New()
 	agentID := uuid.New()
 
-	agentRoleResolver := &mockAgentRoleResolver{
-		roles: map[uuid.UUID]map[uuid.UUID]string{
-			project1: {
-				agentID: "agent_developer",
-			},
-			project2: {
-				agentID: "agent_reader",
-			},
-		},
-	}
-
 	permissionStore := &mockPermissionStore{
 		agentPerms: map[uuid.UUID]map[uuid.UUID][]authz.Permission{
 			project1: {
@@ -119,13 +83,9 @@ func TestAgentAuthorizationWithMultipleProjects(t *testing.T) {
 				agentID: {authz.PermissionTasksRead},
 			},
 		},
-		legacyPerms: map[string][]authz.Permission{
-			"agent_developer": {authz.PermissionTasksRead, authz.PermissionTasksWrite},
-			"agent_reader":    {authz.PermissionTasksRead},
-		},
 	}
 
-	authorizer := authz.NewAuthorizer(permissionStore).WithAgentRoleResolver(agentRoleResolver)
+	authorizer := authz.NewAuthorizer(permissionStore)
 
 	t.Run("agent has write permission in project1", func(t *testing.T) {
 		allowed, err := authorizer.HasPermissionsForAgent(context.Background(), agentID, project1, authz.PermissionTasksWrite)

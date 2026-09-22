@@ -40,7 +40,7 @@ func (h *GlobalRoleHandler) callerGlobalPermissions(r *http.Request) (authz.Perm
 	if err != nil {
 		return nil, apierr.New(apierr.CodeBadRequest, "invalid subject claim")
 	}
-	return h.authorizer.EffectivePermissions(r.Context(), userID, nil, claims.Role)
+	return h.authorizer.EffectivePermissions(r.Context(), userID, nil)
 }
 
 // List handles GET /admin/global-roles.
