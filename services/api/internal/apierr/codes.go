@@ -61,6 +61,9 @@ const (
 	CodeProjectRoleNameTaken Code = "PROJECT_ROLE_NAME_TAKEN"
 	// CodeProjectRoleNameInvalid indicates an invalid or empty role name.
 	CodeProjectRoleNameInvalid Code = "PROJECT_ROLE_NAME_INVALID"
+	// CodeProjectRolePermissionsInvalid indicates the role carries permission
+	// keys that exist in no vocabulary (neither built-in nor plugin-declared).
+	CodeProjectRolePermissionsInvalid Code = "PROJECT_ROLE_PERMISSIONS_INVALID"
 	// CodeProjectRoleHasMembers indicates the role cannot be deleted because members still use it.
 	CodeProjectRoleHasMembers Code = "PROJECT_ROLE_HAS_MEMBERS"
 

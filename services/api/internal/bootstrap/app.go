@@ -282,7 +282,7 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	authService := authsvc.New(userRepo, tokenManager, refreshStore, cfg.JWT.RefreshTTL, cfg.JWT.RefreshSessionTTL)
 	userService := usersvc.New(userRepo, permissionStore, globalRoleRepo)
 	globalRoleService := globalrolesvc.NewCachedService(globalrolesvc.New(globalRoleRepo), cacheStore, cfg.Cache.ConfigTTL, log)
-	projectService := projectsvc.NewCachedService(projectsvc.New(projectRepo, taskRepo), cacheStore, cfg.Cache.ProjectTTL, cfg.Cache.ConfigTTL, log)
+	projectService := projectsvc.NewCachedService(projectsvc.New(projectRepo, taskRepo).WithPluginPermissions(pluginRepo), cacheStore, cfg.Cache.ProjectTTL, cfg.Cache.ConfigTTL, log)
 	taskService := tasksvc.NewCachedService(tasksvc.New(taskRepo).WithWorkflowStatusChecker(rawWorkflowRepo), cacheStore, cfg.Cache.ConfigTTL, log)
 	versionService := versionsvc.New(versionRepo)
 	componentService := componentsvc.New(componentRepo)

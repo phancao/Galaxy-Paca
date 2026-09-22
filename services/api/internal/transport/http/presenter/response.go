@@ -130,6 +130,8 @@ func statusAndCodeFor(err error) (int, apierr.Code) {
 		return http.StatusConflict, apierr.CodeProjectRoleNameTaken
 	case errors.Is(err, projectdom.ErrRoleNameInvalid):
 		return http.StatusBadRequest, apierr.CodeProjectRoleNameInvalid
+	case errors.Is(err, projectdom.ErrRolePermissionsInvalid):
+		return http.StatusBadRequest, apierr.CodeProjectRolePermissionsInvalid
 	case errors.Is(err, projectdom.ErrRoleHasMembers):
 		return http.StatusConflict, apierr.CodeProjectRoleHasMembers
 	case errors.Is(err, projectdom.ErrMemberNotFound):
@@ -415,7 +417,8 @@ func httpStatusForCode(code apierr.Code) int {
 		return http.StatusNotFound
 	case apierr.CodeProjectRoleNameTaken:
 		return http.StatusConflict
-	case apierr.CodeProjectRoleNameInvalid:
+	case apierr.CodeProjectRoleNameInvalid,
+		apierr.CodeProjectRolePermissionsInvalid:
 		return http.StatusBadRequest
 	case apierr.CodeProjectRoleHasMembers:
 		return http.StatusConflict

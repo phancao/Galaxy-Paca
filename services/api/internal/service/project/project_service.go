@@ -87,6 +87,10 @@ type taskBootstrapper interface {
 type Service struct {
 	repo     projectdom.Repository
 	taskRepo taskBootstrapper
+	// pluginPerms supplies the permission keys installed plugins declare, so
+	// role validation does not reject them as junk. Optional; see
+	// WithPluginPermissions.
+	pluginPerms PluginPermissionSource
 }
 
 // New returns a configured project service.
