@@ -3696,6 +3696,29 @@ func taskListFieldSum(t *testing.T, body []byte) (float64, bool) {
 // sum_field with custom task field in list response
 // ---------------------------------------------------------------------------
 
+// seedNumberCustomField khai báo một custom field kiểu number cho project.
+//
+// Bắt buộc phải gọi TRƯỚC khi tạo task mang field ấy: ValidateCustomFields
+// (ADR-040 P0, 3a7e4c8f) VỨT mọi khoá không có định nghĩa trong project —
+// "drop rather than persist junk". Không khai báo trước thì giá trị không bao
+// giờ được lưu, và sum_field cộng ra 0 chứ không báo lỗi gì.
+//
+// is_required để false và không đặt default_value, nên luật required/default
+// không chạm tới những task cố tình bỏ trống field trong các phép kiểm dưới.
+func seedNumberCustomField(t *testing.T, r http.Handler, tok string, projectID uuid.UUID, fieldKey string) {
+	t.Helper()
+	w := serve(r, authedJSONReq(t.Context(), http.MethodPost,
+		fmt.Sprintf("/api/v1/projects/%s/custom-fields", projectID), tok, map[string]any{
+			"field_key":    fieldKey,
+			"display_name": fieldKey,
+			"field_type":   "number",
+			"is_required":  false,
+		}))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("seed custom field %q: expected 201, got %d (%s)", fieldKey, w.Code, w.Body.String())
+	}
+}
+
 func TestIntegrationTasks_SumCustomField_BasicSum(t *testing.T) {
 	// Verifies that sum_field=<custom_key> sums the numeric custom field value
 	// across all matching tasks.
@@ -3709,6 +3732,10 @@ func TestIntegrationTasks_SumCustomField_BasicSum(t *testing.T) {
 	r := buildTaskTestRouter(taskRepo, store)
 	tok := issueTaskToken(t, uuid.NewString())
 	base := fmt.Sprintf("/api/v1/projects/%s/tasks", projectID)
+
+	// Field phải tồn tại TRƯỚC khi task mang nó được tạo — nếu không
+	// ValidateCustomFields vứt giá trị và sum_field lặng lẽ ra 0.
+	seedNumberCustomField(t, r, tok, projectID, "effort")
 
 	// Create tasks with a numeric custom field "effort".
 	for _, effort := range []float64{3, 5, 7} {
@@ -3748,6 +3775,10 @@ func TestIntegrationTasks_SumCustomField_FilterBySprint(t *testing.T) {
 	r := buildTaskTestRouter(taskRepo, store)
 	tok := issueTaskToken(t, uuid.NewString())
 	base := fmt.Sprintf("/api/v1/projects/%s/tasks", projectID)
+
+	// Field phải tồn tại TRƯỚC khi task mang nó được tạo — nếu không
+	// ValidateCustomFields vứt giá trị và sum_field lặng lẽ ra 0.
+	seedNumberCustomField(t, r, tok, projectID, "effort")
 
 	// Sprint tasks: effort 4 + 6 = 10.
 	for _, effort := range []float64{4, 6} {
@@ -3793,6 +3824,10 @@ func TestIntegrationTasks_SumCustomField_BacklogOnly(t *testing.T) {
 	tok := issueTaskToken(t, uuid.NewString())
 	base := fmt.Sprintf("/api/v1/projects/%s/tasks", projectID)
 
+	// Field phải tồn tại TRƯỚC khi task mang nó được tạo — nếu không
+	// ValidateCustomFields vứt giá trị và sum_field lặng lẽ ra 0.
+	seedNumberCustomField(t, r, tok, projectID, "effort")
+
 	// Backlog tasks: effort 2 + 8 = 10.
 	for _, effort := range []float64{2, 8} {
 		serve(r, authedJSONReq(t.Context(), http.MethodPost, base, tok, map[string]any{
@@ -3832,6 +3867,10 @@ func TestIntegrationTasks_SumCustomField_IgnoresCursor(t *testing.T) {
 	r := buildTaskTestRouter(taskRepo, store)
 	tok := issueTaskToken(t, uuid.NewString())
 	base := fmt.Sprintf("/api/v1/projects/%s/tasks", projectID)
+
+	// Field phải tồn tại TRƯỚC khi task mang nó được tạo — nếu không
+	// ValidateCustomFields vứt giá trị và sum_field lặng lẽ ra 0.
+	seedNumberCustomField(t, r, tok, projectID, "effort")
 
 	for i := range 5 {
 		serve(r, authedJSONReq(t.Context(), http.MethodPost, base, tok, map[string]any{
