@@ -30,6 +30,23 @@ func openProjectRepoTestDB(t *testing.T) *sqlx.DB {
 			created_by   TEXT,
 			created_at   DATETIME,
 			deleted_at   DATETIME
+		);
+
+		-- ProjectRepository.Delete cascade nhánh soft-delete sang hai bảng con
+		-- (xem chú thích ở project_repository.go). Thiếu chúng thì Delete nổ
+		-- "no such table: tasks" và MỌI phép kiểm soft-delete đỏ.
+		CREATE TABLE tasks (
+			id         TEXT PRIMARY KEY,
+			project_id TEXT NOT NULL,
+			title      TEXT NOT NULL DEFAULT '',
+			updated_at DATETIME,
+			deleted_at DATETIME
+		);
+
+		CREATE TABLE project_members (
+			project_id TEXT NOT NULL,
+			user_id    TEXT NOT NULL,
+			deleted_at DATETIME
 		);`
 	if _, err := db.ExecContext(context.Background(), schema); err != nil {
 		t.Fatalf("create schema: %v", err)
@@ -72,6 +89,93 @@ func TestProjectRepository_Delete_SetsDeletedAt(t *testing.T) {
 	}
 	if rec.DeletedAt == nil {
 		t.Fatal("expected deleted_at to be non-nil after Delete")
+	}
+}
+
+// TestProjectRepository_Delete_CascadesSoftDeleteToTasksAndMembers đo CHÍNH cái
+// mà 3652a22d thêm vào Delete, chứ không chỉ đo rằng Delete hết nổ.
+//
+// Không có phép kiểm này thì bảng tasks/project_members trong schema test chỉ là
+// thứ làm cho hết đỏ: bỏ hẳn hai lệnh UPDATE cascade khỏi mã sản xuất, mọi phép
+// kiểm soft-delete khác vẫn xanh, và hai lỗi mà 3652a22d vá (ghost member,
+// hai task cùng mang khoá ABC-1 sau khi prefix được tái dùng) lặng lẽ trở lại.
+func TestProjectRepository_Delete_CascadesSoftDeleteToTasksAndMembers(t *testing.T) {
+	db := openProjectRepoTestDB(t)
+	repo := NewProjectRepository(db)
+	ctx := context.Background()
+
+	p := testProject(uuid.New(), "CAS")
+	if err := repo.Create(ctx, p); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	liveTask := uuid.New()
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO tasks (id, project_id, title) VALUES ($1, $2, $3)`,
+		liveTask.String(), p.ID.String(), "task còn sống"); err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+
+	// Task đã bị xoá mềm TỪ TRƯỚC: mệnh đề `AND deleted_at IS NULL` phải chừa
+	// nó ra, chứ không dập lại dấu thời gian.
+	goneTask := uuid.New()
+	earlier := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO tasks (id, project_id, title, deleted_at) VALUES ($1, $2, $3, $4)`,
+		goneTask.String(), p.ID.String(), "task xoá từ trước", earlier); err != nil {
+		t.Fatalf("seed deleted task: %v", err)
+	}
+
+	// Task của project KHÁC: cascade không được đụng tới.
+	other := testProject(uuid.New(), "OTH")
+	if err := repo.Create(ctx, other); err != nil {
+		t.Fatalf("Create other: %v", err)
+	}
+	otherTask := uuid.New()
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO tasks (id, project_id, title) VALUES ($1, $2, $3)`,
+		otherTask.String(), other.ID.String(), "task project khác"); err != nil {
+		t.Fatalf("seed other task: %v", err)
+	}
+
+	member := uuid.New()
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO project_members (project_id, user_id) VALUES ($1, $2)`,
+		p.ID.String(), member.String()); err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+
+	if err := repo.Delete(ctx, p.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	taskDeletedAt := func(id uuid.UUID) *time.Time {
+		t.Helper()
+		var at *time.Time
+		if err := db.GetContext(ctx, &at, `SELECT deleted_at FROM tasks WHERE id = $1`, id.String()); err != nil {
+			t.Fatalf("read task %s: %v", id, err)
+		}
+		return at
+	}
+
+	if at := taskDeletedAt(liveTask); at == nil {
+		t.Error("task còn sống của project bị xoá phải được đánh dấu deleted_at")
+	}
+	if at := taskDeletedAt(goneTask); at == nil || !at.UTC().Equal(earlier) {
+		t.Errorf("task đã xoá từ trước phải giữ nguyên dấu thời gian %v, got %v", earlier, at)
+	}
+	if at := taskDeletedAt(otherTask); at != nil {
+		t.Error("cascade không được đụng tới task của project khác")
+	}
+
+	var memberDeletedAt *time.Time
+	if err := db.GetContext(ctx, &memberDeletedAt,
+		`SELECT deleted_at FROM project_members WHERE project_id = $1 AND user_id = $2`,
+		p.ID.String(), member.String()); err != nil {
+		t.Fatalf("read member: %v", err)
+	}
+	if memberDeletedAt == nil {
+		t.Error("thành viên của project bị xoá phải được đánh dấu deleted_at (ghost member)")
 	}
 }
 
