@@ -173,7 +173,7 @@ func newOIDCTestHandler(t *testing.T, fi *fakeIssuer, resolver *fakeResolver, se
 func doLogin(t *testing.T, h *handler.OIDCHandler) (*url.URL, *http.Cookie) {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	h.Login(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/login", nil))
+	h.Login(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/login", nil))
 
 	if rec.Code != http.StatusFound {
 		t.Fatalf("login: expected 302, got %d (%s)", rec.Code, rec.Body.String())
@@ -244,7 +244,7 @@ func TestOIDCCallbackHappyPath(t *testing.T) {
 	state := loc.Query().Get("state")
 	challenge := loc.Query().Get("code_challenge")
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(state), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(state), nil)
 	req.AddCookie(stateCookie)
 	rec := httptest.NewRecorder()
 	h.Callback(rec, req)
@@ -312,7 +312,7 @@ func TestOIDCCallbackRejectsTokenWithoutTenant(t *testing.T) {
 	h := newOIDCTestHandler(t, fi, resolver, sessions)
 
 	loc, stateCookie := doLogin(t, h)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
 	req.AddCookie(stateCookie)
 	rec := httptest.NewRecorder()
 	h.Callback(rec, req)
@@ -338,7 +338,7 @@ func TestOIDCCallbackRejectsOtherTenant(t *testing.T) {
 	h := newOIDCTestHandler(t, fi, resolver, sessions)
 
 	loc, stateCookie := doLogin(t, h)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
 	req.AddCookie(stateCookie)
 	rec := httptest.NewRecorder()
 	h.Callback(rec, req)
@@ -357,7 +357,7 @@ func TestOIDCCallbackRejectsStateMismatch(t *testing.T) {
 
 	_, stateCookie := doLogin(t, h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state=forged-state", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state=forged-state", nil)
 	req.AddCookie(stateCookie)
 	rec := httptest.NewRecorder()
 	h.Callback(rec, req)
@@ -378,7 +378,7 @@ func TestOIDCCallbackRejectsWrongAudience(t *testing.T) {
 	loc, stateCookie := doLogin(t, h)
 	state := loc.Query().Get("state")
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(state), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(state), nil)
 	req.AddCookie(stateCookie)
 	rec := httptest.NewRecorder()
 	h.Callback(rec, req)

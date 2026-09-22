@@ -80,7 +80,7 @@ func (c *Client) mintActAsToken(ctx context.Context, userSub string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("mint request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("mint failed: status %d: %s", resp.StatusCode, snippet(raw))
@@ -139,7 +139,7 @@ func (c *Client) WriteDescription(ctx context.Context, userSub, title, currentDe
 	if err != nil {
 		return "", fmt.Errorf("ai request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ai completion failed: status %d: %s", resp.StatusCode, snippet(raw))
@@ -165,9 +165,9 @@ func (c *Client) WriteDescription(ctx context.Context, userSub, title, currentDe
 }
 
 func snippet(b []byte) string {
-	const max = 300
-	if len(b) > max {
-		return string(b[:max])
+	const maxLen = 300
+	if len(b) > maxLen {
+		return string(b[:maxLen])
 	}
 	return string(b)
 }

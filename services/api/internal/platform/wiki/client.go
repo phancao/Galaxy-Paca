@@ -140,7 +140,7 @@ func (c *Client) rpc(ctx context.Context, actor Actor, method string, body any, 
 	if err != nil {
 		return fmt.Errorf("wiki %s: %w", method, err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	raw, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 	if err != nil {
 		return fmt.Errorf("wiki %s: read: %w", method, err)

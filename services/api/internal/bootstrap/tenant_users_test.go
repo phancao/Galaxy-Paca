@@ -91,9 +91,9 @@ func do(t *testing.T, m *tenantMux, method, url, secret, body string) *httptest.
 	t.Helper()
 	var r *http.Request
 	if body == "" {
-		r = httptest.NewRequest(method, url, nil)
+		r = httptest.NewRequestWithContext(t.Context(), method, url, nil)
 	} else {
-		r = httptest.NewRequest(method, url, strings.NewReader(body))
+		r = httptest.NewRequestWithContext(t.Context(), method, url, strings.NewReader(body))
 	}
 	if secret != "" {
 		r.Header.Set("X-Service-Secret", secret)

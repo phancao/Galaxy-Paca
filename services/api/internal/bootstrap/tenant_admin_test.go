@@ -19,7 +19,7 @@ func newTestMux(h *tenantAdminHandler) *tenantMux {
 
 func post(t *testing.T, h http.Handler, secret, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	r := httptest.NewRequest(http.MethodPost, "/internal/tenant-admin", strings.NewReader(body))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/tenant-admin", strings.NewReader(body))
 	if secret != "" {
 		r.Header.Set("X-Service-Secret", secret)
 	}
@@ -74,7 +74,7 @@ func TestMissingSecretHeaderIsRefused(t *testing.T) {
 
 func TestGetIsRefused(t *testing.T) {
 	h := newTenantAdminHandler(map[string]*tenantApp{}, testSecret, slog.Default())
-	r := httptest.NewRequest(http.MethodGet, "/internal/tenant-admin", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/internal/tenant-admin", nil)
 	r.Header.Set("X-Service-Secret", testSecret)
 	w := httptest.NewRecorder()
 	newTestMux(h).ServeHTTP(w, r)
@@ -153,7 +153,7 @@ func TestOtherInternalPathsAreNotFoundNotRoutedToATenant(t *testing.T) {
 	// platform call silently acts on the wrong tenant.
 	h := newTenantAdminHandler(map[string]*tenantApp{}, testSecret, slog.Default())
 	m := newTestMux(h)
-	r := httptest.NewRequest(http.MethodPost, "/internal/something-else", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/something-else", nil)
 	r.Header.Set("X-Service-Secret", testSecret)
 	w := httptest.NewRecorder()
 	m.ServeHTTP(w, r)
