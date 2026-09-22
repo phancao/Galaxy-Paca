@@ -21,8 +21,9 @@ import (
 	"strings"
 	"time"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // UserStore is the persistence contract nexussync needs.  It is implemented
@@ -238,7 +239,7 @@ func confirmVortexUserActive(ctx context.Context, userID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return false, fmt.Errorf("identity /internal/users status %d", resp.StatusCode)
 	}

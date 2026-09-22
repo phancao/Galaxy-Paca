@@ -10,8 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // memUserService is the tenant's own use-case, faked. It records what the
@@ -91,9 +92,9 @@ func do(t *testing.T, m *tenantMux, method, url, secret, body string) *httptest.
 	t.Helper()
 	var r *http.Request
 	if body == "" {
-		r = httptest.NewRequest(method, url, nil)
+		r = httptest.NewRequestWithContext(t.Context(), method, url, nil)
 	} else {
-		r = httptest.NewRequest(method, url, strings.NewReader(body))
+		r = httptest.NewRequestWithContext(t.Context(), method, url, strings.NewReader(body))
 	}
 	if secret != "" {
 		r.Header.Set("X-Service-Secret", secret)

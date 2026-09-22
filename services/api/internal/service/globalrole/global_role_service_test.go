@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
+
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	"github.com/Paca-AI/api/internal/platform/authz"
 	globalrolesvc "github.com/Paca-AI/api/internal/service/globalrole"
-	"github.com/google/uuid"
 )
 
 // superAdmin is a caller permission set holding "*", which bypasses the grant

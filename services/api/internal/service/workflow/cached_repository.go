@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 	"github.com/Paca-AI/api/internal/platform/cache"
-	"github.com/google/uuid"
 )
 
 // CachedRepository decorates a workflowdom.Repository with a Redis-backed

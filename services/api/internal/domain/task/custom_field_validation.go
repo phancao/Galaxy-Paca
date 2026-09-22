@@ -47,6 +47,10 @@ func ValidateFieldDefinition(ft FieldType, options []string, cascadeOptions []Ca
 				return ErrCustomFieldOptionsInvalid
 			}
 		}
+	default:
+		// Text/number/date/boolean/url/user/label: không có ràng buộc cấu trúc
+		// nào trên BẢN THÂN định nghĩa — giá trị mới là thứ được kiểm, ở
+		// coerceFieldValue. Nhánh default này là CHỦ Ý, không phải bỏ sót.
 	}
 	return nil
 }

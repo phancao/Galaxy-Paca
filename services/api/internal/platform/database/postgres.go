@@ -125,7 +125,7 @@ func createDatabase(dsn string, log *slog.Logger) (string, error) {
 		return "", fmt.Errorf("dsn names no database")
 	}
 	for _, c := range name {
-		if !(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '_' {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' {
 			return "", fmt.Errorf("refusing to create database %q: name must be lowercase letters, digits or underscore", name)
 		}
 	}

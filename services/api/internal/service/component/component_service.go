@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	componentdom "github.com/Paca-AI/api/internal/domain/component"
 	"github.com/google/uuid"
+
+	componentdom "github.com/Paca-AI/api/internal/domain/component"
 )
 
 // Service is the concrete implementation of componentdom.Service.

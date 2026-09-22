@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
-	"github.com/google/uuid"
 )
 
 // seedProjectAdminUser creates a user and assigns them a global role that grants
@@ -70,11 +71,21 @@ func createProjectViaAPI(t *testing.T, env *e2eEnv, client *http.Client, token, 
 }
 
 // createProjectRoleViaAPI creates a project-scoped role and returns its ID.
+//
+// Quyền của vai phải là khoá THẬT nằm trong tầm người gọi. Từ vựng quyền LUÔN
+// có không gian tên (xem internal/platform/authz/permissions.go: projects.read,
+// tasks.read, project.members.read …) — không tồn tại khoá trần "read". Helper
+// này từng cấp {"read": true}, một khoá rác không có nghĩa với hệ thống, và vì
+// ceiling PACA-4 trong AddMember đòi người gọi phải BAO được mọi quyền của vai
+// được gán, không ai ngoài người giữ "*" gán nổi vai ấy — 403.
+//
+// project.members.read nằm trong 8 quyền mà seedProjectAdminUser cấp, nên vai
+// này nằm gọn dưới trần của người gọi. KHÔNG nới trần để test xanh.
 func createProjectRoleViaAPI(t *testing.T, env *e2eEnv, client *http.Client, token, projectID, roleName string) string {
 	t.Helper()
 	body := jsonBody(t, map[string]any{
 		"role_name":   roleName,
-		"permissions": map[string]any{"read": true},
+		"permissions": map[string]any{"project.members.read": true},
 	})
 	url := fmt.Sprintf("%s/api/v1/projects/%s/roles", env.base, projectID)
 	req := mustRequest(env.ctx, t, http.MethodPost, url, body)

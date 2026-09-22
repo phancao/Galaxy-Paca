@@ -3,8 +3,9 @@ package globalroledom
 import (
 	"context"
 
-	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/google/uuid"
+
+	"github.com/Paca-AI/api/internal/platform/authz"
 )
 
 // CreateInput carries fields for creating a new global role.

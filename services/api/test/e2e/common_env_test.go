@@ -24,6 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+
 	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/Paca-AI/api/internal/platform/cache"
 	"github.com/Paca-AI/api/internal/platform/database"
@@ -43,10 +48,6 @@ import (
 	workflowsvc "github.com/Paca-AI/api/internal/service/workflow"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	"github.com/Paca-AI/api/internal/transport/http/router"
-	"github.com/jmoiron/sqlx"
-	"github.com/redis/go-redis/v9"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const (
@@ -236,6 +237,9 @@ func newE2EEnv(t *testing.T) *e2eEnv {
 		RefreshSessionTTL: e2eRefreshSessionTTL,
 	}
 	engine := router.New(router.Deps{
+		// ADR-058 D7: POST /auth/login chỉ được đăng ký khi cờ này bật
+		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
+		LocalLoginEnabled:    true,
 		TokenManager:         tm,
 		APIKeyAuth:           apiKeyService,
 		Authorizer:           authz.NewAuthorizer(authzStore),

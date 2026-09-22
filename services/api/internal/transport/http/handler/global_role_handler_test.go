@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 type mockGlobalRoleSvc struct {

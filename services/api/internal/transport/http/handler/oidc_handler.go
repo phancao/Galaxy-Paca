@@ -307,7 +307,7 @@ func (h *OIDCHandler) exchangeCode(ctx context.Context, code, verifier string) (
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
@@ -376,7 +376,7 @@ func (h *OIDCHandler) renderTenantMismatch(w http.ResponseWriter, sessionTenant 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusForbidden)
-	fmt.Fprintf(w, `<!doctype html><html lang="vi"><meta charset="utf-8">
+	_, _ = fmt.Fprintf(w, `<!doctype html><html lang="vi"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sai nơi làm việc</title>
 <style>

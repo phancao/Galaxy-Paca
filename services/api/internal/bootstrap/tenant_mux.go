@@ -165,7 +165,7 @@ func tenantFromAPIKey(key string) string {
 	}
 	code := strings.ToLower(parts[1])
 	for _, c := range code {
-		if !(c >= 'a' && c <= 'z') && !(c >= '0' && c <= '9') && c != '-' {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
 			return ""
 		}
 	}

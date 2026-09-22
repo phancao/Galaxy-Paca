@@ -13,10 +13,11 @@ import (
 	"testing"
 	"time"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
-	"github.com/Paca-AI/api/internal/platform/oidc"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
+	"github.com/Paca-AI/api/internal/platform/oidc"
 )
 
 // newFakeJWKSIssuer serves discovery + JWKS for a generated RSA key and

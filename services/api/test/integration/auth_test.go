@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/Paca-AI/api/internal/platform/authz"
@@ -18,8 +21,6 @@ import (
 	authsvc "github.com/Paca-AI/api/internal/service/auth"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	"github.com/Paca-AI/api/internal/transport/http/router"
-	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // -- fakes -------------------------------------------------------------------
@@ -150,12 +151,15 @@ func buildTestRouter(repo *fakeUserRepo) http.Handler {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	return router.New(router.Deps{
-		TokenManager: tm,
-		Authorizer:   authz.NewAuthorizer(nil),
-		Health:       handler.NewHealthHandler(),
-		Auth:         handler.NewAuthHandler(authService, testCookieCfg),
-		User:         handler.NewUserHandler(nil),
-		Log:          log,
+		// ADR-058 D7: POST /auth/login chỉ được đăng ký khi cờ này bật
+		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
+		LocalLoginEnabled: true,
+		TokenManager:      tm,
+		Authorizer:        authz.NewAuthorizer(nil),
+		Health:            handler.NewHealthHandler(),
+		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
+		User:              handler.NewUserHandler(nil),
+		Log:               log,
 	})
 }
 
@@ -343,4 +347,69 @@ func TestLogin_RememberMe_Omitted_DefaultsToFalse(t *testing.T) {
 		}
 	}
 	t.Fatal("refresh_token cookie not found")
+}
+
+// -- ADR-058 D7: cửa mật khẩu là cửa phá kính ----------------------------------
+
+// buildTestRouterNoLocalLogin dựng đúng router như buildTestRouter nhưng ĐÓNG
+// cửa đăng nhập bằng mật khẩu, tức deployment đã có SSO (ADR-058 D7).
+func buildTestRouterNoLocalLogin(repo *fakeUserRepo) http.Handler {
+	tm := jwttoken.New(testSecret, 15*time.Minute, 168*time.Hour)
+	store := &fakeRefreshStore{}
+	authService := authsvc.New(repo, tm, store, 168*time.Hour, 24*time.Hour)
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	return router.New(router.Deps{
+		LocalLoginEnabled: false,
+		TokenManager:      tm,
+		Authorizer:        authz.NewAuthorizer(nil),
+		Health:            handler.NewHealthHandler(),
+		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
+		User:              handler.NewUserHandler(nil),
+		Log:               log,
+	})
+}
+
+// TestLogin_LocalLoginDisabled_RouteAbsent là cổng ĐỐI CHỨNG cho ADR-058 D7.
+//
+// Trước bản vá này KHÔNG có phép kiểm nào đo hành vi ấy: mọi bộ khung test bỏ
+// trống LocalLoginEnabled, nên tất cả đều chạy ở nhánh "cửa đóng" một cách tình
+// cờ và cùng đỏ ở bước đăng nhập. Nếu cờ bị nối sai và cửa mật khẩu mở toang
+// trên một deployment có SSO, sẽ không cổng nào đỏ. Phép kiểm này đóng khe đó.
+func TestLogin_LocalLoginDisabled_RouteAbsent(t *testing.T) {
+	repo := newFakeUserRepo()
+
+	hash, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.MinCost)
+	_ = repo.Create(context.Background(), &userdom.User{
+		ID:           uuid.New(),
+		Username:     "testuser",
+		PasswordHash: string(hash),
+		Role:         userdom.RoleUser,
+	})
+
+	r := buildTestRouterNoLocalLogin(repo)
+
+	body, _ := json.Marshal(map[string]string{
+		"username": "testuser",
+		"password": "password123",
+	})
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// 404, KHÔNG phải 401: tuyến không tồn tại, nên thông tin đăng nhập đúng
+	// cũng không lọt qua được. Một 200 ở đây nghĩa là cửa phá kính đang mở.
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("cửa mật khẩu phải vắng mặt: want 404, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Phần còn lại của router vẫn sống — chứng minh 404 ở trên là do CỜ, không
+	// phải do router hỏng hay tiền tố đường dẫn sai.
+	cfgReq := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/config", nil)
+	cfgW := httptest.NewRecorder()
+	r.ServeHTTP(cfgW, cfgReq)
+	if cfgW.Code != http.StatusOK {
+		t.Fatalf("/auth/config phải còn sống: want 200, got %d: %s", cfgW.Code, cfgW.Body.String())
+	}
 }

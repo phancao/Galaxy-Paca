@@ -8,12 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 	"github.com/Paca-AI/api/internal/events"
 	"github.com/Paca-AI/api/internal/platform/messaging"
-	"github.com/google/uuid"
 )
 
 // taskLookup is the minimal task-domain surface the workflow service needs.

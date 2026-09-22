@@ -14,10 +14,11 @@ import (
 	"strings"
 	"time"
 
-	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+
+	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // ErrUserNotProvisioned indicates the asserted identity has no local account

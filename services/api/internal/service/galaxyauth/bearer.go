@@ -14,8 +14,9 @@ import (
 	"net/http"
 	"strings"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/golang-jwt/jwt/v5"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // TokenVerifier validates a raw token against the trusted issuer (signature

@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
-	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 	"github.com/google/uuid"
+
+	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 )
 
 // --- Workflow DTOs ------------------------------------------------------------

@@ -10,13 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
+
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 	"github.com/Paca-AI/api/internal/events"
 	"github.com/Paca-AI/api/internal/platform/messaging"
-	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 )
 
 const (

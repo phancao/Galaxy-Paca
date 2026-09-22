@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	wikispacedom "github.com/Paca-AI/api/internal/domain/wikispace"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	wikispacedom "github.com/Paca-AI/api/internal/domain/wikispace"
 )
 
 type projectWikiSpaceRecord struct {

@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	componentdom "github.com/Paca-AI/api/internal/domain/component"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	componentdom "github.com/Paca-AI/api/internal/domain/component"
 )
 
 type componentRecord struct {

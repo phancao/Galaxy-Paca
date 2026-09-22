@@ -4,8 +4,8 @@ import "errors"
 
 // Sentinel domain errors for the task aggregate.
 var (
-	ErrTaskNotFound            = errors.New("task: not found")
-	ErrTaskTitleInvalid        = errors.New("task: title is empty or invalid")
+	ErrTaskNotFound     = errors.New("task: not found")
+	ErrTaskTitleInvalid = errors.New("task: title is empty or invalid")
 	// ErrTaskReferenceInvalid is returned when a task write references an entity
 	// that does not exist or does not belong to this project — an assignee or
 	// reporter member id, or a version/component/sprint/status/type id. It maps

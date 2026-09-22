@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // userRecord is the sqlx write model for the users table. It mirrors the
@@ -147,8 +148,8 @@ func (r *UserRepository) FindByUsernameIncludingDeleted(ctx context.Context, use
 //
 // Galaxy (ADR-038): the optional Email/OIDCSub identity links are written in
 // the same INSERT (NULLIF keeps empty = NULL so the partial unique indexes
-// never collide on ''), so an admin/directory-sync creation is atomic — a
-// conflicting email or subject fails the whole INSERT and leaves no
+// never collide on the empty string), so an admin/directory-sync creation is
+// atomic — a conflicting email or subject fails the whole INSERT and leaves no
 // half-linked row behind.
 func (r *UserRepository) Create(ctx context.Context, u *userdom.User) error {
 	_, err := r.db.ExecContext(ctx, `
