@@ -1023,7 +1023,7 @@ func (r *Runtime) registerHTTPFunctions(b wazero.HostModuleBuilder, _ plugindom.
 				projectID = &pid
 			}
 
-			granted, err := r.services.Authorizer.HasPermissions(ctx, userID, projectID, req.CallerRole, authz.Permission(permission))
+			granted, err := r.services.Authorizer.HasPermissions(ctx, userID, projectID, authz.Permission(permission))
 			if err != nil || !granted {
 				stack[0] = 0
 				return

@@ -22,14 +22,17 @@ func (s *stubPermissionStore) ListProjectPermissions(context.Context, uuid.UUID,
 	return s.projectPerms, nil
 }
 
-func TestAuthorizer_LegacyAdminFallback(t *testing.T) {
+// TestAuthorizer_NoStoreGrantsNothing: không có kho quyền thì không cấp gì.
+// Trước 22/09/2026 phép kiểm ở chỗ này mong điều ngược lại — vai TÊN "ADMIN"
+// cấp được users.delete với `store == nil`. Xem no_permissions_from_role_name_test.go.
+func TestAuthorizer_NoStoreGrantsNothing(t *testing.T) {
 	a := authz.NewAuthorizer(nil)
-	ok, err := a.HasPermissions(context.Background(), uuid.New(), nil, "ADMIN", authz.PermissionUsersDelete)
+	ok, err := a.HasPermissions(context.Background(), uuid.New(), nil, authz.PermissionUsersDelete)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !ok {
-		t.Fatal("expected ADMIN legacy role to authorize users.delete")
+	if ok {
+		t.Fatal("no permission store must grant nothing")
 	}
 }
 
@@ -40,7 +43,7 @@ func TestAuthorizer_GlobalAndProjectPermissions(t *testing.T) {
 		projectPerms: []authz.Permission{authz.PermissionTasksWrite},
 	})
 
-	ok, err := a.HasPermissions(context.Background(), uuid.New(), &projectID, "USER", authz.PermissionTasksWrite)
+	ok, err := a.HasPermissions(context.Background(), uuid.New(), &projectID, authz.PermissionTasksWrite)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,7 +54,7 @@ func TestAuthorizer_GlobalAndProjectPermissions(t *testing.T) {
 
 func TestAuthorizer_WildcardMatch(t *testing.T) {
 	a := authz.NewAuthorizer(&stubPermissionStore{globalPerms: []authz.Permission{authz.PermissionTasksAll}})
-	ok, err := a.HasPermissions(context.Background(), uuid.New(), nil, "USER", authz.PermissionTasksWrite)
+	ok, err := a.HasPermissions(context.Background(), uuid.New(), nil, authz.PermissionTasksWrite)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

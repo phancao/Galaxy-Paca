@@ -39,10 +39,6 @@ func (s *Service) Create(ctx context.Context, in globalroledom.CreateInput, call
 	if name == "" {
 		return nil, globalroledom.ErrInvalidName
 	}
-	if err := enforceReservedName(caller, name); err != nil {
-		return nil, err
-	}
-
 	if err := enforceGrantCeiling(caller, in.Permissions); err != nil {
 		return nil, err
 	}
@@ -84,15 +80,6 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, in globalroledom.Upd
 	if name == "" {
 		return nil, globalroledom.ErrInvalidName
 	}
-	// Đổi tên cũng là một đường lách: `EqualFold` bên dưới coi "Admin" khác
-	// "ANALYST" nên cho qua, rồi `FindByName` so nguyên văn nên không thấy
-	// "ADMIN" đã tồn tại. Chặn ở đây, trước cả hai.
-	if !strings.EqualFold(name, role.Name) {
-		if err := enforceReservedName(caller, name); err != nil {
-			return nil, err
-		}
-	}
-
 	if in.Permissions != nil {
 		if err := enforceGrantCeiling(caller, in.Permissions); err != nil {
 			return nil, err
@@ -158,23 +145,6 @@ func (s *Service) ReplaceUserRoles(ctx context.Context, userID uuid.UUID, roleID
 		return nil, err
 	}
 	return s.repo.ListUserRoles(ctx, userID)
-}
-
-// enforceReservedName chặn việc đúc một vai mang tên mà tầng phân quyền còn
-// coi là đặc quyền (xem `authz.IsLegacyRoleName`).
-//
-// Người giữ `*` vẫn đặt được: họ đã có toàn quyền nên không leo thang được
-// thêm, và một môi trường bị xoá mất vai gốc thì phải có đường dựng lại. Người
-// chỉ được uỷ quyền quản lý vai thì KHÔNG — đó chính là đối tượng mà trần cấp
-// phát sinh ra để chặn.
-func enforceReservedName(caller authz.PermissionSet, name string) error {
-	if caller.HasAll() {
-		return nil
-	}
-	if authz.IsLegacyRoleName(name) {
-		return globalroledom.ErrReservedName
-	}
-	return nil
 }
 
 // enforceGrantCeiling returns ErrPermissionCeilingExceeded when the given role

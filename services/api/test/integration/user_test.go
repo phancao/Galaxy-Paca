@@ -35,7 +35,7 @@ func buildUserTestRouter(repo *fakeUserRepo) http.Handler {
 		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
 		LocalLoginEnabled: true,
 		TokenManager:      tm,
-		Authorizer:        authz.NewAuthorizer(nil),
+		Authorizer:        authz.NewAuthorizer(repo),
 		Health:            handler.NewHealthHandler(),
 		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
 		User:              handler.NewUserHandler(userService),
@@ -44,10 +44,18 @@ func buildUserTestRouter(repo *fakeUserRepo) http.Handler {
 }
 
 // issueAdminToken issues a JWT for an admin user to authenticate admin routes.
-func issueAdminToken(t *testing.T) string {
+//
+// Người ấy phải CÓ THẬT trong kho: quyền đến từ hàng vai của họ trong DB, nên
+// một chủ thể không tồn tại thì không mang quyền nào — cái tên "ADMIN" trong
+// claims tự nó không còn mở được cửa nào.
+func issueAdminToken(t *testing.T, repo *fakeUserRepo) string {
 	t.Helper()
+	admin := &userdom.User{ID: uuid.New(), Username: "admin-user", Role: userdom.RoleAdmin}
+	if err := repo.Create(t.Context(), admin); err != nil {
+		t.Fatalf("seed admin: %v", err)
+	}
 	tm := jwttoken.New(testSecret, 15*time.Minute, 168*time.Hour)
-	tok, err := tm.IssueAccess(uuid.NewString(), "admin-user", "ADMIN", "fam-admin", false)
+	tok, err := tm.IssueAccess(admin.ID.String(), admin.Username, userdom.RoleAdmin, "fam-admin", false)
 	if err != nil {
 		t.Fatalf("issue admin token: %v", err)
 	}
@@ -66,7 +74,7 @@ func TestCreateUser(t *testing.T) {
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -90,7 +98,7 @@ func TestCreateUserDuplicateUsername(t *testing.T) {
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -246,14 +254,23 @@ func TestGetMyGlobalPermissions_AdminRoleIncludesWildcard(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	foundWildcard := false
+	// Vai ADMIN mang đúng ba nhánh mà bảng khai — KHÔNG phải `*`. Quyền toàn
+	// phần chỉ thuộc SUPER_ADMIN; trước 22/09/2026 tên "ADMIN" tự cấp `*`.
+	got := map[string]bool{}
 	for _, p := range env.Data.Permissions {
-		if p == string(authz.PermissionAll) {
-			foundWildcard = true
-		}
+		got[p] = true
 	}
-	if !foundWildcard {
-		t.Fatalf("expected %q in permissions, got %v", authz.PermissionAll, env.Data.Permissions)
+	if got[string(authz.PermissionAll)] {
+		t.Fatalf("vai ADMIN không được mang %q, nhận %v", authz.PermissionAll, env.Data.Permissions)
+	}
+	for _, want := range []authz.Permission{
+		authz.PermissionUsersAll,
+		authz.PermissionProjectsAll,
+		authz.PermissionGlobalRolesAll,
+	} {
+		if !got[string(want)] {
+			t.Fatalf("expected %q in permissions, got %v", want, env.Data.Permissions)
+		}
 	}
 }
 
@@ -452,7 +469,7 @@ func TestListUsers(t *testing.T) {
 	r := buildUserTestRouter(repo)
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/admin/users?page=1&page_size=10", nil)
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -496,7 +513,7 @@ func TestGetUserByID_Admin(t *testing.T) {
 	r := buildUserTestRouter(repo)
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/admin/users/"+u.ID.String(), nil)
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -523,7 +540,7 @@ func TestGetUserByID_NotFound(t *testing.T) {
 	r := buildUserTestRouter(repo)
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/admin/users/"+uuid.NewString(), nil)
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -544,7 +561,7 @@ func TestAdminUpdateUser(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"full_name": "New Name"})
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/api/v1/admin/users/"+u.ID.String(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -572,7 +589,7 @@ func TestDeleteUser(t *testing.T) {
 	r := buildUserTestRouter(repo)
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/admin/users/"+u.ID.String(), nil)
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -591,7 +608,7 @@ func TestDeleteUser_NotFound(t *testing.T) {
 	r := buildUserTestRouter(repo)
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodDelete, "/api/v1/admin/users/"+uuid.NewString(), nil)
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -618,7 +635,7 @@ func TestAdminResetPassword(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"new_password": "brandnewpass"})
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/api/v1/admin/users/"+u.ID.String()+"/password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -649,7 +666,7 @@ func TestAdminResetPassword_SetsMustChangePassword(t *testing.T) {
 		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
 		LocalLoginEnabled: true,
 		TokenManager:      tm,
-		Authorizer:        authz.NewAuthorizer(nil),
+		Authorizer:        authz.NewAuthorizer(repo),
 		Health:            handler.NewHealthHandler(),
 		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
 		User:              handler.NewUserHandler(userService, authService),
@@ -659,7 +676,7 @@ func TestAdminResetPassword_SetsMustChangePassword(t *testing.T) {
 	body, _ := json.Marshal(map[string]string{"new_password": "brandnewpass"})
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/api/v1/admin/users/"+u.ID.String()+"/password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t))
+	req.Header.Set("Authorization", "Bearer "+issueAdminToken(t, repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -752,7 +769,7 @@ func TestMustChangePassword_ChangeAllowedAndUnblocks(t *testing.T) {
 		// (router.go:78). Bỏ trống = false = tuyến không tồn tại = 404.
 		LocalLoginEnabled: true,
 		TokenManager:      tm,
-		Authorizer:        authz.NewAuthorizer(nil),
+		Authorizer:        authz.NewAuthorizer(repo),
 		Health:            handler.NewHealthHandler(),
 		Auth:              handler.NewAuthHandler(authService, testCookieCfg),
 		User:              handler.NewUserHandler(userService, authService),

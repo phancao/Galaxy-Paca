@@ -400,7 +400,6 @@ type projectPermStore struct {
 	projectPerms map[uuid.UUID][]authz.Permission
 	userPerms    map[uuid.UUID]map[uuid.UUID][]authz.Permission // user_id -> project_id -> permissions
 	agentPerms   map[uuid.UUID]map[uuid.UUID][]authz.Permission // project_id -> agent_id -> permissions
-	agentRoles   map[uuid.UUID]map[uuid.UUID]string             // project_id -> agent_id -> role_name
 }
 
 func (s *projectPermStore) ListGlobalPermissions(context.Context, uuid.UUID) ([]authz.Permission, error) {
@@ -418,15 +417,6 @@ func (s *projectPermStore) ListProjectPermissions(_ context.Context, userID uuid
 		return append([]authz.Permission(nil), perms...), nil
 	}
 	return nil, nil
-}
-
-func (s *projectPermStore) GetAgentProjectRoleName(_ context.Context, agentID, projectID uuid.UUID) (string, error) {
-	if projMap, ok := s.agentRoles[projectID]; ok {
-		if role, ok := projMap[agentID]; ok {
-			return role, nil
-		}
-	}
-	return "", fmt.Errorf("agent not found in project")
 }
 
 func (s *projectPermStore) ListAgentProjectPermissions(_ context.Context, agentID, projectID uuid.UUID) ([]authz.Permission, error) {

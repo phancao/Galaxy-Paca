@@ -150,6 +150,9 @@ func newPluginRuntimeE2EEnv(t *testing.T, limits pluginrt.ResourceLimits) *plugi
 func (p *pluginRuntimeE2EEnv) issueAdminToken(t *testing.T) string {
 	t.Helper()
 	seedUser(t, p.env, "plugin-rt-admin", "Admin1234!", "Plugin Runtime Admin")
+	// Vai ADMIN phải có THẬT trong DB: cái tên "ADMIN" trong claims không
+	// còn tự cấp quyền nào kể từ khi cầu tên-vai bị gỡ.
+	assignGlobalRolesByName(t, p.env, "plugin-rt-admin", "ADMIN")
 	admin, err := p.env.userRepo.FindByUsername(p.env.ctx, "plugin-rt-admin")
 	if err != nil {
 		t.Fatalf("find admin user: %v", err)

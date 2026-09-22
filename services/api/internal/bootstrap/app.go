@@ -230,7 +230,7 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	tokenManager := jwttoken.New(cfg.JWT.Secret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL).
 		ForTenant(tc.Code, tc.Code == cfg.Primary().Code)
 	permissionStore := pgRepo.NewAuthzPermissionStore(db)
-	authorizer := authz.NewAuthorizer(permissionStore).WithAgentRoleResolver(permissionStore)
+	authorizer := authz.NewAuthorizer(permissionStore)
 
 	// --- Repositories -------------------------------------------------------
 	userRepo := pgRepo.NewUserRepository(db)

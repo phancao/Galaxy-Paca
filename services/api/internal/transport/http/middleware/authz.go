@@ -85,7 +85,7 @@ func EnforcePermissions(w http.ResponseWriter, r *http.Request, authorizer *auth
 			presenter.Error(w, r, apierr.New(apierr.CodeBadRequest, "invalid subject claim"))
 			return false
 		}
-		allowed, err = authorizer.HasPermissions(r.Context(), userID, projectID, claims.Role, permissions...)
+		allowed, err = authorizer.HasPermissions(r.Context(), userID, projectID, permissions...)
 	}
 
 	if err != nil {
@@ -159,7 +159,7 @@ func RequireAnyPermissions(authorizer *authz.Authorizer, groups ...PermissionGro
 				if hasAgentID && projectID != nil {
 					allowed, err = authorizer.HasPermissionsForAgent(r.Context(), agentID, *projectID, group.Permissions...)
 				} else {
-					allowed, err = authorizer.HasPermissions(r.Context(), userID, projectID, claims.Role, group.Permissions...)
+					allowed, err = authorizer.HasPermissions(r.Context(), userID, projectID, group.Permissions...)
 				}
 
 				if err != nil {
@@ -234,7 +234,7 @@ func RequirePublicProjectOrPermissions(checker ProjectVisibilityChecker, authori
 					if hasAgentID && projectID != nil {
 						allowed, err = authorizer.HasPermissionsForAgent(r.Context(), agentID, *projectID, group.Permissions...)
 					} else {
-						allowed, err = authorizer.HasPermissions(r.Context(), userID, projectID, claims.Role, group.Permissions...)
+						allowed, err = authorizer.HasPermissions(r.Context(), userID, projectID, group.Permissions...)
 					}
 
 					if err != nil {

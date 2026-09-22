@@ -201,10 +201,21 @@ func adminClaimsMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
+// allPermissionsStore đóng vai một vai toàn cục mang `*`.
+type allPermissionsStore struct{}
+
+func (allPermissionsStore) ListGlobalPermissions(context.Context, uuid.UUID) ([]authz.Permission, error) {
+	return []authz.Permission{authz.PermissionAll}, nil
+}
+
+func (allPermissionsStore) ListProjectPermissions(context.Context, uuid.UUID, uuid.UUID) ([]authz.Permission, error) {
+	return nil, nil
+}
+
 func newProjectRouter(svc projectdom.Service) chi.Router {
-	// Use a real Authorizer with nil store — legacy ADMIN role grants everything
-	// without any database calls.
-	authorizer := authz.NewAuthorizer(nil)
+	// Quyền chỉ đến từ bảng, không từ tên vai trong claims — nên bộ test phải
+	// tự cấp `*` qua kho quyền giả, y như một vai ADMIN thật trong DB.
+	authorizer := authz.NewAuthorizer(allPermissionsStore{})
 	r := chi.NewRouter()
 	r.Use(adminClaimsMiddleware())
 	h := handler.NewProjectHandler(svc, authorizer)

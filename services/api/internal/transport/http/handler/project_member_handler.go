@@ -31,7 +31,7 @@ func (h *ProjectHandler) callerProjectPermissions(r *http.Request, projectID uui
 	if err != nil {
 		return nil, apierr.New(apierr.CodeBadRequest, "invalid subject claim")
 	}
-	return h.authorizer.EffectivePermissions(r.Context(), userID, &projectID, claims.Role)
+	return h.authorizer.EffectivePermissions(r.Context(), userID, &projectID)
 }
 
 // ListMembers handles GET /projects/:projectId/members.

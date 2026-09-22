@@ -73,18 +73,16 @@ func PermissionsFromMap(m map[string]any) []Permission {
 }
 
 // EffectivePermissions returns the full set of permissions granted to the user
-// in the given scope: the legacy role's implicit permissions unioned with the
-// permissions from the user's persisted global role and — when projectID is
-// non-nil — their project role. It mirrors exactly the union that
-// HasPermissions evaluates, exposed as a set so callers can enforce a grant
-// ceiling (e.g. reject creating a role broader than the caller's own).
+// in the given scope: the permissions from the user's persisted global role
+// and — when projectID is non-nil — their project role. It mirrors exactly the
+// union that HasPermissions evaluates, exposed as a set so callers can enforce
+// a grant ceiling (e.g. reject creating a role broader than the caller's own).
 func (a *Authorizer) EffectivePermissions(
 	ctx context.Context,
 	userID uuid.UUID,
 	projectID *uuid.UUID,
-	legacyRole string,
 ) (PermissionSet, error) {
-	return a.effectivePermissionsForActor(ctx, userID, nil, projectID, legacyRole)
+	return a.effectivePermissionsForActor(ctx, userID, nil, projectID)
 }
 
 // EffectivePermissionsForAgent returns the full set of permissions granted to
@@ -94,14 +92,7 @@ func (a *Authorizer) EffectivePermissionsForAgent(
 	agentID uuid.UUID,
 	projectID uuid.UUID,
 ) (PermissionSet, error) {
-	if a.agentRoleResolver == nil {
-		return nil, fmt.Errorf("authz: agent role resolver not configured")
-	}
-	roleName, err := a.agentRoleResolver.GetAgentProjectRoleName(ctx, agentID, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("authz: resolve agent role: %w", err)
-	}
-	return a.effectivePermissionsForActor(ctx, uuid.Nil, &agentID, &projectID, roleName)
+	return a.effectivePermissionsForActor(ctx, uuid.Nil, &agentID, &projectID)
 }
 
 // effectivePermissionsForActor gathers the granted permission set for a user or
@@ -112,12 +103,8 @@ func (a *Authorizer) effectivePermissionsForActor(
 	userID uuid.UUID,
 	agentID *uuid.UUID,
 	projectID *uuid.UUID,
-	legacyRole string,
 ) (PermissionSet, error) {
 	granted := make(PermissionSet)
-	for _, p := range LegacyPermissionsForRole(legacyRole) {
-		granted[p] = struct{}{}
-	}
 
 	if a.store == nil {
 		return granted, nil
