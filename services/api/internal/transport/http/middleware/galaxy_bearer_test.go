@@ -12,10 +12,11 @@ import (
 	"testing"
 	"time"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 type stubGalaxyBearerAuth struct {

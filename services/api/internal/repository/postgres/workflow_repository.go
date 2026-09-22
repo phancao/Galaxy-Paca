@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
 )
 
 // --- sqlx models -------------------------------------------------------------

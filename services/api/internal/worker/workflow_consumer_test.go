@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/google/uuid"
+
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	workflowdom "github.com/Paca-AI/api/internal/domain/workflow"
-	"github.com/google/uuid"
 )
 
 func discardLogger() *slog.Logger {

@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	versiondom "github.com/Paca-AI/api/internal/domain/version"
 	"github.com/google/uuid"
+
+	versiondom "github.com/Paca-AI/api/internal/domain/version"
 )
 
 // Service is the concrete implementation of versiondom.Service.

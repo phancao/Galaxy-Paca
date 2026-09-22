@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
 	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/Paca-AI/api/internal/platform/cache"
-	"github.com/google/uuid"
 )
 
 // CachedService decorates a projectdom.Service with a Valkey/Redis-backed

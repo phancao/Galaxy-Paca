@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	versiondom "github.com/Paca-AI/api/internal/domain/version"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	versiondom "github.com/Paca-AI/api/internal/domain/version"
 )
 
 type versionRecord struct {

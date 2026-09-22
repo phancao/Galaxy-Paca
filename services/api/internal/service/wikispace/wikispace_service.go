@@ -11,11 +11,12 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	wikispacedom "github.com/Paca-AI/api/internal/domain/wikispace"
 	"github.com/Paca-AI/api/internal/platform/wiki"
-	"github.com/google/uuid"
 )
 
 // Service implements wikispacedom.Service.

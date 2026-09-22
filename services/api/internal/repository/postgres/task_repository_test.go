@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+
+	taskdom "github.com/Paca-AI/api/internal/domain/task"
 )
 
 // openTaskRepoTestDB sets up an in-memory SQLite DB with a minimal tasks

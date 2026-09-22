@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // userRecord is the sqlx write model for the users table. It mirrors the

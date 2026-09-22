@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	sprintdom "github.com/Paca-AI/api/internal/domain/sprint"
 	taskdom "github.com/Paca-AI/api/internal/domain/task"
-	"github.com/google/uuid"
 )
 
 // Service is the concrete implementation of sprintdom.SprintService.

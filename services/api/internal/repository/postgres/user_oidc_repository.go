@@ -11,8 +11,9 @@ import (
 	"fmt"
 	"time"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // FindByOIDCSub returns the active user linked to the given OIDC subject, or

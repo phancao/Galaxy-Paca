@@ -3,8 +3,9 @@ package projectdom
 import (
 	"context"
 
-	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/google/uuid"
+
+	"github.com/Paca-AI/api/internal/platform/authz"
 )
 
 // AddMemberInput carries fields for adding a user to a project.

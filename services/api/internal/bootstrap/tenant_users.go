@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // The platform's user plane for a tenant it was not routed to.

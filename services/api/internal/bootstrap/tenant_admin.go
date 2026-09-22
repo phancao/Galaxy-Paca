@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/google/uuid"
+
+	userdom "github.com/Paca-AI/api/internal/domain/user"
 )
 
 // Platform bootstrap: who is the FIRST admin of a tenant?

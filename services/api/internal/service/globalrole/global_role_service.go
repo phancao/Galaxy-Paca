@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	"github.com/Paca-AI/api/internal/platform/authz"
-	"github.com/google/uuid"
 )
 
 // Service is the concrete implementation of globalrole.Service.

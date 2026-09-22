@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	worklogdom "github.com/Paca-AI/api/internal/domain/worklog"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
+	worklogdom "github.com/Paca-AI/api/internal/domain/worklog"
 )
 
 type worklogRecord struct {

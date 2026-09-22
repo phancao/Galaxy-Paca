@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
-	versiondom "github.com/Paca-AI/api/internal/domain/version"
 	"github.com/google/uuid"
+
+	versiondom "github.com/Paca-AI/api/internal/domain/version"
 )
 
 // CreateVersionRequest is the body for POST /projects/:projectId/versions.

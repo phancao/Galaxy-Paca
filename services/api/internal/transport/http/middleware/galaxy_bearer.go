@@ -18,11 +18,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/Paca-AI/api/internal/apierr"
 	domainauth "github.com/Paca-AI/api/internal/domain/auth"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/Paca-AI/api/internal/transport/http/presenter"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 // galaxyAgentNameContextKey stores the act_as_agent attribution for logging

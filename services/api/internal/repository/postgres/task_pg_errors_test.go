@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	taskdom "github.com/Paca-AI/api/internal/domain/task"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	taskdom "github.com/Paca-AI/api/internal/domain/task"
 )
 
 func TestTranslateTaskReference(t *testing.T) {

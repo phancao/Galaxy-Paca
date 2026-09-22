@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
+
 	projectdom "github.com/Paca-AI/api/internal/domain/project"
 	"github.com/Paca-AI/api/internal/platform/authz"
-	"github.com/google/uuid"
 )
 
 // enforceRoleGrantCeiling returns ErrPermissionCeilingExceeded when the target

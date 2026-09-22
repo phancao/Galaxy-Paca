@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
-	componentdom "github.com/Paca-AI/api/internal/domain/component"
 	"github.com/google/uuid"
+
+	componentdom "github.com/Paca-AI/api/internal/domain/component"
 )
 
 // CreateComponentRequest is the body for POST /projects/:projectId/components.

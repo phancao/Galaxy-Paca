@@ -24,6 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+
 	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/Paca-AI/api/internal/platform/cache"
 	"github.com/Paca-AI/api/internal/platform/database"
@@ -43,10 +48,6 @@ import (
 	workflowsvc "github.com/Paca-AI/api/internal/service/workflow"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
 	"github.com/Paca-AI/api/internal/transport/http/router"
-	"github.com/jmoiron/sqlx"
-	"github.com/redis/go-redis/v9"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const (

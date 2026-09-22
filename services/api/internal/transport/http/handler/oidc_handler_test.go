@@ -15,13 +15,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+
 	domainauth "github.com/Paca-AI/api/internal/domain/auth"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
 	"github.com/Paca-AI/api/internal/platform/oidc"
 	"github.com/Paca-AI/api/internal/service/galaxyauth"
 	"github.com/Paca-AI/api/internal/transport/http/handler"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 // ---------------------------------------------------------------------------

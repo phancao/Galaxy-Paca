@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	globalroledom "github.com/Paca-AI/api/internal/domain/globalrole"
 	userdom "github.com/Paca-AI/api/internal/domain/user"
-	"github.com/google/uuid"
 )
 
 // ---------------------------------------------------------------------------

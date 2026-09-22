@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	projectdom "github.com/Paca-AI/api/internal/domain/project"
-	"github.com/Paca-AI/api/internal/platform/authz"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	projectdom "github.com/Paca-AI/api/internal/domain/project"
+	"github.com/Paca-AI/api/internal/platform/authz"
 )
 
 // superAdminCaller is a permission set holding "*", which bypasses the grant

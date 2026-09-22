@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	sprintdom "github.com/Paca-AI/api/internal/domain/sprint"
 	"github.com/google/uuid"
+
+	sprintdom "github.com/Paca-AI/api/internal/domain/sprint"
 )
 
 // ViewService is the concrete implementation of sprintdom.ViewService.
