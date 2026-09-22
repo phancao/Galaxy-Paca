@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useLoginForm } from "@/hooks/use-login-form";
 import { authConfigQueryOptions } from "@/lib/auth-api";
 import { validatePassword, validateUsername } from "@/lib/auth-validation";
+import { portalOriginFrom, warnPortalOriginMissing } from "@/lib/portal-origin";
 import { cn } from "@/lib/utils";
 
 import { FieldError } from "./FieldError";
@@ -49,6 +50,14 @@ export function LoginFormPanel() {
 			? new URLSearchParams(window.location.search)
 			: new URLSearchParams();
 	const localLogin = Boolean(authConfig?.local_login_enabled);
+	// Không có portal_origin → KHÔNG hiện link đăng xuất toàn Vortex (không
+	// đoán estate), chỉ báo lỗi rõ. Xem @/lib/portal-origin.
+	const portalOrigin = portalOriginFrom(authConfig);
+	useEffect(() => {
+		if (authConfig && !portalOrigin) {
+			warnPortalOriginMissing("LoginFormPanel");
+		}
+	}, [authConfig, portalOrigin]);
 	// SSO loop-breaker: right after logout the Vortex IdP session is usually
 	// still alive, so auto-redirecting would silently sign the user back in.
 	const justLoggedOut = searchParams.get("logged_out") === "1";
@@ -92,19 +101,21 @@ export function LoginFormPanel() {
 				{/* ADR-027 single logout — also ends the platform (Zitadel) session.
 				    NO post_logout_redirect_uri: Zitadel only accepts URIs registered
 				    on the portal client (tasks.* is not), so let identity fall back
-				    to its default dest (the portal login page). Origin now comes
-				    from authConfig.portal_origin (T7) instead of a hardcoded
-				    constant — every tenant deploy before 22/09/2026 pointed this
-				    link at Galaxy's own portal regardless of which estate it ran on. */}
-				<a
-					href={`${authConfig?.portal_origin || "https://ai.skyplatform.net"}/api/identity/auth/logout`}
-					className="text-xs text-(--sea-ink-soft) underline underline-offset-2"
-				>
-					{t(
-						"login.logoutEverywhere",
-						"Đăng xuất khỏi toàn bộ Vortex (mọi ứng dụng)",
-					)}
-				</a>
+				    to its default dest (the portal login page). Origin comes ONLY
+				    from authConfig.portal_origin (T7); without it the link is
+				    withheld — before 22/09/2026 a hardcoded constant pointed it at
+				    Galaxy's own portal regardless of which estate it ran on. */}
+				{portalOrigin ? (
+					<a
+						href={`${portalOrigin}/api/identity/auth/logout`}
+						className="text-xs text-(--sea-ink-soft) underline underline-offset-2"
+					>
+						{t(
+							"login.logoutEverywhere",
+							"Đăng xuất khỏi toàn bộ Vortex (mọi ứng dụng)",
+						)}
+					</a>
+				) : null}
 			</div>
 		);
 	}
@@ -120,7 +131,10 @@ export function LoginFormPanel() {
 					)}
 				</p>
 				{authConfig?.oidc_enabled ? (
-					<a href={OIDC_LOGIN_URL} className={cn(buttonVariants({ size: "lg" }))}>
+					<a
+						href={OIDC_LOGIN_URL}
+						className={cn(buttonVariants({ size: "lg" }))}
+					>
 						{authConfig.oidc_button_label || t("login.ssoSignIn")}
 					</a>
 				) : null}
