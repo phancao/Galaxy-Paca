@@ -286,6 +286,7 @@ func Load() (*Config, error) {
 		AIAgentURL:        env("AI_AGENT_URL", "http://ai-agent:8080"),
 		// Galaxy chat dock (ADR-038 P3.2) — empty keeps the dock disabled.
 		GalaxyDockSrc: env("GALAXY_DOCK_SRC", ""),
+		PortalOrigin:  portalOrigin(env("GALAXY_DOCK_SRC", ""), env("GALAXY_PORTAL_ORIGIN", "")),
 		// Galaxy platform AI for one-shot write-with-ai (ADR-038). Empty
 		// IdentityURL/ServiceSecret disables the feature (returns 503).
 		GalaxyAI: func() GalaxyAIConfig {
@@ -455,6 +456,25 @@ func moveToFront(list []string, want string) []string {
 		out = append(out, v)
 	}
 	return out
+}
+
+// portalOrigin returns the platform portal's origin (scheme://host[:port]).
+//
+// An explicit GALAXY_PORTAL_ORIGIN always wins. Otherwise it is derived from
+// dockSrc's own origin — the dock bundle and the portal are the same
+// platform, so a working dock URL already proves the right host. Only when
+// BOTH are empty does it fall back to the historical hardcoded default,
+// which is Galaxy's own portal: correct for Galaxy, wrong for every other
+// estate that forgets to set either variable, exactly as three frontend
+// files did before this field existed (T7).
+func portalOrigin(dockSrc, explicit string) string {
+	if explicit != "" {
+		return strings.TrimRight(explicit, "/")
+	}
+	if u, err := url.Parse(dockSrc); err == nil && u.Scheme != "" && u.Host != "" {
+		return u.Scheme + "://" + u.Host
+	}
+	return "https://ai.skyplatform.net"
 }
 
 // env returns the environment variable value or a fallback default.

@@ -32,12 +32,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { authConfigQueryOptions } from "@/lib/auth-api";
+import { dockPortalOrigin, warnPortalOriginMissing } from "@/lib/portal-origin";
 
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 const GUARD_KEY = "galaxy-dock-sso-attempted";
 const HASH_PREFIX = "#dock_sso=";
-const DEFAULT_PORTAL = "https://ai.skyplatform.net";
+// NO hardcoded portal fallback here (22/09/2026): when neither the dock src
+// nor /auth/config names the portal, the dock stays unmounted and we say so
+// on the console — a relay that "works" against a guessed estate is worse
+// than one that fails. See @/lib/portal-origin.
 
 declare module "react" {
 	namespace JSX {
@@ -154,17 +158,6 @@ function relayThroughPortal(portalOrigin: string): void {
 	);
 }
 
-/** Portal origin hosting the /dock-sso relay, derived from the dock src. */
-function portalOriginFor(dockSrc: string): string {
-	try {
-		return new URL(dockSrc).origin;
-	} catch {
-		// Relative dock src (same-origin gateway bridge) — use the default
-		// portal origin, mirroring the wiki bootstrap's fallback.
-		return DEFAULT_PORTAL;
-	}
-}
-
 /** Idempotently inject the dock bundle script. */
 function loadDockScript(src: string): void {
 	if (document.querySelector("script[data-galaxy-dock]")) {
@@ -195,11 +188,16 @@ export function GalaxyChatDock() {
 			// One bounce per browser session through the portal SSO relay;
 			// comes back to this exact URL with a #dock_sso fragment that
 			// consumeDockSsoRelayHash() (main.tsx) stores at boot.
-			relayThroughPortal(portalOriginFor(dockSrc));
+			const portal = dockPortalOrigin(dockSrc, config);
+			if (!portal) {
+				warnPortalOriginMissing("GalaxyChatDock");
+				return;
+			}
+			relayThroughPortal(portal);
 			return;
 		}
 		loadDockScript(dockSrc);
-	}, [dockSrc]);
+	}, [dockSrc, config]);
 
 	if (!dockSrc) {
 		return null;

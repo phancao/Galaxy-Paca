@@ -9,7 +9,7 @@ import {
 	User,
 	UsersRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LocaleRadioGroup } from "@/components/LocaleRadioGroup";
@@ -32,7 +32,12 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useLocale } from "@/hooks/use-locale";
-import { currentUserOptionalQueryOptions, logout } from "@/lib/auth-api";
+import {
+	authConfigQueryOptions,
+	currentUserOptionalQueryOptions,
+	logout,
+} from "@/lib/auth-api";
+import { portalOriginFrom, warnPortalOriginMissing } from "@/lib/portal-origin";
 
 function getInitials(name: string): string {
 	return name
@@ -44,17 +49,21 @@ function getInitials(name: string): string {
 		.slice(0, 2);
 }
 
-/**
- * Origin portal. Cùng giá trị mà galaxy-dock.tsx và màn đăng nhập đã dùng —
- * ba chỗ nói cùng một câu, và không chỗ nào lặng lẽ biến mất khi thiếu cấu hình.
- */
-const PORTAL_ORIGIN = "https://ai.skyplatform.net";
-
 export function UserMenu() {
 	const { t } = useTranslation("appShell");
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const { data: user } = useQuery(currentUserOptionalQueryOptions);
+	const { data: authConfig } = useQuery(authConfigQueryOptions);
+	// KHÔNG có origin mặc định (22/09/2026): API chưa quảng cáo portal_origin
+	// thì ẨN hai mục dẫn sang portal và báo lỗi rõ, chứ không lặng lẽ đưa
+	// người dùng sang estate khác. Xem @/lib/portal-origin.
+	const PORTAL_ORIGIN = portalOriginFrom(authConfig);
+	useEffect(() => {
+		if (authConfig && !PORTAL_ORIGIN) {
+			warnPortalOriginMissing("UserMenu");
+		}
+	}, [authConfig, PORTAL_ORIGIN]);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const { locale, set: setLocale } = useLocale();
 
@@ -186,34 +195,38 @@ export function UserMenu() {
 								<LocaleRadioGroup value={locale} onValueChange={setLocale} />
 							</DropdownMenuSubContent>
 						</DropdownMenuSub>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							onClick={() =>
-								void leaveToPortal(
-									`${PORTAL_ORIGIN}/nexus/switch-workspace?return_url=${encodeURIComponent(backHere())}`,
-								)
-							}
-							disabled={isLoggingOut}
-						>
-							<Building2 className="size-4" />
-							{t("userMenu.switchWorkspace")}
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={() =>
-								void leaveToPortal(
-									// KHÔNG kèm `tenant`: ghim org Zitadel theo tenant thì danh
-									// sách chỉ còn danh tính của org ấy — đúng cái vòng người
-									// dùng đang muốn bước ra.
-									`${PORTAL_ORIGIN}/api/identity/auth/sso/zitadel/init?prompt=select_account&redirect_uri=${encodeURIComponent(
-										`${PORTAL_ORIGIN}/auth/callback?return_url=${encodeURIComponent(backHere())}`,
-									)}`,
-								)
-							}
-							disabled={isLoggingOut}
-						>
-							<UsersRound className="size-4" />
-							{t("userMenu.switchAccount")}
-						</DropdownMenuItem>
+						{PORTAL_ORIGIN && (
+							<>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem
+									onClick={() =>
+										void leaveToPortal(
+											`${PORTAL_ORIGIN}/nexus/switch-workspace?return_url=${encodeURIComponent(backHere())}`,
+										)
+									}
+									disabled={isLoggingOut}
+								>
+									<Building2 className="size-4" />
+									{t("userMenu.switchWorkspace")}
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									onClick={() =>
+										void leaveToPortal(
+											// KHÔNG kèm `tenant`: ghim org Zitadel theo tenant thì danh
+											// sách chỉ còn danh tính của org ấy — đúng cái vòng người
+											// dùng đang muốn bước ra.
+											`${PORTAL_ORIGIN}/api/identity/auth/sso/zitadel/init?prompt=select_account&redirect_uri=${encodeURIComponent(
+												`${PORTAL_ORIGIN}/auth/callback?return_url=${encodeURIComponent(backHere())}`,
+											)}`,
+										)
+									}
+									disabled={isLoggingOut}
+								>
+									<UsersRound className="size-4" />
+									{t("userMenu.switchAccount")}
+								</DropdownMenuItem>
+							</>
+						)}
 						<DropdownMenuSeparator />
 						<DropdownMenuItem
 							variant="destructive"

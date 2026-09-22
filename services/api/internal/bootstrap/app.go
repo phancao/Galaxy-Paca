@@ -451,6 +451,11 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	if cfg.GalaxyDockSrc != "" {
 		authHandler = authHandler.WithGalaxyDock(cfg.GalaxyDockSrc)
 	}
+	// PortalOrigin always resolves to something (config.portalOrigin falls
+	// back to the historical default), so this is unconditional — the SPA
+	// must never see an empty string and fall further back to its own
+	// hardcoded constant.
+	authHandler = authHandler.WithPortalOrigin(cfg.PortalOrigin)
 
 	// --- Galaxy identity (ADR-038) -------------------------------------------
 	// OIDC SSO login against the Vortex identity provider. Off unless

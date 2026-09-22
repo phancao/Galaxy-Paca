@@ -26,6 +26,16 @@ type Config struct {
 	// e.g. https://ai.skyplatform.net/dock.js or /dock.js (same-origin via
 	// the gateway bridge).  Empty disables the dock.
 	GalaxyDockSrc string
+	// PortalOrigin is the platform portal's origin (scheme://host[:port], no
+	// path) — where the SPA sends the user after logout and where the Galaxy
+	// dock's own localStorage session lives (galaxy-dock.tsx reads THIS
+	// origin's storage for an existing platform session before falling back
+	// to SSO). Derived from GalaxyDockSrc when unset, since both name the
+	// same platform and a second knob is one more thing to forget setting
+	// per estate — every tenant deploy before 22/09/2026 forgot it, and the
+	// hardcoded "https://ai.skyplatform.net" fallback silently pointed every
+	// new estate's logout link and dock session lookup at Galaxy's own.
+	PortalOrigin string
 	// GalaxyAI configures the one-shot "write task description with AI"
 	// feature (ADR-038). Empty IdentityURL/ServiceSecret disables it.
 	GalaxyAI GalaxyAIConfig
