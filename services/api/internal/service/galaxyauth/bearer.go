@@ -49,6 +49,24 @@ type BearerAuthenticator struct {
 	// e.g. "mcp:") but none for Paca is rejected as a foreign-resource token,
 	// and a token whose Paca scopes are read-only is denied write operations.
 	resourceScopePrefix string
+
+	// fleetScopePrefix names the FLEET scope that reaches every MCP server
+	// through one connector (Vortex ADR-043: one endpoint, one login, no
+	// per-server OAuth storm). A token carrying it is not a foreign-resource
+	// token — it is the designed way an aggregating gateway calls Paca on a
+	// user's behalf, and Paca is one of the servers it aggregates.
+	//
+	// Without this, PACA-C1's foreign-resource rule fires on exactly the
+	// intended path: the gateway forwards the caller's ORIGINAL token
+	// (paca_client.py: "forwarded unchanged"), that token's scopes are
+	// `mcp:galaxy:read`/`:write`, they share the `mcp:` family but none has
+	// the `mcp:paca:` prefix — so every call 401s with "scope does not grant
+	// access to this resource". Measured on SpaxeAI 24/09/2026.
+	//
+	// Read/write still bites: `mcp:galaxy:read` alone denies write methods,
+	// because scopeAction reads the segment after the final colon either way.
+	// A genuinely foreign token (`mcp:wiki:read`) is still refused.
+	fleetScopePrefix string
 }
 
 // NewBearerAuthenticator returns a configured BearerAuthenticator.
@@ -69,6 +87,14 @@ func (a *BearerAuthenticator) WithResourceAudience(aud string) *BearerAuthentica
 // checks. Returns the receiver for fluent wiring.
 func (a *BearerAuthenticator) WithResourceScopePrefix(prefix string) *BearerAuthenticator {
 	a.resourceScopePrefix = strings.TrimSpace(prefix)
+	return a
+}
+
+// WithFleetScopePrefix configures the fleet scope prefix that an aggregating
+// MCP gateway carries (e.g. "mcp:galaxy:"). Empty leaves fleet scopes treated
+// as foreign. Returns the receiver for fluent wiring.
+func (a *BearerAuthenticator) WithFleetScopePrefix(prefix string) *BearerAuthenticator {
+	a.fleetScopePrefix = strings.TrimSpace(prefix)
 	return a
 }
 
@@ -156,7 +182,8 @@ func (a *BearerAuthenticator) enforceScope(claims jwt.MapClaims, method string) 
 		if family != "" && strings.HasPrefix(s, family) {
 			resourceScopes = append(resourceScopes, s)
 		}
-		if strings.HasPrefix(s, a.resourceScopePrefix) {
+		if strings.HasPrefix(s, a.resourceScopePrefix) ||
+			(a.fleetScopePrefix != "" && strings.HasPrefix(s, a.fleetScopePrefix)) {
 			pacaScopes = append(pacaScopes, s)
 		}
 	}
