@@ -497,12 +497,16 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 				cfg.Security.GalaxyTrustedIssuer, cfg.Security.GalaxyTrustedIssuerClaims),
 			userRepo, log).
 			WithResourceAudience(cfg.Security.GalaxyBearerAudience).
-			WithResourceScopePrefix(cfg.Security.GalaxyResourceScopePrefix)
+			WithResourceScopePrefix(cfg.Security.GalaxyResourceScopePrefix).
+			WithFleetScopePrefix(cfg.Security.GalaxyFleetScopePrefix).
+			WithLegacyScopePrefixes(cfg.Security.GalaxyLegacyScopePrefixes)
 		log.Info("Galaxy trusted-issuer bearer auth enabled",
 			"issuer", cfg.Security.GalaxyTrustedIssuer,
 			"extra_issuer_claims", cfg.Security.GalaxyTrustedIssuerClaims,
 			"audience_enforced", cfg.Security.GalaxyBearerAudience != "",
-			"resource_scope_prefix", cfg.Security.GalaxyResourceScopePrefix)
+			"resource_scope_prefix", cfg.Security.GalaxyResourceScopePrefix,
+			"fleet_scope_prefix", cfg.Security.GalaxyFleetScopePrefix,
+			"legacy_scope_prefixes", cfg.Security.GalaxyLegacyScopePrefixes)
 	}
 
 	// Vortex identity-sync webhook receiver (ADR-040): applies user.changed

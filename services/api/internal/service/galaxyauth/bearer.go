@@ -49,6 +49,37 @@ type BearerAuthenticator struct {
 	// e.g. "mcp:") but none for Paca is rejected as a foreign-resource token,
 	// and a token whose Paca scopes are read-only is denied write operations.
 	resourceScopePrefix string
+
+	// fleetScopePrefix names the FLEET scope that reaches every MCP server
+	// through one connector (Vortex ADR-043: one endpoint, one login, no
+	// per-server OAuth storm). A token carrying it is not a foreign-resource
+	// token — it is the designed way an aggregating gateway calls Paca on a
+	// user's behalf, and Paca is one of the servers it aggregates.
+	//
+	// Without this, PACA-C1's foreign-resource rule fires on exactly the
+	// intended path: the gateway forwards the caller's ORIGINAL token
+	// (paca_client.py: "forwarded unchanged"), that token's scopes are
+	// `mcp:galaxy:read`/`:write`, they share the `mcp:` family but none has
+	// the `mcp:paca:` prefix — so every call 401s with "scope does not grant
+	// access to this resource". Measured on SpaxeAI 24/09/2026.
+	//
+	// Read/write still bites: `mcp:galaxy:read` alone denies write methods,
+	// because scopeAction reads the segment after the final colon either way.
+	// A genuinely foreign token (`mcp:wiki:read`) is still refused.
+	fleetScopePrefix string
+
+	// legacyScopePrefixes lists prefixes this service answered to under a
+	// FORMER NAME. Paca was called `pm`, and the rename reached every tool
+	// name a client sees (`pm__*` is gone, deliberately) but never reached
+	// the scope catalogue: identity still issues `mcp:pm:read`/`:write` and
+	// has no `mcp:paca:*` row at all. So PACA-C1 read its own old name as a
+	// foreign resource and refused every call.
+	//
+	// This is not a name→permission bridge (the kind PACA-3/4 removed). It is
+	// the same shape as reading both `NEXUS_` and `VORTEX_` for one secret:
+	// two spellings, one thing. Read/write still comes from the scope's own
+	// action segment, so `mcp:pm:read` grants exactly reads.
+	legacyScopePrefixes []string
 }
 
 // NewBearerAuthenticator returns a configured BearerAuthenticator.
@@ -70,6 +101,43 @@ func (a *BearerAuthenticator) WithResourceAudience(aud string) *BearerAuthentica
 func (a *BearerAuthenticator) WithResourceScopePrefix(prefix string) *BearerAuthenticator {
 	a.resourceScopePrefix = strings.TrimSpace(prefix)
 	return a
+}
+
+// WithFleetScopePrefix configures the fleet scope prefix that an aggregating
+// MCP gateway carries (e.g. "mcp:galaxy:"). Empty leaves fleet scopes treated
+// as foreign. Returns the receiver for fluent wiring.
+func (a *BearerAuthenticator) WithFleetScopePrefix(prefix string) *BearerAuthenticator {
+	a.fleetScopePrefix = strings.TrimSpace(prefix)
+	return a
+}
+
+// WithLegacyScopePrefixes configures prefixes this service answered to under a
+// former name (e.g. "mcp:pm:"). Empty entries are dropped.
+func (a *BearerAuthenticator) WithLegacyScopePrefixes(prefixes []string) *BearerAuthenticator {
+	a.legacyScopePrefixes = nil
+	for _, p := range prefixes {
+		if p = strings.TrimSpace(p); p != "" {
+			a.legacyScopePrefixes = append(a.legacyScopePrefixes, p)
+		}
+	}
+	return a
+}
+
+// grantsPaca reports whether s is one of this service's own scopes, under any
+// name it has ever had, or the fleet scope that reaches it.
+func (a *BearerAuthenticator) grantsPaca(s string) bool {
+	if strings.HasPrefix(s, a.resourceScopePrefix) {
+		return true
+	}
+	if a.fleetScopePrefix != "" && strings.HasPrefix(s, a.fleetScopePrefix) {
+		return true
+	}
+	for _, p := range a.legacyScopePrefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // AuthenticateBearer verifies rawToken and returns the effective local user
@@ -156,7 +224,7 @@ func (a *BearerAuthenticator) enforceScope(claims jwt.MapClaims, method string) 
 		if family != "" && strings.HasPrefix(s, family) {
 			resourceScopes = append(resourceScopes, s)
 		}
-		if strings.HasPrefix(s, a.resourceScopePrefix) {
+		if a.grantsPaca(s) {
 			pacaScopes = append(pacaScopes, s)
 		}
 	}
@@ -170,7 +238,12 @@ func (a *BearerAuthenticator) enforceScope(claims jwt.MapClaims, method string) 
 	// Resource-scoped token that targets other resources but not Paca — a
 	// confused-deputy / foreign-resource token.
 	if len(pacaScopes) == 0 {
-		return fmt.Errorf("galaxyauth: bearer token scope does not grant access to this resource")
+		// Nêu ĐÍCH DANH scope nào — một câu từ chối không nói nó thấy gì
+		// buộc người vận hành đi giải mã token bằng tay để biết phải sửa
+		// cái gì. Scope là tên năng lực, không phải bí mật.
+		return fmt.Errorf("galaxyauth: bearer token scope does not grant access to this resource "+
+			"(token carries %v; need prefix %q, fleet prefix %q, or a legacy prefix %v)",
+			resourceScopes, a.resourceScopePrefix, a.fleetScopePrefix, a.legacyScopePrefixes)
 	}
 
 	if isWriteMethod(method) && isReadOnlyScopes(pacaScopes) {

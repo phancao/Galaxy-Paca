@@ -361,4 +361,19 @@ type SecurityConfig struct {
 	// carry a scope claim. Empty disables scope enforcement. Configure via
 	// GALAXY_RESOURCE_SCOPE_PREFIX (default "mcp:paca:").
 	GalaxyResourceScopePrefix string
+
+	// GalaxyFleetScopePrefix is the scope prefix an AGGREGATING MCP gateway
+	// carries to reach the whole fleet through one connector (Vortex ADR-043).
+	// A token carrying it is not a foreign-resource token: it is the designed
+	// path, and Paca is one of the servers aggregated. Read/write is still
+	// enforced on it. Empty = fleet scopes are treated as foreign.
+	// Configure via GALAXY_FLEET_SCOPE_PREFIX (default "mcp:galaxy:").
+	GalaxyFleetScopePrefix string
+
+	// GalaxyLegacyScopePrefixes lists scope prefixes this service answered to
+	// under a FORMER NAME. Paca was `pm`: the rename reached every tool name a
+	// client sees but never reached identity's scope catalogue, which still
+	// issues `mcp:pm:*` and has no `mcp:paca:*` row. Two spellings, one thing.
+	// Configure via GALAXY_LEGACY_SCOPE_PREFIXES (default "mcp:pm:").
+	GalaxyLegacyScopePrefixes []string
 }
