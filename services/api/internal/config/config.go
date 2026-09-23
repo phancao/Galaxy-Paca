@@ -369,4 +369,11 @@ type SecurityConfig struct {
 	// enforced on it. Empty = fleet scopes are treated as foreign.
 	// Configure via GALAXY_FLEET_SCOPE_PREFIX (default "mcp:galaxy:").
 	GalaxyFleetScopePrefix string
+
+	// GalaxyLegacyScopePrefixes lists scope prefixes this service answered to
+	// under a FORMER NAME. Paca was `pm`: the rename reached every tool name a
+	// client sees but never reached identity's scope catalogue, which still
+	// issues `mcp:pm:*` and has no `mcp:paca:*` row. Two spellings, one thing.
+	// Configure via GALAXY_LEGACY_SCOPE_PREFIXES (default "mcp:pm:").
+	GalaxyLegacyScopePrefixes []string
 }

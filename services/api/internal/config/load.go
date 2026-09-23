@@ -250,6 +250,7 @@ func Load() (*Config, error) {
 			GalaxyBearerAudience:      strings.TrimSpace(env("GALAXY_BEARER_AUDIENCE", "")),
 			GalaxyResourceScopePrefix: strings.TrimSpace(env("GALAXY_RESOURCE_SCOPE_PREFIX", "mcp:paca:")),
 			GalaxyFleetScopePrefix:    strings.TrimSpace(env("GALAXY_FLEET_SCOPE_PREFIX", "mcp:galaxy:")),
+			GalaxyLegacyScopePrefixes: splitCommaList(env("GALAXY_LEGACY_SCOPE_PREFIXES", "mcp:pm:")),
 			// Identity-sync webhook shared secret (ADR-040).  env() treats a
 			// defined-but-empty variable as unset, mirroring the sender's
 			// VORTEX_WEBHOOK_SECRET-or-NEXUS_WEBHOOK_SECRET fallback chain.

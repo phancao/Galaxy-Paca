@@ -67,6 +67,19 @@ type BearerAuthenticator struct {
 	// because scopeAction reads the segment after the final colon either way.
 	// A genuinely foreign token (`mcp:wiki:read`) is still refused.
 	fleetScopePrefix string
+
+	// legacyScopePrefixes lists prefixes this service answered to under a
+	// FORMER NAME. Paca was called `pm`, and the rename reached every tool
+	// name a client sees (`pm__*` is gone, deliberately) but never reached
+	// the scope catalogue: identity still issues `mcp:pm:read`/`:write` and
+	// has no `mcp:paca:*` row at all. So PACA-C1 read its own old name as a
+	// foreign resource and refused every call.
+	//
+	// This is not a name→permission bridge (the kind PACA-3/4 removed). It is
+	// the same shape as reading both `NEXUS_` and `VORTEX_` for one secret:
+	// two spellings, one thing. Read/write still comes from the scope's own
+	// action segment, so `mcp:pm:read` grants exactly reads.
+	legacyScopePrefixes []string
 }
 
 // NewBearerAuthenticator returns a configured BearerAuthenticator.
@@ -96,6 +109,35 @@ func (a *BearerAuthenticator) WithResourceScopePrefix(prefix string) *BearerAuth
 func (a *BearerAuthenticator) WithFleetScopePrefix(prefix string) *BearerAuthenticator {
 	a.fleetScopePrefix = strings.TrimSpace(prefix)
 	return a
+}
+
+// WithLegacyScopePrefixes configures prefixes this service answered to under a
+// former name (e.g. "mcp:pm:"). Empty entries are dropped.
+func (a *BearerAuthenticator) WithLegacyScopePrefixes(prefixes []string) *BearerAuthenticator {
+	a.legacyScopePrefixes = nil
+	for _, p := range prefixes {
+		if p = strings.TrimSpace(p); p != "" {
+			a.legacyScopePrefixes = append(a.legacyScopePrefixes, p)
+		}
+	}
+	return a
+}
+
+// grantsPaca reports whether s is one of this service's own scopes, under any
+// name it has ever had, or the fleet scope that reaches it.
+func (a *BearerAuthenticator) grantsPaca(s string) bool {
+	if strings.HasPrefix(s, a.resourceScopePrefix) {
+		return true
+	}
+	if a.fleetScopePrefix != "" && strings.HasPrefix(s, a.fleetScopePrefix) {
+		return true
+	}
+	for _, p := range a.legacyScopePrefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // AuthenticateBearer verifies rawToken and returns the effective local user
@@ -182,8 +224,7 @@ func (a *BearerAuthenticator) enforceScope(claims jwt.MapClaims, method string) 
 		if family != "" && strings.HasPrefix(s, family) {
 			resourceScopes = append(resourceScopes, s)
 		}
-		if strings.HasPrefix(s, a.resourceScopePrefix) ||
-			(a.fleetScopePrefix != "" && strings.HasPrefix(s, a.fleetScopePrefix)) {
+		if a.grantsPaca(s) {
 			pacaScopes = append(pacaScopes, s)
 		}
 	}
@@ -197,7 +238,12 @@ func (a *BearerAuthenticator) enforceScope(claims jwt.MapClaims, method string) 
 	// Resource-scoped token that targets other resources but not Paca — a
 	// confused-deputy / foreign-resource token.
 	if len(pacaScopes) == 0 {
-		return fmt.Errorf("galaxyauth: bearer token scope does not grant access to this resource")
+		// Nêu ĐÍCH DANH scope nào — một câu từ chối không nói nó thấy gì
+		// buộc người vận hành đi giải mã token bằng tay để biết phải sửa
+		// cái gì. Scope là tên năng lực, không phải bí mật.
+		return fmt.Errorf("galaxyauth: bearer token scope does not grant access to this resource "+
+			"(token carries %v; need prefix %q, fleet prefix %q, or a legacy prefix %v)",
+			resourceScopes, a.resourceScopePrefix, a.fleetScopePrefix, a.legacyScopePrefixes)
 	}
 
 	if isWriteMethod(method) && isReadOnlyScopes(pacaScopes) {

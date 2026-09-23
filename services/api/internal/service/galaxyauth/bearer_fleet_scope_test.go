@@ -86,3 +86,66 @@ func TestPacaWriteScopeBesideFleetReadStillWrites(t *testing.T) {
 		t.Fatalf("an explicit Paca write scope must still grant writes, got %v", err)
 	}
 }
+
+// Paca duoc doi ten tu `pm`. Cuoc doi ten di toi MOI TEN HAM client nhin thay
+// (`pm__*` bien mat, co y), nhung KHONG di toi so scope cua identity: no van
+// phat `mcp:pm:read`/`:write` va khong he co dong `mcp:paca:*`. Nen PACA-C1
+// doc chinh TEN CU cua minh nhu mot tai nguyen la va tu choi moi luot goi.
+//
+// Do 24/09/2026 tren SpaxeAI, doc duoc nguyen van sau khi cau tu choi chiu
+// neu dich danh scope no thay:
+//
+//	token carries [mcp:design:read … mcp:pm:read mcp:pm:write … mcp:wiki:write];
+//	need prefix "mcp:paca:" or fleet prefix "mcp:galaxy:"
+
+func TestFormerNameIsStillThisService(t *testing.T) {
+	auth, store, sign := newBearerFixture(t)
+	auth.WithResourceScopePrefix("mcp:paca:").
+		WithFleetScopePrefix("mcp:galaxy:").
+		WithLegacyScopePrefixes([]string{"mcp:pm:"})
+	seedUser(store, "cao-sub")
+
+	token := sign(jwt.MapClaims{"sub": "cao-sub", "scope": "mcp:wiki:read mcp:pm:read mcp:pm:write"})
+	if _, _, err := auth.AuthenticateBearer(context.Background(), token, http.MethodGet); err != nil {
+		t.Fatalf("the service's own former scope name must reach it, got %v", err)
+	}
+}
+
+func TestFormerNameStillSeparatesReadFromWrite(t *testing.T) {
+	auth, store, sign := newBearerFixture(t)
+	auth.WithResourceScopePrefix("mcp:paca:").WithLegacyScopePrefixes([]string{"mcp:pm:"})
+	seedUser(store, "cao-sub")
+
+	token := sign(jwt.MapClaims{"sub": "cao-sub", "scope": "mcp:pm:read"})
+	if _, _, err := auth.AuthenticateBearer(context.Background(), token, http.MethodGet); err != nil {
+		t.Fatalf("legacy read scope should be accepted on GET, got %v", err)
+	}
+	if _, _, err := auth.AuthenticateBearer(context.Background(), token, http.MethodPost); err == nil {
+		t.Fatal("a legacy READ scope must still be denied on POST — honouring an old name is not widening it")
+	}
+}
+
+func TestUnsetLegacyPrefixesKeepsTheOldRule(t *testing.T) {
+	auth, store, sign := newBearerFixture(t)
+	auth.WithResourceScopePrefix("mcp:paca:").WithLegacyScopePrefixes(nil)
+	seedUser(store, "cao-sub")
+
+	token := sign(jwt.MapClaims{"sub": "cao-sub", "scope": "mcp:pm:read"})
+	if _, _, err := auth.AuthenticateBearer(context.Background(), token, http.MethodGet); err == nil {
+		t.Fatal("without WithLegacyScopePrefixes the former name stays foreign")
+	}
+}
+
+func TestEmptyLegacyEntriesAreDroppedNotMatchEverything(t *testing.T) {
+	// A blank entry would be a prefix of EVERY string — the whole gate would
+	// open on a stray comma in the env var.
+	auth, store, sign := newBearerFixture(t)
+	auth.WithResourceScopePrefix("mcp:paca:").
+		WithLegacyScopePrefixes([]string{"", "  ", "mcp:pm:"})
+	seedUser(store, "cao-sub")
+
+	token := sign(jwt.MapClaims{"sub": "cao-sub", "scope": "mcp:wiki:read"})
+	if _, _, err := auth.AuthenticateBearer(context.Background(), token, http.MethodGet); err == nil {
+		t.Fatal("a blank legacy prefix must not match every scope")
+	}
+}
