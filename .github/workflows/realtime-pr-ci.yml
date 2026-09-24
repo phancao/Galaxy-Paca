@@ -17,7 +17,7 @@ concurrency:
 jobs:
   realtime-quality:
     name: Lint, typecheck, and build
-    runs-on: [self-hosted, galaxy]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     defaults:

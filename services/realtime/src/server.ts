@@ -163,7 +163,10 @@ export function createSocketServer(
 		// can be delivered without an explicit join from the client.
 		const notifRoom = userNotificationRoom(tenant, userId);
 		socket.join(notifRoom);
-		logger.debug({ tenant, userId, room: notifRoom }, "joined user notification room");
+		logger.debug(
+			{ tenant, userId, room: notifRoom },
+			"joined user notification room",
+		);
 
 		// Join namespace-scoped rooms for a project.  Fetches project permissions
 		// once and joins only the rooms the user is allowed to see:
@@ -196,7 +199,9 @@ export function createSocketServer(
 					NAMESPACE_PERMISSIONS,
 				)) {
 					if (hasProjectPermission(perms, requiredPerm)) {
-						socket.join(projectRoomName(tenant, projectId, ns as EventNamespace));
+						socket.join(
+							projectRoomName(tenant, projectId, ns as EventNamespace),
+						);
 						joinedNamespaces.push(ns);
 					}
 				}

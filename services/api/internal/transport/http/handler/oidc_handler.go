@@ -31,11 +31,15 @@ const (
 	oidcStateCookiePath = "/api/v1/auth/oidc"
 	// oidcStateTTL bounds how long a login attempt may take.
 	oidcStateTTL = 10 * time.Minute
-	// portalOrigin is where the Vortex session actually lives — the one place
-	// a person can change which tenant they are working for. Hard-coded, like
-	// every other app in the fleet does it: a door that disappears because a
-	// variable was unset is the hardest kind of breakage to notice.
-	portalOrigin = "https://ai.skyplatform.net"
+	// defaultPortalOrigin is the LAST fallback for where the Vortex session
+	// lives, used only when OIDCOptions.PortalOrigin is empty. It used to be
+	// the only value: on every other estate (production FinX, 24/09/2026) the
+	// "wrong workspace" page sent people to Galaxy's STAGING portal to switch
+	// tenant — a door that leads to a different building. The configured
+	// origin (config.PortalOrigin, from GALAXY_PORTAL_ORIGIN or the dock
+	// bundle's own host) always resolves to something, so the page never loses
+	// its door; it just stops pointing at somebody else's.
+	defaultPortalOrigin = "https://ai.skyplatform.net"
 )
 
 // OIDCOptions carries the OIDC client settings the handler needs (a transport
@@ -49,6 +53,9 @@ type OIDCOptions struct {
 	// Tenant is the one Vortex tenant this deployment serves (ADR-058): the
 	// callback refuses an id_token that names another tenant, or none.
 	Tenant string
+	// PortalOrigin is the Vortex portal of THIS estate (config.PortalOrigin) —
+	// where a person refused for being in another workspace goes to switch.
+	PortalOrigin string
 }
 
 // SessionIssuer mints a session token pair for an already-authenticated user.
@@ -371,7 +378,8 @@ func (h *OIDCHandler) servedTenants() []string {
 // page names both tenants and offers the only two moves that help: change
 // workspace back, or go to the portal.
 func (h *OIDCHandler) renderTenantMismatch(w http.ResponseWriter, sessionTenant string) {
-	switchURL := portalOrigin + "/nexus/switch-workspace?return_url=" + url.QueryEscape(h.publicOrigin())
+	portal := h.portalOrigin()
+	switchURL := portal + "/nexus/switch-workspace?return_url=" + url.QueryEscape(h.publicOrigin())
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -402,8 +410,17 @@ a.sub{display:inline-block;margin-top:1rem;color:#8f97a8;font-size:.9rem}
 		html.EscapeString(h.opts.Tenant),
 		html.EscapeString(sessionTenant),
 		html.EscapeString(switchURL),
-		portalOrigin,
+		html.EscapeString(portal),
 	)
+}
+
+// portalOrigin is this estate's portal, falling back to the historical default
+// only when none was configured.
+func (h *OIDCHandler) portalOrigin() string {
+	if o := strings.TrimRight(h.opts.PortalOrigin, "/"); o != "" {
+		return o
+	}
+	return defaultPortalOrigin
 }
 
 // publicOrigin is where a browser reaches THIS deployment — derived from the
@@ -412,7 +429,7 @@ a.sub{display:inline-block;margin-top:1rem;color:#8f97a8;font-size:.9rem}
 func (h *OIDCHandler) publicOrigin() string {
 	u, err := url.Parse(h.opts.RedirectURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return portalOrigin
+		return h.portalOrigin()
 	}
 	return u.Scheme + "://" + u.Host
 }

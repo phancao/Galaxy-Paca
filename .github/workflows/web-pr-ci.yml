@@ -17,7 +17,7 @@ concurrency:
 jobs:
   web-quality:
     name: Check, test, and build web app
-    runs-on: [self-hosted, galaxy]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     defaults:
