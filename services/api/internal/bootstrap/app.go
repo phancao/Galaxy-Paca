@@ -474,6 +474,7 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 				ClientSecret: cfg.OIDC.ClientSecret,
 				RedirectURL:  cfg.OIDC.RedirectURL,
 				Scopes:       cfg.OIDC.Scopes,
+				PortalOrigin: cfg.PortalOrigin,
 			},
 			galaxyAuthService,
 			authService,

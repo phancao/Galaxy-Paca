@@ -1,0 +1,111 @@
+name: Galaxy CD — dựng ảnh và đẩy lên ECR
+
+# Vì sao kho này cần pipeline ảnh
+#
+# Ảnh Paca của Galaxy (`galaxy-local/paca-*`) xưa nay chỉ được dựng TAY trên máy
+# staging rồi ghim vào `deploy/galaxy/.env.galaxy`. Production FinX là EC2 và
+# không ai có shell: đường duy nhất một ảnh tới được nó là ECR. `cd.yml` của
+# thượng nguồn đẩy GHCR/DockerHub khi có release — không dùng được ở đây.
+#
+# Trunk của Galaxy là `galaxy-main`, KHÔNG phải `master` (master dừng ở #40 và
+# không có `deploy/galaxy/`). Chủ thể OIDC phía AWS là dạng BẤT BIẾN vì kho tạo
+# sau 15/07/2026:
+#   repo:phancao@26134743/Galaxy-Paca@1303569737:ref:refs/heads/galaxy-main
+# (terraform FinX #35). Push lên nhánh khác không nhận được vai.
+#
+# `ubuntu-latest`, KHÔNG self-hosted: kho CÔNG KHAI nên runner GitHub miễn phí,
+# và runner nhà của kho này đã GỠ 24/09 — một kho công khai chạy job trên máy
+# nhà là mời người lạ vào máy. Không phụ thuộc kho riêng nào, nên không cần
+# khoá deploy.
+#
+# Thẻ là SHA git, BẤT BIẾN (kho ECR bật immutable tag). Sổ ghim
+# `infra/aws/anh_app.json` bên Galaxy-Vortex kéo thẻ mới nhất về.
+
+on:
+  push:
+    branches: [galaxy-main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: galaxy-cd-ecr-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  tien-kiem:
+    runs-on: ubuntu-latest
+    outputs:
+      san-sang: ${{ steps.x.outputs.san_sang }}
+    steps:
+      - id: x
+        run: |
+          set -euo pipefail
+          if [ -z "${ROLE:-}" ]; then
+            echo "san_sang=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::AWS_CI_BUILD_ROLE chưa đặt — bỏ qua bước đẩy ảnh"
+          else
+            echo "san_sang=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          ROLE: ${{ vars.AWS_CI_BUILD_ROLE }}
+
+  anh:
+    needs: tien-kiem
+    if: needs.tien-kiem.outputs.san-sang == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ecr: vortex/paca-api
+            context: services/api
+            file: services/api/Dockerfile
+          - ecr: vortex/paca-web
+            context: apps/web
+            file: apps/web/Dockerfile
+          - ecr: vortex/paca-realtime
+            context: services/realtime
+            file: services/realtime/Dockerfile
+          # Một ảnh cho HAI dịch vụ: notify-bridge và dock-trigger (khác lệnh).
+          - ecr: vortex/paca-notify-bridge
+            context: deploy/galaxy/notify-bridge
+            file: deploy/galaxy/notify-bridge/Dockerfile
+          - ecr: vortex/paca-sdd-proxy
+            context: deploy/galaxy/sdd-proxy
+            file: deploy/galaxy/sdd-proxy/Dockerfile
+          - ecr: vortex/sdd-server
+            context: services/sdd-server
+            file: services/sdd-server/central/Dockerfile
+            args: --build-arg VITE_BASE_PATH=/sdd-server
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_BUILD_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Dựng và đẩy ${{ matrix.ecr }}
+        env:
+          REG: ${{ steps.ecr.outputs.registry }}
+          ECR: ${{ matrix.ecr }}
+          CTX: ${{ matrix.context }}
+          FILE: ${{ matrix.file }}
+          ARGS: ${{ matrix.args }}
+        run: |
+          set -euo pipefail
+          IMG="$REG/$ECR:${{ github.sha }}"
+          # shellcheck disable=SC2086  # ARGS là danh sách cờ, cố ý tách từ
+          DOCKER_BUILDKIT=1 docker build --platform linux/amd64 -f "$FILE" ${ARGS} -t "$IMG" "$CTX"
+          docker push "$IMG"
+          echo "\`$IMG\`" >> "$GITHUB_STEP_SUMMARY"

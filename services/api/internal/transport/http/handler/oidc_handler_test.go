@@ -151,6 +151,11 @@ func (f *fakeSessionIssuer) IssueSession(_ context.Context, u *userdom.User, _ b
 
 func newOIDCTestHandler(t *testing.T, fi *fakeIssuer, resolver *fakeResolver, sessions *fakeSessionIssuer) *handler.OIDCHandler {
 	t.Helper()
+	return newOIDCTestHandlerWithPortal(t, fi, resolver, sessions, "")
+}
+
+func newOIDCTestHandlerWithPortal(t *testing.T, fi *fakeIssuer, resolver *fakeResolver, sessions *fakeSessionIssuer, portal string) *handler.OIDCHandler {
+	t.Helper()
 	authHandler := handler.NewAuthHandler(&mockAuthSvc{}, testCookieConfig)
 	return handler.NewOIDCHandler(
 		oidc.NewProvider(fi.srv.URL),
@@ -160,6 +165,7 @@ func newOIDCTestHandler(t *testing.T, fi *fakeIssuer, resolver *fakeResolver, se
 			RedirectURL:  "http://paca.local/api/v1/auth/oidc/callback",
 			Scopes:       "openid profile email",
 			Tenant:       "galaxy",
+			PortalOrigin: portal,
 		},
 		resolver,
 		sessions,
@@ -349,6 +355,42 @@ func TestOIDCCallbackRejectsOtherTenant(t *testing.T) {
 	}
 	if sessions.lastUser != nil {
 		t.Error("no session must be issued for another tenant's session")
+	}
+}
+
+// The "wrong workspace" page must send people to THIS estate's portal to
+// switch tenant. It used a hard-coded staging origin, so on production FinX
+// (24/09/2026) a person refused here was handed a link into another estate.
+func TestOIDCTenantMismatchLinksThisEstatesPortal(t *testing.T) {
+	cases := []struct{ name, portal, want string }{
+		{"configured", "https://ai-portal.dev.galaxyfinx.com/", "https://ai-portal.dev.galaxyfinx.com/nexus/switch-workspace"},
+		{"unset falls back", "", "https://ai.skyplatform.net/nexus/switch-workspace"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fi := newFakeIssuer(t, "paca-client")
+			fi.idClaims = jwt.MapClaims{"email": "cao@example.com", "tenant": "galaxy", "act_as_tenant": "vietjet"}
+			resolver := &fakeResolver{user: &userdom.User{ID: uuid.New(), Username: "cao.phan", Role: "USER"}}
+			h := newOIDCTestHandlerWithPortal(t, fi, resolver, &fakeSessionIssuer{}, tc.portal)
+
+			loc, stateCookie := doLogin(t, h)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/auth/oidc/callback?code=test-code&state="+url.QueryEscape(loc.Query().Get("state")), nil)
+			req.AddCookie(stateCookie)
+			req.Header.Set("Accept", "text/html")
+			rec := httptest.NewRecorder()
+			h.Callback(rec, req)
+
+			body := rec.Body.String()
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("expected 403, got %d (%s)", rec.Code, body)
+			}
+			if !strings.Contains(body, tc.want) {
+				t.Fatalf("page must link %q, got:\n%s", tc.want, body)
+			}
+			if tc.portal != "" && strings.Contains(body, "skyplatform") {
+				t.Fatalf("a configured estate must not link another estate's portal:\n%s", body)
+			}
+		})
 	}
 }
 
