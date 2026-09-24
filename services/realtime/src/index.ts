@@ -59,7 +59,7 @@ function shutdown(signal: string): void {
 	// then close the HTTP server so it stops accepting new connections.
 	io.close(() => {
 		httpServer.close(() => {
-			subscribers.forEach((s) => s.disconnect());
+			for (const s of subscribers) s.disconnect();
 			sessionRedis.disconnect();
 			logger.info("shutdown complete");
 			process.exit(0);

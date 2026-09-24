@@ -77,7 +77,9 @@ export function tenantValkeys(baseUrl: string): TenantValkey[] {
 	return codes.map((tenant, i) => {
 		if (i === 0) return { tenant, url: baseUrl };
 		const explicit =
-			process.env[`PACA_TENANT_REDIS_${tenant.replace(/-/g, "_").toUpperCase()}`];
+			process.env[
+				`PACA_TENANT_REDIS_${tenant.replace(/-/g, "_").toUpperCase()}`
+			];
 		if (explicit) return { tenant, url: explicit };
 		const u = new URL(baseUrl);
 		u.pathname = `/${i}`;

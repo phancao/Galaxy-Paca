@@ -321,7 +321,13 @@ func TestMain(m *testing.M) {
 				"POSTGRES_DB":       "testdb",
 			},
 			ExposedPorts: []string{"5432/tcp"},
-			WaitingFor:   wait.ForLog("database system is ready to accept connections").WithStartupTimeout(60 * time.Second),
+			// Occurrence 2: the image prints this line first for the temporary
+			// server initdb runs, then stops it and starts the real one. Waiting
+			// for the first line connects in that gap — "connection refused" on
+			// every test, which reads like a broken database, not a race.
+			WaitingFor: wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(60 * time.Second),
 		},
 		Started: true,
 	})
@@ -360,7 +366,10 @@ func TestMain(m *testing.M) {
 
 	minioC, err := testcontainers.GenericContainer(bgCtx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image: "minio/minio:latest",
+			// quay.io: Docker Hub stopped serving minio/minio to anonymous
+			// pulls ("pull access denied"), which silently skipped every
+			// attachment test. Pinned to the release the deployments run.
+			Image: "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
 			Env: map[string]string{
 				"MINIO_ROOT_USER":     "minioadmin",
 				"MINIO_ROOT_PASSWORD": "minioadmin",
