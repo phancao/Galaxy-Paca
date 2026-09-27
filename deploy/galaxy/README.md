@@ -65,13 +65,12 @@ từ ngày 0, trước cả lần SSO đầu tiên. JIT login giữ nguyên: fin
 
 ## Plugins
 
-- `plugins/com.galaxy.sdd` — **SDD Sensor** (ADR-038 T6): nhúng dashboard SDD sensor (`nexus.8verse.games/sdd-server`) vào Paca qua iframe; v1 frontend-only, không secret, backend chỉ là stub WASM trơ (host bắt buộc phải có file).
 - `plugins/com.galaxy.analytics` — **Analytics** (ADR-038 P3.4): 4 panel agile (Sprint Progress/burndown v1, Velocity, Status Distribution, Sprint Report) — component Module Federation THẬT (không iframe, không chart lib), tự fetch REST same-origin `/api/v1` bằng session của chính user (`credentials: "include"`, phân trang tasks theo cursor `page_size=100`), tính toán client-side + cache 60s; backend cũng là stub WASM trơ. Các phép xấp xỉ "không có history" ghi rõ ở footnote UI — xem `plugins/com.galaxy.analytics/README.md`.
 
 Build + cài prod (mỗi plugin cùng một quy trình):
 
 ```bash
-cd deploy/galaxy/plugins/<plugin-id>   # com.galaxy.sdd | com.galaxy.analytics
+cd deploy/galaxy/plugins/<plugin-id>   # com.galaxy.analytics
 ./build.sh
 API_KEY=<paca-api-key> ./install-prod.sh
 ```

@@ -954,8 +954,8 @@ function PluginNavLeaf({
 }
 
 /**
- * Collapsible sidebar group for a plugin that exposes MULTIPLE pages (e.g. the
- * native SDD Fleet plugin's eight views). The plugin's displayName becomes the
+ * Collapsible sidebar group for a plugin that exposes MULTIPLE pages (a
+ * multi-view federated plugin). The plugin's displayName becomes the
  * parent row; each nav item nests as a sub-page underneath, so there is no
  * second in-content sub-rail eating horizontal space (ADR-038). Owns its own
  * open/closed state and auto-expands whenever one of its children is active.

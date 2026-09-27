@@ -1,7 +1,7 @@
 //go:build wasip1
 
 // Stub backend for the frontend-only com.galaxy.analytics plugin (ADR-038
-// P3.4, v1) — same pattern as com.galaxy.sdd (ADR-038 T6).
+// P3.4, v1) — inert stub backend (ADR-038).
 //
 // Why this file exists at all: the Paca plugin runtime unconditionally loads
 // {PLUGINS_WASM_DIR}/<plugin-id>/backend.wasm for every ENABLED plugin

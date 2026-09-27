@@ -32,7 +32,7 @@ Galaxy deployment it is branded **"Galaxy Tasks"** and served at
   fields, task links, worklogs (time tracking), versions/components.
 - Per-project living documents (BlockNote editor, snapshots, comments).
 - Automation workflows (task-dependency graphs, status-rule reassignment).
-- A WASM plugin system (SDD Fleet, Analytics, GitHub, BDD, Checklist…).
+- A WASM plugin system (Analytics, GitHub, BDD, Checklist…).
 - AI-agent collaboration (see §8) and an MCP server for external agents (§7).
 
 ---
@@ -79,7 +79,6 @@ services/
   realtime/       Bun + Socket.IO event hub (port 3001)
   ai-agent/       Python OpenHands sandbox runner  [RETIRED in Galaxy — §8]
   agent-server/   Dockerfile only: OpenHands sandbox base image [RETIRED]
-  sdd-server/     Vendored Galaxy SDD Coordination Server (Node)
 apps/
   web/            React 19 SPA (served via Caddy)
   mcp/            @paca-ai/paca-mcp npm MCP server (~73 tools)
@@ -107,7 +106,6 @@ Caddy fans out (`deploy/caddy/Caddyfile`):
 | Path | Upstream | Purpose |
 |:--|:--|:--|
 | `/api/*` | `api:8080` | Go REST API | (`Caddyfile:196`) |
-| `/sdd-api/*` | `sdd-proxy:8791` | SDD Fleet read proxy (session-gated) | (`:192`) |
 | `/ws/*` | `realtime:3001` | Socket.IO | (`:102`) |
 | `/storage/*` | `minio:9000` | object storage / presigned uploads | (`:90`) |
 | `/plugins/*`, `/plugins-mcp/*` | Caddy file server | plugin frontend + MCP bundles | (`:115,139`) |
@@ -358,11 +356,10 @@ here. Evidence from this repo:
   systems push through with admin API keys
   (`deploy/galaxy/README.md:52`, `service/user/user_service_test.go:648`). The
   PM/Bugbase-side bridge implementations are external.
-- **SDD Coordination Server fully absorbed:** vendored into
-  `services/sdd-server` and surfaced as the native `com.galaxy.sdd` plugin; the
-  standalone dashboard is decommissioned and returns a `410` "moved to Galaxy
-  Tasks" page (`docs/runbooks/galaxy-paca-runbook.md:30-121`,
-  `docker-compose.galaxy.yml:351-415`).
+- **SDD removed (2026-09-27):** the vendored SDD Coordination Server, the
+  `sdd-proxy` sidecar and the native `com.galaxy.sdd` plugin were deleted;
+  agent task coordination moves to the Paperclip app (ADR-080). Only the
+  `sdd-sensor` service account row remains as history.
 - **PM AI features ported:** the three PM analyst prompts became Paca skills /
   AgentOps `paca` skills (§8), and PM's efficiency/velocity reporting has since
   **shipped**: `apps/web/src/routes/_authenticated/projects/$projectId/efficiency/index.tsx`
@@ -397,8 +394,7 @@ docker compose \
   (`docker-compose.galaxy.yml:32`, runbook).
 - **Active services:** `postgres`, `valkey`, `minio`, `api`, `web`, `realtime`,
   `paca-edge` (Caddy), `notify-bridge` (Paca events → platform notify inbox),
-  `dock-trigger` (task events → ChatDock agent), `sdd-proxy`, `sdd-server`,
-  `sdd-server-postgres`, `db-backup`.
+  `dock-trigger` (task events → ChatDock agent), `db-backup`.
 - **Profile-gated / retired:** `ai-agent`, `socket-proxy` (profile
   `retired-use-chatdock`); the base `gateway` service is disabled in favour of
   `paca-edge` to avoid a `galaxy_network` alias collision with `vortex-gateway`
