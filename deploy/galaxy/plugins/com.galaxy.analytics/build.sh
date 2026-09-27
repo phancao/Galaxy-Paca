@@ -4,7 +4,7 @@
 #      (no formal JSON schema exists in-repo; the authoritative rules live in
 #      services/api/internal/domain/plugin/entity.go and
 #      apps/web/src/lib/plugin-api.ts — the checks below mirror them, same as
-#      the sibling com.galaxy.sdd plugin),
+#      a federated plugin),
 #   2. build the frontend Module Federation remote  -> frontend/dist/assets/remoteEntry.js
 #   3. build the inert stub backend                 -> backend/backend.wasm
 #      (Go wasip1 c-shared when Go is available, else an 8-byte empty module —
@@ -90,7 +90,7 @@ if command -v go >/dev/null 2>&1; then
 else
   # Empty WASM module ("\0asm" + version 1). wazero compiles it, skips the
   # missing _initialize start function, and the runtime nil-guards every other
-  # export — verified against wazero v1.11.0 (see com.galaxy.sdd/backend/main.go).
+  # export — verified against wazero v1.11.0 (see backend/main.go).
   printf '\x00\x61\x73\x6d\x01\x00\x00\x00' > backend.wasm
   ok "backend: Go not found — wrote 8-byte empty-module stub backend.wasm"
 fi

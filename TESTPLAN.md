@@ -10,7 +10,7 @@
 > **Note on "OpenProject sync":** Paca is standalone and does **not** sync with
 > OpenProject (see `ARCHITECTURE.md` §intro). The equivalent integration surfaces
 > exercised below are the **Vortex identity-sync webhook (ADR-040)**, the
-> **SDD→Paca bridge**, and the **ChatDock / write-with-AI** platform-AI path.
+> and the **ChatDock / write-with-AI** platform-AI path.
 
 ## Conventions
 
@@ -18,8 +18,7 @@
   `galaxy-paca-api-1`, `galaxy-paca-web-1`, `galaxy-paca-realtime-1`,
   `galaxy-paca-postgres-1`, `galaxy-paca-valkey-1`, `galaxy-paca-minio-1`,
   `galaxy-paca-paca-edge-1`, `galaxy-paca-notify-bridge-1`,
-  `galaxy-paca-dock-trigger-1`, `galaxy-paca-sdd-proxy-1`, `sdd-server`,
-  `sdd-server-postgres`. Confirm the exact list with:
+  `galaxy-paca-dock-trigger-1`. Confirm the exact list with:
   ```bash
   docker compose -p galaxy-paca ps
   ```
@@ -215,17 +214,9 @@ refresh/bearer call (access token still valid up to ~15m — documented residual
 `nexussync_service.go:96-108`); replayed `_id` is deduped (200 `{"deduped":...}`);
 restore only for `oidc_sub`-linked rows after an identity read-back.
 
-## 17. SDD → Paca bridge & Fleet plugin (P2)
+## 17. SDD → Paca bridge & Fleet plugin — ĐÃ GỠ (27/09/2026)
 
-`/sdd-api/*` is session-gated: anonymous → 401; a Paca session → JSON
-(`runbook:89-96`).
-```bash
-curl -s https://tasks.skyplatform.net/sdd-api/team/overview     # {"error":{"code":"UNAUTHENTICATED"…}}
-curl -s -o /dev/null -w '%{http_code}\n' \
-  'https://tasks.skyplatform.net/plugins/com.galaxy.sdd/assets/remoteEntry.js?v=3'   # 200
-docker exec sdd-server printenv | grep PACA_BRIDGE_ENABLED
-```
-Pass: SDD tasks mirror into Paca as comments; the Fleet view renders (no iframe).
+Cụm SDD không còn trong Paca; không có phép thử.
 
 ## 18. Admin: users & global roles (P1)
 

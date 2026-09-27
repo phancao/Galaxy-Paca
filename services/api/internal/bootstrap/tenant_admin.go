@@ -44,7 +44,7 @@ import (
 //     in constant time. Unset means the route does not exist, so a deployment
 //     that never joined a platform never grows a new door.
 //   - The path is NOT under /api/, and the gateway forwards only /api/*, /ws/*,
-//     /storage/*, /plugins*/* and /sdd-api/*. It is therefore reachable over
+//     /storage/* and /plugins*/*. It is therefore reachable over
 //     galaxy_network (http://paca-api:8080) and from nowhere public — the same
 //     posture as identity's own /internal/*.
 //   - SUPER_ADMIN is never touched in either direction: it is the tenant's own

@@ -163,8 +163,8 @@ func TestOtherInternalPathsAreNotFoundNotRoutedToATenant(t *testing.T) {
 }
 
 func TestTenantAdminPathIsNotUnderApiSoTheGatewayNeverForwardsIt(t *testing.T) {
-	// The gateway forwards /api/*, /ws/*, /storage/*, /plugins*/* and
-	// /sdd-api/* only. If this path ever moves under /api/ it becomes publicly
+	// The gateway forwards /api/*, /ws/*, /storage/* and /plugins*/* only.
+	// If this path ever moves under /api/ it becomes publicly
 	// reachable, and the only guard left is the secret.
 	if strings.HasPrefix("/internal/tenant-admin", "/api/") {
 		t.Fatal("the bootstrap route must stay outside /api/")

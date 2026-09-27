@@ -12,7 +12,7 @@ import { CATEGORY_VAR } from "./theme";
 // only (no hooks): shared resolution normally hands us the host's React 19
 // singleton, but class components keep working even if the federation share
 // scope ever falls back to the bundled copy — hooks would crash across
-// copies. Same rationale as com.galaxy.sdd.
+// copies.
 //
 // Chart conventions (dataviz method): thin marks (bars <= 24px, 2px lines,
 // >= 8px markers with a 2px surface ring), solid hairline grid, 2px surface

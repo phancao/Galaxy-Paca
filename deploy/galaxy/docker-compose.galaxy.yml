@@ -292,45 +292,6 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
 
-  # ── SDD fleet data proxy (ADR-038) ────────────────────────────────────────
-  # Same-origin /sdd-api/* backend for the NATIVE com.galaxy.sdd plugin. Caddy
-  # (handle_path /sdd-api/*) forwards here; this sidecar gates each request on
-  # the caller's Paca session (GET api:8080/api/v1/users/me), mints a short-
-  # lived RS256 service token at vortex-identity /internal/mint-service-token
-  # (iss=galaxy-nexus, like dock-trigger), and reverse-proxies GET reads to the
-  # SDD Coordination Server (sdd-server:4830). Team-wide READ only; no secret
-  # ever reaches the browser. Zero-dependency Node image (deploy/galaxy/sdd-proxy).
-  # Networks: default (reach api:8080) + galaxy_network (reach vortex-identity +
-  # sdd-server). Explicit alias paca-sdd-proxy avoids the implicit-name collision
-  # class that forced the gateway→paca-edge rename.
-  sdd-proxy:
-    build:
-      # Relative paths resolve against the FIRST compose file's dir (deploy/).
-      context: ./galaxy/sdd-proxy
-    restart: unless-stopped
-    environment:
-      PORT: ${SDD_PROXY_PORT:-8791}
-      SDD_UPSTREAM_URL: ${SDD_UPSTREAM_URL:-http://sdd-server:4830}
-      GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-http://vortex-identity:8086}
-      PACA_AUTH_CHECK_URL: ${PACA_AUTH_CHECK_URL:-http://api:8080/api/v1/users/me}
-      # RS256 mint auth (primary). Sourced host-side from the shared env; the
-      # same secret ai-agent/dock-trigger use. NEVER committed.
-      GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
-      SDD_SERVICE_SUB: ${SDD_SERVICE_SUB:-svc-paca-sdd-fleet}
-      SDD_SERVICE_AUD: ${SDD_SERVICE_AUD:-sdd-server}
-      # No HS256 fallback secret. If identity is unreachable the proxy returns
-      # 502 rather than self-signing with the fleet-shared key.
-    networks:
-      default: {}
-      galaxy_network:
-        aliases:
-          - paca-sdd-proxy
-    depends_on:
-      api:
-        condition: service_started
-    mem_limit: 128m
-    memswap_limit: 128m
-
   # ⚠️ SỰ CỐ 17/07: service upstream tên `gateway` sinh alias DNS NGẦM
   # `gateway` trên galaxy_network (Compose luôn thêm alias = tên service),
   # đụng alias `gateway` của vortex-gateway → tunnel round-robin đưa traffic
@@ -364,8 +325,6 @@ services:
         required: false
       realtime:
         condition: service_started
-      sdd-proxy:
-        condition: service_started
     # Reachable only through galaxy_network (Cloudflare tunnel), never via
     # host ports. GATEWAY_NETWORK_ALIAS parameterizes the DNS name for
     # instance-per-tenant deploys (ADR-038 T7: paca-<tenant>-gateway).
@@ -384,83 +343,9 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
 
-  # ── SDD Coordination Server (moved into Paca — was standalone `central`) ──────
-  # Vendored under services/sdd-server/ (Galaxy-SDD-Monitor central/ + client/ +
-  # server/lib). Paca's SDD Fleet plugin reads it via sdd-proxy → sdd-server:4830.
-  # Fresh DB — history from the old standalone deployment is NOT migrated.
-  sdd-server-postgres:
-    image: postgres:16-alpine
-    container_name: sdd-server-postgres
-    environment:
-      POSTGRES_USER: ${SDD_PG_USER:-sdd}
-      POSTGRES_PASSWORD: ${SDD_PG_PASSWORD:-sdd_local_pw}
-      POSTGRES_DB: ${SDD_PG_DB:-sdd}
-    volumes:
-      - paca_sdd_pg:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${SDD_PG_USER:-sdd}", "-d", "${SDD_PG_DB:-sdd}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks: [paca-sdd-internal]
-    restart: unless-stopped
-    mem_limit: 256m
-    memswap_limit: 256m
-
-  sdd-server:
-    build:
-      # context = vendored source; central/Dockerfile reuses central/+client/+server/lib
-      context: ../services/sdd-server
-      dockerfile: central/Dockerfile
-      args:
-        VITE_BASE_PATH: /sdd-server
-    image: galaxy-local/sdd-server:latest
-    container_name: sdd-server
-    environment:
-      NODE_ENV: production
-      PORT: "4830"
-      SDD_SERVE_SPA: "off"
-      # Fresh DB — schema auto-applied by db.init() on start. Connects as the
-      # superuser role (sdd); the non-super sdd_app hardening is out-of-band.
-      PGHOST: sdd-server-postgres
-      PGPORT: "5432"
-      PGUSER: ${SDD_PG_USER:-sdd}
-      PGPASSWORD: ${SDD_PG_PASSWORD:-sdd_local_pw}
-      PGDATABASE: ${SDD_PG_DB:-sdd}
-      # Auth: RS256 only — delegation tokens (ingest) and OIDC access tokens
-      # (read), both verified against the Vortex JWKS. JWT_SECRET is
-      # deliberately NOT passed: this server verifies, it does not sign, and a
-      # shared symmetric key would let it (and every other holder) forge the
-      # telemetry every dashboard reads.
-      NEXUS_JWKS_URL: ${NEXUS_JWKS_URL:-http://vortex-identity:8086/.well-known/jwks.json}
-      VORTEX_JWKS_URL: ${NEXUS_JWKS_URL:-http://vortex-identity:8086/.well-known/jwks.json}
-      # Paca bridge: mirrors SDD tasks into Paca. API key from .env.galaxy (never committed).
-      PACA_BRIDGE_ENABLED: ${SDD_PACA_BRIDGE_ENABLED:-true}
-      PACA_BASE_URL: ${SDD_PACA_BASE_URL:-http://paca-gateway:80}
-      PACA_API_KEY: ${SDD_PACA_API_KEY:-}
-      PACA_BRIDGE_POLL_MS: ${SDD_PACA_BRIDGE_POLL_MS:-30000}
-      # OTel off for the vendored deploy (no preloaded package in this image build).
-      NODE_OPTIONS: ""
-      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
-    depends_on:
-      sdd-server-postgres:
-        condition: service_healthy
-    networks:
-      galaxy_network:
-        aliases:
-          - sdd-server
-      paca-sdd-internal: {}
-    restart: unless-stopped
-    mem_limit: 512m
-    memswap_limit: 512m
-
 networks:
   galaxy_network:
     external: true
   agentops-redis-net:
     external: true
-  paca-sdd-internal:
-    driver: bridge
 
-volumes:
-  paca_sdd_pg:

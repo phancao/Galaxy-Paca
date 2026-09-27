@@ -77,13 +77,6 @@ jobs:
           - ecr: vortex/paca-notify-bridge
             context: deploy/galaxy/notify-bridge
             file: deploy/galaxy/notify-bridge/Dockerfile
-          - ecr: vortex/paca-sdd-proxy
-            context: deploy/galaxy/sdd-proxy
-            file: deploy/galaxy/sdd-proxy/Dockerfile
-          - ecr: vortex/sdd-server
-            context: services/sdd-server
-            file: services/sdd-server/central/Dockerfile
-            args: --build-arg VITE_BASE_PATH=/sdd-server
     steps:
       - uses: actions/checkout@v5
 

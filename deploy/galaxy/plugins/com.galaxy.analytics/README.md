@@ -13,7 +13,7 @@ Module Federation components with dependency-free inline SVG charts.
 - All aggregation is computed **client-side** (`frontend/src/analytics.ts`).
 - Charts are hand-rolled inline SVG (`frontend/src/charts.tsx`) to keep the
   remote small — the built `remoteEntry.js` is ~14 KB (~5 KB gzip).
-- The WASM backend is the same **inert stub** pattern as `com.galaxy.sdd`
+- The WASM backend is an **inert stub**
   (the host requires a loadable `backend.wasm` for every enabled plugin).
 
 ## Surfaces
@@ -168,7 +168,7 @@ curl -X DELETE -H "X-API-Key: $API_KEY" https://tasks.skyplatform.net/api/v1/adm
 docker exec -u 0 galaxy-paca-api-1 rm -rf /plugins/com.galaxy.analytics /plugins-frontend/com.galaxy.analytics
 ```
 
-## Manifest gotchas (host behaviour — same list as com.galaxy.sdd)
+## Manifest gotchas (host behaviour)
 
 - `"backend": {}` must stay in `plugin.json` even though the plugin is
   frontend-only: `Runtime.EmitEvent` dereferences
