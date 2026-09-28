@@ -366,10 +366,13 @@ func TestMain(m *testing.M) {
 
 	minioC, err := testcontainers.GenericContainer(bgCtx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			// quay.io: Docker Hub stopped serving minio/minio to anonymous
-			// pulls ("pull access denied"), which silently skipped every
-			// attachment test. Pinned to the release the deployments run.
-			Image: "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z",
+			// Docker Hub stopped serving minio/minio to anonymous pulls ("pull
+			// access denied"), and since 09/2026 quay.io/minio/minio does too
+			// ("unauthorized: access to the requested resource is not
+			// authorized"). Chainguard's build is the same MinIO server,
+			// anonymously pullable, with `minio` as entrypoint so the Cmd
+			// below is unchanged. Only `latest` is free, so it is not pinned.
+			Image: "cgr.dev/chainguard/minio:latest",
 			Env: map[string]string{
 				"MINIO_ROOT_USER":     "minioadmin",
 				"MINIO_ROOT_PASSWORD": "minioadmin",
@@ -381,8 +384,11 @@ func TestMain(m *testing.M) {
 		Started: true,
 	})
 	if err != nil {
-		_ = pgC.Terminate(bgCtx)
-		_ = redisC.Terminate(bgCtx)
+		// MinIO is optional: only the attachment tests need it and they skip
+		// themselves when sharedMinIOEndpoint is empty. Postgres and Valkey
+		// must stay up — terminating them here turned "attachment tests
+		// skipped" into "every test fails with connection refused".
+		minioC = nil
 		fmt.Fprintf(os.Stderr, "WARN: start minio container: %v – attachment tests will be skipped\n", err)
 	} else {
 		minioHost, _ := minioC.Host(bgCtx)
