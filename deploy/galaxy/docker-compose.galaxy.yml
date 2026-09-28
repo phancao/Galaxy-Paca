@@ -86,6 +86,10 @@ services:
       # Advertised on the public /auth/config endpoint; the SPA mounts the
       # dock after login. Empty keeps the dock disabled.
       GALAXY_DOCK_SRC: ${GALAXY_DOCK_SRC:-}
+      # This estate's Vortex portal (wrong-workspace page, SPA logout link).
+      # Falls back to EXTERNAL_DOMAIN (the wizard writes it, same as the AWS
+      # stack); empty → the API logs an error, never another estate's portal.
+      GALAXY_PORTAL_ORIGIN: ${GALAXY_PORTAL_ORIGIN:-${EXTERNAL_DOMAIN:-}}
       # ── ADR-038: one-shot "write task description with AI" ──────────────
       # The in-app agent (OpenHands) runtime is retired; the agent surface is
       # ChatDock. This remaining in-context AI touchpoint mints a short-lived
@@ -104,7 +108,10 @@ services:
       # runtime/galaxy-shared/*.env — NEVER committed.
       WIKI_API_URL: ${PACA_WIKI_API_URL:-http://docx:3000}
       WIKI_API_TOKEN: ${PACA_WIKI_API_TOKEN:-}
-      WIKI_PUBLIC_URL: ${PACA_WIKI_PUBLIC_URL:-https://wiki.skyplatform.net}
+      # Browser-facing wiki of THIS estate (wizard writes wiki.<base>). No
+      # estate default — the API logs an error when the wiki surface is on
+      # without it.
+      WIKI_PUBLIC_URL: ${PACA_WIKI_PUBLIC_URL:-}
     # Split-horizon OIDC (SỰ CỐ "invalid id_token" 17/07): identity mints
     # iss=http://nexus-identity:8086 (OIDC_ISSUER nội bộ của identity), nên
     # api phải fetch discovery/token/JWKS qua galaxy_network như RAGFlow.
@@ -233,7 +240,8 @@ services:
       OIDC_TENANT: ${OIDC_TENANT:-}
       GALAXY_NOTIFY_REDIS_URL: ${GALAXY_NOTIFY_REDIS_URL:-redis://agentops-redis:6379/0}
       NOTIFY_FANOUT_CHANNEL: ${NOTIFY_FANOUT_CHANNEL:-notify.fan-out}
-      PACA_PUBLIC_URL: ${PUBLIC_URL:-https://tasks.skyplatform.net}
+      # No estate default: the bridge refuses to start without it.
+      PACA_PUBLIC_URL: ${PUBLIC_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       postgres:
@@ -277,7 +285,8 @@ services:
       # One consumer loop per tenant, on that tenant's own Valkey + database.
       PACA_TENANTS: ${PACA_TENANTS:-}
       OIDC_TENANT: ${OIDC_TENANT:-}
-      PACA_PUBLIC_URL: ${PUBLIC_URL:-https://tasks.skyplatform.net}
+      # No estate default: the bridge refuses to start without it.
+      PACA_PUBLIC_URL: ${PUBLIC_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       postgres:

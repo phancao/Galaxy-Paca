@@ -4,7 +4,7 @@
 # =============================================================================
 #
 # Usage:
-#   ./provision-tenant-paca.sh <tenant_code> <domain>
+#   EXTERNAL_DOMAIN=https://ai.<estate domain> ./provision-tenant-paca.sh <tenant_code> <domain>
 #   ./provision-tenant-paca.sh vietjet tasks-vietjet.skyplatform.net
 #
 # Generates ~/Nexus/paca-tenants/<tenant_code>/.env.tenant from
@@ -40,7 +40,8 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." >/dev/null 2>&1 && pwd)"
 usage() {
 	echo "Usage: $0 <tenant_code> <domain>" >&2
 	echo "  tenant_code: 2-30 chars, lowercase [a-z0-9-], starts alphanumeric" >&2
-	echo "  domain:      public hostname, e.g. tasks-<tenant>.skyplatform.net" >&2
+	echo "  domain:      public hostname, e.g. tasks-<tenant>.<estate domain>" >&2
+	echo "  EXTERNAL_DOMAIN (env, required): this estate's Vortex portal origin, e.g. https://ai.<estate domain>" >&2
 	exit 64
 }
 
@@ -56,6 +57,15 @@ if ! printf '%s' "${TENANT}" | grep -Eq '^[a-z0-9][a-z0-9-]{1,29}$'; then
 fi
 if ! printf '%s' "${DOMAIN}" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'; then
 	echo "ERROR: invalid domain '${DOMAIN}'" >&2
+	usage
+fi
+# The Vortex portal of THIS estate (issuer, AI proxy, dock). No default: the
+# template used to pin Galaxy's staging portal, so a tenant provisioned on any
+# other estate trusted staging's identity.
+PORTAL="${EXTERNAL_DOMAIN:-}"
+PORTAL="${PORTAL%/}"
+if ! printf '%s' "${PORTAL}" | grep -Eq '^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]+)?$'; then
+	echo "ERROR: EXTERNAL_DOMAIN must be set to this estate's Vortex portal origin (https://ai.<estate domain>), got '${PORTAL}'" >&2
 	usage
 fi
 [ -f "${TEMPLATE}" ] || {
@@ -90,6 +100,7 @@ trap 'rm -f "${TMP_FILE}"' EXIT
 sed \
 	-e "s/__TENANT__/${TENANT}/g" \
 	-e "s/__DOMAIN__/${DOMAIN}/g" \
+	-e "s|__PORTAL__|${PORTAL}|g" \
 	-e "s/__POSTGRES_PASSWORD__/$(gen_secret)/" \
 	-e "s/__JWT_SECRET__/$(gen_secret)/" \
 	-e "s/__ADMIN_PASSWORD__/$(gen_secret)/" \
