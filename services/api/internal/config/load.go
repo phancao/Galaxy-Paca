@@ -464,11 +464,11 @@ func moveToFront(list []string, want string) []string {
 //
 // An explicit GALAXY_PORTAL_ORIGIN always wins. Otherwise it is derived from
 // dockSrc's own origin — the dock bundle and the portal are the same
-// platform, so a working dock URL already proves the right host. Only when
-// BOTH are empty does it fall back to the historical hardcoded default,
-// which is Galaxy's own portal: correct for Galaxy, wrong for every other
-// estate that forgets to set either variable, exactly as three frontend
-// files did before this field existed (T7).
+// platform, so a working dock URL already proves the right host. When BOTH
+// are empty (or the dock URL is relative) it returns "" — there is no estate
+// to name. It used to fall back to Galaxy's staging portal, which on every
+// other estate sent people to somebody else's building; now bootstrap logs
+// the gap loudly and the SPA hides the portal links instead (T7).
 func portalOrigin(dockSrc, explicit string) string {
 	if explicit != "" {
 		return strings.TrimRight(explicit, "/")
@@ -476,7 +476,7 @@ func portalOrigin(dockSrc, explicit string) string {
 	if u, err := url.Parse(dockSrc); err == nil && u.Scheme != "" && u.Host != "" {
 		return u.Scheme + "://" + u.Host
 	}
-	return "https://ai.skyplatform.net"
+	return ""
 }
 
 // env returns the environment variable value or a fallback default.

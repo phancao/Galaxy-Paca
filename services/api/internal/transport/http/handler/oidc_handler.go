@@ -31,15 +31,6 @@ const (
 	oidcStateCookiePath = "/api/v1/auth/oidc"
 	// oidcStateTTL bounds how long a login attempt may take.
 	oidcStateTTL = 10 * time.Minute
-	// defaultPortalOrigin is the LAST fallback for where the Vortex session
-	// lives, used only when OIDCOptions.PortalOrigin is empty. It used to be
-	// the only value: on every other estate (production FinX, 24/09/2026) the
-	// "wrong workspace" page sent people to Galaxy's STAGING portal to switch
-	// tenant — a door that leads to a different building. The configured
-	// origin (config.PortalOrigin, from GALAXY_PORTAL_ORIGIN or the dock
-	// bundle's own host) always resolves to something, so the page never loses
-	// its door; it just stops pointing at somebody else's.
-	defaultPortalOrigin = "https://ai.skyplatform.net"
 )
 
 // OIDCOptions carries the OIDC client settings the handler needs (a transport
@@ -378,8 +369,19 @@ func (h *OIDCHandler) servedTenants() []string {
 // page names both tenants and offers the only two moves that help: change
 // workspace back, or go to the portal.
 func (h *OIDCHandler) renderTenantMismatch(w http.ResponseWriter, sessionTenant string) {
-	portal := h.portalOrigin()
-	switchURL := portal + "/nexus/switch-workspace?return_url=" + url.QueryEscape(h.publicOrigin())
+	// Without a configured portal there is no door to offer: name the gap in
+	// the log and show the explanation alone, never another estate's portal.
+	links := `<p>Hãy mở cổng Vortex của nơi làm việc này để đổi nơi làm việc.</p>`
+	if portal := h.portalOrigin(); portal != "" {
+		switchURL := portal + "/nexus/switch-workspace?return_url=" + url.QueryEscape(h.publicOrigin())
+		links = fmt.Sprintf(`<a class="btn" href="%s">Đổi nơi làm việc</a>
+<div><a class="sub" href="%s">Về Vortex</a></div>`,
+			html.EscapeString(switchURL),
+			html.EscapeString(portal),
+		)
+	} else {
+		h.log.Error("oidc: portal origin unknown — wrong-workspace page has no switch link; set GALAXY_PORTAL_ORIGIN")
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -404,23 +406,20 @@ a.sub{display:inline-block;margin-top:1rem;color:#8f97a8;font-size:.9rem}
 <h1>Không gian này phục vụ một nơi làm việc khác</h1>
 <p>Ứng dụng đang chạy cho <b>%s</b>, còn phiên của bạn đang ở <b>%s</b>.
 Đổi nơi làm việc rồi quay lại là xong.</p>
-<a class="btn" href="%s">Đổi nơi làm việc</a>
-<div><a class="sub" href="%s">Về Vortex</a></div>
+%s
 </div>`,
 		html.EscapeString(h.opts.Tenant),
 		html.EscapeString(sessionTenant),
-		html.EscapeString(switchURL),
-		html.EscapeString(portal),
+		links,
 	)
 }
 
-// portalOrigin is this estate's portal, falling back to the historical default
-// only when none was configured.
+// portalOrigin is this estate's portal, or "" when none was configured.
+// There is deliberately no hardcoded fallback: the old one was Galaxy's
+// STAGING portal, and on every other estate (production FinX, 24/09/2026) the
+// "wrong workspace" page sent people there to switch tenant.
 func (h *OIDCHandler) portalOrigin() string {
-	if o := strings.TrimRight(h.opts.PortalOrigin, "/"); o != "" {
-		return o
-	}
-	return defaultPortalOrigin
+	return strings.TrimRight(h.opts.PortalOrigin, "/")
 }
 
 // publicOrigin is where a browser reaches THIS deployment — derived from the

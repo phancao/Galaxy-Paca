@@ -482,6 +482,12 @@ def main() -> int:
         while not triggers[0].stopping:
             time.sleep(5)
         return 0
+    if not triggers[0].public_url:
+        log.error(
+            "PACA_PUBLIC_URL is not set — refusing to start: the agent prompt "
+            "would carry no task link (set it to this estate's tasks.<domain> origin)"
+        )
+        return 1
 
     log.info(
         "starting: tenants=%s streams=%s,%s group=%s agentops=%s trigger_usernames=%s",

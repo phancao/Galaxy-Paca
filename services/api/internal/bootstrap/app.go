@@ -289,6 +289,11 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	worklogService := worklogsvc.New(worklogRepo, worklogsvc.NewTaskOwnerChecker(taskRepo))
 	// Wiki-backed Documentation (ADR-042). A disabled client (missing
 	// WIKI_API_URL/WIKI_API_TOKEN) leaves the routes unregistered.
+	// WIKI_PUBLIC_URL has no estate default; without it browser links fall
+	// back to the internal API URL, which no browser can open — say so.
+	if cfg.Wiki.APIURL != "" && cfg.Wiki.APIToken != "" && cfg.Wiki.PublicURL == "" {
+		log.Error("config: WIKI_PUBLIC_URL is not set — wiki links will use the internal WIKI_API_URL; set it to this estate's wiki.<domain>")
+	}
 	wikiSpaceService := wikispacesvc.New(wikiRepo,
 		wiki.New(cfg.Wiki.APIURL, cfg.Wiki.APIToken, cfg.Wiki.PublicURL),
 		projectRepo, projectRepo, userRepo, log)
@@ -452,10 +457,12 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	if cfg.GalaxyDockSrc != "" {
 		authHandler = authHandler.WithGalaxyDock(cfg.GalaxyDockSrc)
 	}
-	// PortalOrigin always resolves to something (config.portalOrigin falls
-	// back to the historical default), so this is unconditional — the SPA
-	// must never see an empty string and fall further back to its own
-	// hardcoded constant.
+	// PortalOrigin is empty when neither GALAXY_PORTAL_ORIGIN nor an absolute
+	// GALAXY_DOCK_SRC is set. There is no estate-neutral default to fall back
+	// to, so say so loudly; the SPA hides its portal links on an empty value.
+	if cfg.PortalOrigin == "" {
+		log.Error("config: portal origin unknown — set GALAXY_PORTAL_ORIGIN (or an absolute GALAXY_DOCK_SRC) to this estate's Vortex portal")
+	}
 	authHandler = authHandler.WithPortalOrigin(cfg.PortalOrigin)
 
 	// --- Galaxy identity (ADR-038) -------------------------------------------

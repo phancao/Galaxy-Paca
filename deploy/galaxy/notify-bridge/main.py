@@ -50,7 +50,9 @@ Environment:
   GALAXY_NOTIFY_REDIS_URL  default redis://agentops-redis:6379/0 (galaxy_network,
                            same convention as NOTIFY_REDIS_URL in pm_service)
   NOTIFY_FANOUT_CHANNEL    default notify.fan-out
-  PACA_PUBLIC_URL          default https://tasks.skyplatform.net
+  PACA_PUBLIC_URL          REQUIRED when enabled — this estate's Paca origin
+                           (tasks.<estate>). No default: a staging fallback
+                           would link every other estate's tasks to staging.
 
 Never logs secrets or connection strings; identity comes from Paca's signed
 writes (streams + DB rows), not from anything client-supplied.
@@ -516,7 +518,7 @@ class Bridge:
             "PACA_DATABASE_URL",
             "postgres://paca:changeme@postgres:5432/paca?sslmode=disable",
         )
-        self.public_url = os.getenv("PACA_PUBLIC_URL", "https://tasks.skyplatform.net")
+        self.public_url = os.getenv("PACA_PUBLIC_URL", "").strip().rstrip("/")
         host = socket.gethostname() or str(uuidlib.uuid4())
         # The consumer name must differ per tenant: two bridges in one process
         # reading with the SAME name would be treated by Valkey as one
@@ -738,6 +740,12 @@ def main() -> int:
         while not bridges[0].stopping:
             time.sleep(5)
         return 0
+    if not bridges[0].public_url:
+        log.error(
+            "PACA_PUBLIC_URL is not set — refusing to start: task links would "
+            "point nowhere (set it to this estate's tasks.<domain> origin)"
+        )
+        return 1
 
     log.info(
         "starting: tenants=%s streams=%s,%s group=%s channel=%s",

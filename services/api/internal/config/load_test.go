@@ -282,14 +282,15 @@ func TestPortalOrigin(t *testing.T) {
 			want:     "https://ai.example-tenant.com",
 		},
 		{
-			name: "relative dock src falls back to the historical default",
+			name: "relative dock src names no estate",
 			// A same-origin bridge path carries no scheme/host to derive from.
+			// No fallback to any estate: bootstrap logs the gap instead.
 			dockSrc: "/dock.js",
-			want:    "https://ai.skyplatform.net",
+			want:    "",
 		},
 		{
-			name: "empty everything falls back to the historical default",
-			want: "https://ai.skyplatform.net",
+			name: "empty everything names no estate",
+			want: "",
 		},
 	}
 	for _, tc := range cases {

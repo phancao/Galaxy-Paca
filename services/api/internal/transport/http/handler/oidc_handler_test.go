@@ -364,7 +364,8 @@ func TestOIDCCallbackRejectsOtherTenant(t *testing.T) {
 func TestOIDCTenantMismatchLinksThisEstatesPortal(t *testing.T) {
 	cases := []struct{ name, portal, want string }{
 		{"configured", "https://ai-portal.dev.galaxyfinx.com/", "https://ai-portal.dev.galaxyfinx.com/nexus/switch-workspace"},
-		{"unset falls back", "", "https://ai.skyplatform.net/nexus/switch-workspace"},
+		// Unset: no link at all — never another estate's portal.
+		{"unset offers no portal link", "", "Hãy mở cổng Vortex của nơi làm việc này"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -387,8 +388,11 @@ func TestOIDCTenantMismatchLinksThisEstatesPortal(t *testing.T) {
 			if !strings.Contains(body, tc.want) {
 				t.Fatalf("page must link %q, got:\n%s", tc.want, body)
 			}
-			if tc.portal != "" && strings.Contains(body, "skyplatform") {
-				t.Fatalf("a configured estate must not link another estate's portal:\n%s", body)
+			if strings.Contains(body, "skyplatform") {
+				t.Fatalf("the page must not link another estate's portal:\n%s", body)
+			}
+			if tc.portal == "" && strings.Contains(body, "switch-workspace") {
+				t.Fatalf("with no portal configured the page must offer no switch link:\n%s", body)
 			}
 		})
 	}

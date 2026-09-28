@@ -13,7 +13,7 @@
 #   API_KEY=<paca-api-key> ./install-prod.sh
 #
 # Env overrides:
-#   API_URL        (default https://tasks.skyplatform.net)
+#   API_URL        (required — this estate's Paca origin, https://tasks.<domain>)
 #   API_CONTAINER  (default galaxy-paca-api-1)
 #   API_KEY        (required — Paca web: Settings -> API Keys)
 set -euo pipefail
@@ -21,7 +21,7 @@ cd "$(dirname "$0")"
 
 PLUGIN_ID=$(jq -r '.id' plugin.json)
 PLUGIN_VERSION=$(jq -r '.version' plugin.json)
-API_URL="${API_URL:-https://tasks.skyplatform.net}"
+: "${API_URL:?API_URL is required: the Paca origin of THIS estate, e.g. https://tasks.<domain>}"
 API_CONTAINER="${API_CONTAINER:-galaxy-paca-api-1}"
 : "${API_KEY:?API_KEY is required (create one in Paca: Settings -> API Keys)}"
 
