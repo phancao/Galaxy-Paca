@@ -138,6 +138,29 @@ def _mint_base_url() -> str:
     return base.removesuffix("/ai/v1")
 
 
+def _mint_headers(service_secret: str) -> dict[str, str]:
+    """Headers for the mint: the shared secret, plus Paca's app credential
+    (X-App-ID + X-Client-Secret) when BOTH halves are configured (SPA-1891).
+
+    With the app credential identity knows the caller IS Paca (keyed
+    ``app:<id>``), not merely some holder of the fleet secret. Half a
+    credential is treated as none — the mint stays shared-secret only, as it
+    always was. Secrets never reach the log.
+    """
+    headers = {"X-Service-Secret": service_secret, "Content-Type": "application/json"}
+    app_id = settings.galaxy_app_id.strip()
+    app_secret = settings.galaxy_app_client_secret.strip()
+    if app_id and app_secret:
+        headers["X-App-ID"] = app_id
+        headers["X-Client-Secret"] = app_secret
+    elif app_id or app_secret:
+        logger.warning(
+            "Only one of GALAXY_APP_ID / GALAXY_APP_CLIENT_SECRET is set — "
+            "minting without app authentication (shared secret only)."
+        )
+    return headers
+
+
 async def _mint_service_token(act_as: str | None, aud: str, ttl_seconds: int) -> str:
     """Mint an RS256 platform token via identity's /internal/mint-service-token.
 
@@ -168,7 +191,7 @@ async def _mint_service_token(act_as: str | None, aud: str, ttl_seconds: int) ->
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 url,
-                headers={"X-Service-Secret": secret, "Content-Type": "application/json"},
+                headers=_mint_headers(secret),
                 json={
                     "sub": settings.galaxy_service_subject,
                     "aud": aud,

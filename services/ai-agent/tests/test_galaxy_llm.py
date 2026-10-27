@@ -32,6 +32,8 @@ def _galaxy_settings(monkeypatch, **overrides):
         "galaxy_identity_url": "",
         "galaxy_internal_service_secret": "platform-secret",
         "galaxy_service_subject": "paca-service@galaxy.internal.nexus",
+        "galaxy_app_id": "",
+        "galaxy_app_client_secret": "",
     }
     values.update(overrides)
     for name, value in values.items():
@@ -142,6 +144,65 @@ async def test_mint_sends_attribution_contract(monkeypatch):
     assert body["ttl_seconds"] == 900
     assert body["extra"]["act_as"] == "alice@example.com"
     assert body["extra"]["act_as_agent"] == "paca-ai"
+
+
+async def test_mint_without_app_credential_sends_shared_secret_only(monkeypatch):
+    # SPA-1891: unset app credential → exactly today's headers.
+    _galaxy_settings(monkeypatch)
+    fake = _FakeAsyncClient(response=_FakeResponse(200, {"access_token": "t"}))
+    with patch.object(galaxy_llm.httpx, "AsyncClient", fake):
+        await mint_llm_token("alice@example.com")
+
+    headers = fake.calls[0]["headers"]
+    assert headers == {"X-Service-Secret": "platform-secret", "Content-Type": "application/json"}
+
+
+async def test_mint_with_app_credential_sends_app_auth_headers(monkeypatch):
+    # SPA-1891: both halves set → identity can key the caller as app:<id>.
+    _galaxy_settings(
+        monkeypatch, galaxy_app_id="paca", galaxy_app_client_secret="paca-client-secret"
+    )
+    fake = _FakeAsyncClient(response=_FakeResponse(200, {"access_token": "t"}))
+    with patch.object(galaxy_llm.httpx, "AsyncClient", fake):
+        await mint_llm_token("alice@example.com")
+
+    call = fake.calls[0]
+    assert call["headers"]["X-Service-Secret"] == "platform-secret"
+    assert call["headers"]["X-App-ID"] == "paca"
+    assert call["headers"]["X-Client-Secret"] == "paca-client-secret"
+    # No act_sub: the actor stays the caller itself.
+    assert "act_sub" not in call["json"]
+    assert "act_sub" not in call["json"]["extra"]
+
+
+@pytest.mark.parametrize(
+    ("app_id", "app_secret"),
+    [("paca", ""), ("", "paca-client-secret"), ("  ", "paca-client-secret")],
+)
+async def test_mint_with_half_app_credential_falls_back_to_shared_secret(
+    monkeypatch, caplog, app_id, app_secret
+):
+    _galaxy_settings(monkeypatch, galaxy_app_id=app_id, galaxy_app_client_secret=app_secret)
+    fake = _FakeAsyncClient(response=_FakeResponse(200, {"access_token": "t"}))
+    with patch.object(galaxy_llm.httpx, "AsyncClient", fake), caplog.at_level("WARNING"):
+        await mint_llm_token(None)
+
+    headers = fake.calls[0]["headers"]
+    assert "X-App-ID" not in headers
+    assert "X-Client-Secret" not in headers
+    assert "paca-client-secret" not in caplog.text
+
+
+async def test_mint_never_logs_app_client_secret(monkeypatch, caplog):
+    _galaxy_settings(
+        monkeypatch, galaxy_app_id="paca", galaxy_app_client_secret="paca-client-secret"
+    )
+    fake = _FakeAsyncClient(response=_FakeResponse(200, {"access_token": "t"}))
+    with patch.object(galaxy_llm.httpx, "AsyncClient", fake), caplog.at_level("DEBUG"):
+        await mint_llm_token("alice@example.com")
+
+    assert "paca-client-secret" not in caplog.text
+    assert "platform-secret" not in caplog.text
 
 
 async def test_mint_omits_act_as_when_unknown(monkeypatch):
