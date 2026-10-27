@@ -67,6 +67,17 @@ class Settings(BaseSettings):
     # Signed subject for the minted service token (house convention:
     # <app>-service@galaxy.internal.nexus).
     galaxy_service_subject: str = "paca-service@galaxy.internal.nexus"
+    # OPTIONAL app authentication on the mint (SPA-1891). The shared
+    # INTERNAL_SERVICE_SECRET identifies nobody — every holder of it can ask
+    # for sub=paca-service@…; identity can only tell Paca apart when the mint
+    # also carries X-App-ID + X-Client-Secret of Paca's own identity
+    # Application. That Application already exists: it is Paca's OIDC client
+    # (OIDC_CLIENT_ID / OIDC_CLIENT_SECRET of the api service — identity's
+    # OAuth clients ARE `applications` rows, same client_secret_hash), so no
+    # new credential is needed. Both set → headers sent; either empty → the
+    # mint is shared-secret only, exactly as before. Never logged.
+    galaxy_app_id: str = ""
+    galaxy_app_client_secret: str = ""
     # Extra Docker networks the sandbox containers join in addition to their
     # primary stack network (comma-separated). In galaxy mode the agent-server
     # containers make the LLM calls themselves (the OpenHands SDK sends the

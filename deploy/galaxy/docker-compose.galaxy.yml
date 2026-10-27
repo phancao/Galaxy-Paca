@@ -194,6 +194,13 @@ services:
       GALAXY_AI_PROXY_URL: ${GALAXY_AI_PROXY_URL:-http://vortex-identity:8086/ai/v1}
       GALAXY_IDENTITY_URL: ${GALAXY_IDENTITY_URL:-}
       GALAXY_INTERNAL_SERVICE_SECRET: ${GALAXY_INTERNAL_SERVICE_SECRET:-}
+      # SPA-1891: OPTIONAL app authentication on the mint (X-App-ID +
+      # X-Client-Secret). Empty = shared-secret-only mint, as before. Value =
+      # Paca's EXISTING identity Application (its OIDC client, see
+      # OIDC_CLIENT_ID / OIDC_CLIENT_SECRET) — a person sets these at deploy
+      # time; no bot creates credentials. NEVER committed.
+      GALAXY_APP_ID: ${GALAXY_APP_ID:-}
+      GALAXY_APP_CLIENT_SECRET: ${GALAXY_APP_CLIENT_SECRET:-}
       # Sandboxes make the LLM calls themselves (SDK ships the agent spec into
       # the agent-server) → they must join galaxy_network too. Spawned
       # containers have random names + no aliases: no DNS-collision surface.
