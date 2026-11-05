@@ -33,8 +33,8 @@ docker compose -f deploy/docker-compose.dev.yml down -v
 | `services/ai-agent` | Python + FastAPI + OpenHands SDK | 8080 (internal) | source volume |
 | PostgreSQL | postgres:16-alpine | 5432 | — |
 | Valkey | valkey/valkey:8-alpine | 6379 | — |
-| MinIO S3 API | minio/minio | 9000 | — |
-| MinIO Console | minio/minio | 9001 | http://localhost:9001 (user: `minioadmin`, pass: `minioadmin`) |
+| MinIO S3 API | pgsty/minio (RELEASE.2026-08-04) | 9000 | — |
+| MinIO Console | pgsty/minio (RELEASE.2026-08-04) | 9001 | http://localhost:9001 (user: `minioadmin`, pass: `minioadmin`) |
 
 The Caddy gateway (port 3000) routes `/api/v1/…` to the API, socket traffic to realtime, and `/storage/…` to MinIO. `apps/web` is served at the root.
 

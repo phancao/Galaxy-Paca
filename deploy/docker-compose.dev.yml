@@ -235,7 +235,7 @@ services:
   # MinIO — S3-compatible object store for development.
   # Swap for AWS S3 in production by updating STORAGE_* env vars in the API service.
   minio:
-    image: minio/minio:latest
+    image: docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z  # SPA-5901: minio/minio và quay.io/minio trả 401 ẩn danh; pgsty drop-in (có mc, curl)
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
