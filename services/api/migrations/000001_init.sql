@@ -40,7 +40,14 @@ CREATE TABLE IF NOT EXISTS users (
         ON DELETE RESTRICT
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uni_users_username ON users (username);
+-- Migrations re-run on EVERY boot (no ledger). Create the active-only index
+-- that 000016 settled on, never the old full index: re-creating a full
+-- uni_users_username on a DB holding a soft-deleted + active pair with the
+-- same username fails with 23505 and the API cannot boot (SPA-6550 incident,
+-- SpaxeAI prod 07/11/2026). 000016 drops any legacy full index.
+CREATE UNIQUE INDEX IF NOT EXISTS uni_users_username_active
+    ON users (username)
+    WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users (deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_role_id    ON users (role_id);
 
