@@ -301,3 +301,62 @@ func TestPortalOrigin(t *testing.T) {
 		})
 	}
 }
+
+func setMinimalLoadEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("DATABASE_URL", "postgres://test")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("ADMIN_USERNAME", "admin")
+	t.Setenv("ADMIN_PASSWORD", "password")
+	t.Setenv("STORAGE_ACCESS_KEY_ID", "access-key")
+	t.Setenv("STORAGE_SECRET_ACCESS_KEY", "secret-key")
+}
+
+// SPA-6550: delegated-bearer JIT is on by default for the MCP gateway only,
+// and follows the deployment's OIDC_AUTO_CREATE_USERS policy.
+func TestLoad_BearerJITDefaultsAndPolicyCoupling(t *testing.T) {
+	setMinimalLoadEnv(t)
+	t.Setenv("GALAXY_BEARER_AUTO_CREATE_USERS", "")
+	t.Setenv("GALAXY_BEARER_JIT_DELEGATORS", "")
+	t.Setenv("OIDC_AUTO_CREATE_USERS", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Security.GalaxyBearerAutoCreateUsers {
+		t.Fatal("bearer JIT must default on")
+	}
+	if got := cfg.Security.GalaxyBearerJITDelegators; len(got) != 1 || got[0] != "galaxy-gateway" {
+		t.Fatalf("default delegators = %v, want [galaxy-gateway]", got)
+	}
+
+	t.Setenv("OIDC_AUTO_CREATE_USERS", "false")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Security.GalaxyBearerAutoCreateUsers {
+		t.Fatal("OIDC_AUTO_CREATE_USERS=false must also turn bearer JIT off")
+	}
+
+	t.Setenv("OIDC_AUTO_CREATE_USERS", "true")
+	t.Setenv("GALAXY_BEARER_AUTO_CREATE_USERS", "false")
+	t.Setenv("GALAXY_BEARER_JIT_DELEGATORS", "galaxy-gateway, jarvis-service")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Security.GalaxyBearerAutoCreateUsers {
+		t.Fatal("GALAXY_BEARER_AUTO_CREATE_USERS=false must turn bearer JIT off")
+	}
+	if got := cfg.Security.GalaxyBearerJITDelegators; len(got) != 2 || got[1] != "jarvis-service" {
+		t.Fatalf("delegators = %v", got)
+	}
+
+	t.Setenv("GALAXY_BEARER_AUTO_CREATE_USERS", "maybe")
+	if _, err := Load(); err == nil {
+		t.Fatal("an unparsable GALAXY_BEARER_AUTO_CREATE_USERS must fail startup")
+	}
+}

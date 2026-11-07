@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,10 +19,17 @@ import (
 // in-memory fakes
 // ---------------------------------------------------------------------------
 
+// memUserStore mimics the postgres UserRepository closely enough for the
+// identity paths: lookups skip soft-deleted rows, Create writes oidc_sub and
+// email in the same insert, and the partial unique indexes on ACTIVE
+// oidc_sub / email (migration 000032) and on username are enforced with the
+// same domain errors the repository maps them to.
 type memUserStore struct {
+	mu      sync.Mutex
 	users   []*userdom.User
 	oidcSub map[uuid.UUID]string
 	emails  map[uuid.UUID]string
+	creates int
 }
 
 func newMemUserStore() *memUserStore {
@@ -29,6 +37,19 @@ func newMemUserStore() *memUserStore {
 }
 
 func (m *memUserStore) FindByOIDCSub(_ context.Context, sub string) (*userdom.User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, u := range m.users {
+		if u.DeletedAt == nil && m.oidcSub[u.ID] == sub {
+			return u, nil
+		}
+	}
+	return nil, userdom.ErrNotFound
+}
+
+func (m *memUserStore) FindByOIDCSubIncludingDeleted(_ context.Context, sub string) (*userdom.User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, u := range m.users {
 		if m.oidcSub[u.ID] == sub {
 			return u, nil
@@ -38,8 +59,10 @@ func (m *memUserStore) FindByOIDCSub(_ context.Context, sub string) (*userdom.Us
 }
 
 func (m *memUserStore) FindByEmail(_ context.Context, email string) (*userdom.User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, u := range m.users {
-		if m.emails[u.ID] == email {
+		if u.DeletedAt == nil && m.emails[u.ID] == email {
 			return u, nil
 		}
 	}
@@ -47,8 +70,10 @@ func (m *memUserStore) FindByEmail(_ context.Context, email string) (*userdom.Us
 }
 
 func (m *memUserStore) FindByUsername(_ context.Context, username string) (*userdom.User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for _, u := range m.users {
-		if u.Username == username {
+		if u.DeletedAt == nil && u.Username == username {
 			return u, nil
 		}
 	}
@@ -56,11 +81,36 @@ func (m *memUserStore) FindByUsername(_ context.Context, username string) (*user
 }
 
 func (m *memUserStore) Create(_ context.Context, u *userdom.User) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, existing := range m.users {
+		if existing.DeletedAt != nil {
+			continue
+		}
+		if u.OIDCSub != "" && m.oidcSub[existing.ID] == u.OIDCSub {
+			return userdom.ErrIdentityTaken
+		}
+		if u.Email != "" && m.emails[existing.ID] == u.Email {
+			return userdom.ErrIdentityTaken
+		}
+		if existing.Username == u.Username {
+			return userdom.ErrUsernameTaken
+		}
+	}
 	m.users = append(m.users, u)
+	if u.OIDCSub != "" {
+		m.oidcSub[u.ID] = u.OIDCSub
+	}
+	if u.Email != "" {
+		m.emails[u.ID] = u.Email
+	}
+	m.creates++
 	return nil
 }
 
 func (m *memUserStore) LinkOIDC(_ context.Context, userID uuid.UUID, sub, email string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.oidcSub[userID] = sub
 	if email != "" {
 		if _, ok := m.emails[userID]; !ok {
@@ -68,6 +118,12 @@ func (m *memUserStore) LinkOIDC(_ context.Context, userID uuid.UUID, sub, email 
 		}
 	}
 	return nil
+}
+
+func (m *memUserStore) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.users)
 }
 
 type memRoleFinder struct {

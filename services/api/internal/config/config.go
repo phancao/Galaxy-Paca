@@ -376,4 +376,22 @@ type SecurityConfig struct {
 	// issues `mcp:pm:*` and has no `mcp:paca:*` row. Two spellings, one thing.
 	// Configure via GALAXY_LEGACY_SCOPE_PREFIXES (default "mcp:pm:").
 	GalaxyLegacyScopePrefixes []string
+
+	// GalaxyBearerAutoCreateUsers enables just-in-time account creation on the
+	// trusted-issuer bearer path for DELEGATED tokens (SPA-6550): a person who
+	// reaches Paca through the aggregating MCP gateway before ever opening the
+	// web app gets an account with the lowest built-in role (USER), after
+	// identity confirms — live — that they are active and a member of this
+	// tenant. Also requires OIDC_AUTO_CREATE_USERS (the deployment's general
+	// "people get accounts on first use" policy); either false keeps the
+	// bearer path reject-only. Configure via GALAXY_BEARER_AUTO_CREATE_USERS
+	// (default true).
+	GalaxyBearerAutoCreateUsers bool
+
+	// GalaxyBearerJITDelegators lists the token subjects / actors trusted to
+	// present a delegated token whose principal may be JIT-created (the
+	// outermost act.sub of an RFC 8693 token, or the sub of a flat act_as
+	// token). Configure via GALAXY_BEARER_JIT_DELEGATORS (comma-separated,
+	// default "galaxy-gateway").
+	GalaxyBearerJITDelegators []string
 }
