@@ -31,6 +31,7 @@ import (
 	"github.com/Paca-AI/api/internal/platform/secret"
 	"github.com/Paca-AI/api/internal/platform/storage"
 	jwttoken "github.com/Paca-AI/api/internal/platform/token"
+	"github.com/Paca-AI/api/internal/platform/vortexidentity"
 	"github.com/Paca-AI/api/internal/platform/wiki"
 	pgRepo "github.com/Paca-AI/api/internal/repository/postgres"
 	redisRepo "github.com/Paca-AI/api/internal/repository/redis"
@@ -500,7 +501,7 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 		// against the configured resource id, and scope-bearing tokens must
 		// target Paca (foreign-resource tokens rejected; read-only tokens
 		// denied writes).
-		galaxyBearer = galaxyauthsvc.NewBearerAuthenticator(
+		bearer := galaxyauthsvc.NewBearerAuthenticator(
 			oidcplatform.NewProviderWithIssuerClaims(
 				cfg.Security.GalaxyTrustedIssuer, cfg.Security.GalaxyTrustedIssuerClaims),
 			userRepo, log).
@@ -508,13 +509,32 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 			WithResourceScopePrefix(cfg.Security.GalaxyResourceScopePrefix).
 			WithFleetScopePrefix(cfg.Security.GalaxyFleetScopePrefix).
 			WithLegacyScopePrefixes(cfg.Security.GalaxyLegacyScopePrefixes)
+		// Delegated JIT (SPA-6550): a person reaching Paca through the MCP
+		// gateway before ever opening the web app gets a USER account, once
+		// identity confirms them active and a member of THIS tenant.
+		if cfg.Security.GalaxyBearerAutoCreateUsers {
+			directory := vortexidentity.FromEnv()
+			if !directory.Configured() {
+				log.Warn("bearer JIT: GALAXY_INTERNAL_SERVICE_SECRET not set — identity cannot be asked, so delegated callers without a Paca account stay rejected")
+			}
+			bearer.WithDelegatedJIT(galaxyauthsvc.DelegatedJIT{
+				Tenant:      tc.Code,
+				Delegators:  cfg.Security.GalaxyBearerJITDelegators,
+				Directory:   directory,
+				Provisioner: galaxyauthsvc.New(userRepo, globalRoleRepo, false, userdom.RoleUser, log),
+				Deleted:     userRepo,
+			})
+		}
+		galaxyBearer = bearer
 		log.Info("Galaxy trusted-issuer bearer auth enabled",
 			"issuer", cfg.Security.GalaxyTrustedIssuer,
 			"extra_issuer_claims", cfg.Security.GalaxyTrustedIssuerClaims,
 			"audience_enforced", cfg.Security.GalaxyBearerAudience != "",
 			"resource_scope_prefix", cfg.Security.GalaxyResourceScopePrefix,
 			"fleet_scope_prefix", cfg.Security.GalaxyFleetScopePrefix,
-			"legacy_scope_prefixes", cfg.Security.GalaxyLegacyScopePrefixes)
+			"legacy_scope_prefixes", cfg.Security.GalaxyLegacyScopePrefixes,
+			"delegated_jit", bearer.DelegatedJITEnabled(),
+			"jit_delegators", cfg.Security.GalaxyBearerJITDelegators)
 	}
 
 	// Vortex identity-sync webhook receiver (ADR-040): applies user.changed

@@ -79,6 +79,14 @@ services:
       # mint-service-token stamps iss=galaxy-nexus (logical name), not the
       # discovery URL. Signature trust anchor unchanged.
       GALAXY_TRUSTED_ISSUER_CLAIMS: ${GALAXY_TRUSTED_ISSUER_CLAIMS:-}
+      # SPA-6550: a person reaching Paca through the MCP gateway before ever
+      # opening the web app gets a USER account, after identity confirms
+      # (GALAXY_IDENTITY_URL + GALAXY_INTERNAL_SERVICE_SECRET below) that they
+      # are active and a member of the token's tenant. Also needs
+      # OIDC_AUTO_CREATE_USERS=true. Set false to keep the bearer path
+      # reject-only.
+      GALAXY_BEARER_AUTO_CREATE_USERS: ${GALAXY_BEARER_AUTO_CREATE_USERS:-true}
+      GALAXY_BEARER_JIT_DELEGATORS: ${GALAXY_BEARER_JIT_DELEGATORS:-galaxy-gateway}
       # Legacy X-Agent-ID header impersonation stays OFF; identity comes
       # from signed tokens only.
       AGENT_HEADER_IMPERSONATION: ${AGENT_HEADER_IMPERSONATION:-disabled}

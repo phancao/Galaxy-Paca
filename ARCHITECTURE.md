@@ -290,7 +290,7 @@ Redis refresh store (`auth_handler.go:78-163`, `config/load.go:30-41`).
 - **RS256 trusted-issuer bearer** (`GALAXY_TRUSTED_ISSUER`): tokens signed by the
   Vortex JWKS are accepted platform-wide; the effective principal is the
   `act_as` claim (falling back to `sub`), resolved to a local user via
-  `users.oidc_sub` — **never auto-provisioned on this path**; `act_as_agent` is
+  `users.oidc_sub`; `act_as_agent` is
   recorded for attribution only and grants nothing beyond the principal
   (`middleware/galaxy_bearer.go`, `service/galaxyauth/bearer.go:74-110`).
   Hardening (PACA-C1): audience enforcement (`GALAXY_BEARER_AUDIENCE`) and
@@ -298,6 +298,18 @@ Redis refresh store (`auth_handler.go:78-163`, `config/load.go:30-41`).
   `mcp:paca:`) reject foreign-resource and read-only-token-on-write cases
   (`bearer.go:134-179`, wired `bootstrap/app.go:354-359`). Header impersonation
   (`X-Agent-ID`) is off by default (`config/config.go:242-246`).
+  **Delegated JIT (SPA-6550).** An unknown principal is rejected unless every
+  gate passes, after the signature/issuer/audience/scope checks above: the
+  token is a delegation (`act.sub` of an RFC 8693 token, or the `sub` that
+  asserted a flat `act_as`) by a delegator in `GALAXY_BEARER_JIT_DELEGATORS`
+  (default `galaxy-gateway`); its tenant (`act_as_tenant`, else `tenant`) is
+  this graph's tenant; the person has no deactivated local account; and
+  identity's `/internal/users` confirms — live, fail-closed — `status=active`
+  and an active membership in this tenant. The account is then created with
+  the lowest built-in role `USER` (never `OIDC_DEFAULT_ROLE`), `oidc_sub` and
+  email in one insert, never linking an existing account by email. Switches:
+  `GALAXY_BEARER_AUTO_CREATE_USERS` (default `true`) AND
+  `OIDC_AUTO_CREATE_USERS`.
 
 **RBAC (local, not OpenFGA).** Permission keys (`platform/authz/permissions.go`)
 like `tasks.read/write`, `projects.*`, `agents.*`, with `*` and `prefix.*`

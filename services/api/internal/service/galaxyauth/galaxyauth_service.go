@@ -223,3 +223,99 @@ func sanitizeUsername(v string) string {
 	}
 	return out
 }
+
+// ErrDelegatedEmailTaken means a delegated-bearer JIT account could not be
+// created because another active local account already holds the person's
+// email. The bearer path never adopts such an account (that is the SSO
+// login's email-link step, done with the person present); the person signs in
+// to Paca once and the SSO path links it.
+var ErrDelegatedEmailTaken = errors.New("galaxyauth: another local account already holds this email; sign in to Paca once to link it")
+
+// maxDelegatedCreateAttempts bounds retries when a concurrent JIT takes the
+// username we picked between the free-name probe and the insert.
+const maxDelegatedCreateAttempts = 3
+
+// ProvisionDelegatedUser creates the local account for a person who reached
+// Paca through a delegated bearer token (SPA-6550). The caller has already
+// verified the token and confirmed with identity that the person is active
+// and a member of this tenant; this method only writes.
+//
+// It differs from the SSO JIT on purpose:
+//   - the role is always the lowest built-in role (userdom.RoleUser), never the
+//     configurable OIDC_DEFAULT_ROLE — a token presented by a service on the
+//     person's behalf must not be the way an elevated default gets handed out;
+//   - it never links an existing account by email (ErrDelegatedEmailTaken);
+//   - oidc_sub and email are written in the SAME insert, so a lost race cannot
+//     leave an unlinked orphan row, and the partial unique index on active
+//     oidc_sub makes concurrent first calls converge on one account: the loser
+//     gets ErrIdentityTaken and returns the winner's row.
+func (s *Service) ProvisionDelegatedUser(ctx context.Context, id Identity) (*userdom.User, error) {
+	if id.Subject == "" {
+		return nil, fmt.Errorf("galaxyauth: delegated identity has no subject")
+	}
+	role, err := s.roles.FindByName(ctx, userdom.RoleUser)
+	if err != nil {
+		return nil, fmt.Errorf("galaxyauth: resolve role %q: %w", userdom.RoleUser, err)
+	}
+	hash, err := unusablePasswordHash()
+	if err != nil {
+		return nil, err
+	}
+
+	for attempt := 1; attempt <= maxDelegatedCreateAttempts; attempt++ {
+		username, err := s.uniqueUsername(ctx, usernameBase(id))
+		if err != nil {
+			return nil, err
+		}
+		fullName := id.Name
+		if fullName == "" {
+			fullName = username
+		}
+		now := time.Now()
+		u := &userdom.User{
+			ID:           uuid.New(),
+			Username:     username,
+			PasswordHash: hash,
+			FullName:     fullName,
+			RoleID:       role.ID,
+			Role:         role.Name,
+			Email:        id.Email,
+			OIDCSub:      id.Subject,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		err = s.users.Create(ctx, u)
+		switch {
+		case err == nil:
+			s.log.Info("galaxyauth: JIT-created user from delegated bearer token",
+				"user_id", u.ID, "username", username, "role", role.Name)
+			return u, nil
+		case errors.Is(err, userdom.ErrIdentityTaken):
+			// Either a concurrent first call won the oidc_sub, or the email
+			// belongs to another account. The first is success.
+			if existing, ferr := s.users.FindByOIDCSub(ctx, id.Subject); ferr == nil {
+				return existing, nil
+			}
+			return nil, ErrDelegatedEmailTaken
+		case errors.Is(err, userdom.ErrUsernameTaken):
+			continue
+		default:
+			return nil, fmt.Errorf("galaxyauth: create delegated user: %w", err)
+		}
+	}
+	return nil, fmt.Errorf("galaxyauth: create delegated user: username kept colliding after %d attempts", maxDelegatedCreateAttempts)
+}
+
+// unusablePasswordHash hashes a throwaway random secret so password login can
+// never match anything a human could know.
+func unusablePasswordHash() (string, error) {
+	randomSecret := make([]byte, 32)
+	if _, err := rand.Read(randomSecret); err != nil {
+		return "", fmt.Errorf("galaxyauth: generate password: %w", err)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(hex.EncodeToString(randomSecret)), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("galaxyauth: hash password: %w", err)
+	}
+	return string(hash), nil
+}

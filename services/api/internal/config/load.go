@@ -133,6 +133,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: OIDC_AUTO_CREATE_USERS: %w", err)
 	}
 
+	bearerAutoCreate, err := strconv.ParseBool(env("GALAXY_BEARER_AUTO_CREATE_USERS", "true"))
+	if err != nil {
+		return nil, fmt.Errorf("config: GALAXY_BEARER_AUTO_CREATE_USERS: %w", err)
+	}
+
 	// OIDC SSO (ADR-038) is optional and off unless OIDC_ISSUER is set, but a
 	// half-configured issuer would only surface as a broken login redirect at
 	// runtime — surface the gaps at startup instead.
@@ -251,6 +256,10 @@ func Load() (*Config, error) {
 			GalaxyResourceScopePrefix: strings.TrimSpace(env("GALAXY_RESOURCE_SCOPE_PREFIX", "mcp:paca:")),
 			GalaxyFleetScopePrefix:    strings.TrimSpace(env("GALAXY_FLEET_SCOPE_PREFIX", "mcp:galaxy:")),
 			GalaxyLegacyScopePrefixes: splitCommaList(env("GALAXY_LEGACY_SCOPE_PREFIXES", "mcp:pm:")),
+			// Delegated-bearer JIT (SPA-6550): on only when OIDC_AUTO_CREATE_USERS
+			// is on too, and only for tokens presented by these delegators.
+			GalaxyBearerAutoCreateUsers: bearerAutoCreate && oidcAutoCreate,
+			GalaxyBearerJITDelegators:   splitCommaList(env("GALAXY_BEARER_JIT_DELEGATORS", "galaxy-gateway")),
 			// Identity-sync webhook shared secret (ADR-040).  env() treats a
 			// defined-but-empty variable as unset, mirroring the sender's
 			// VORTEX_WEBHOOK_SECRET-or-NEXUS_WEBHOOK_SECRET fallback chain.

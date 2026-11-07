@@ -3,12 +3,22 @@ package galaxyauth
 // Bearer authentication against the trusted Vortex issuer (ADR-038):
 // RS256 tokens carry the platform identity; the effective principal is the
 // act_as claim (an agent acting on a user's behalf) falling back to the
-// token's own sub.  Principals map to local users via users.oidc_sub — never
-// auto-created on this path — and act_as_agent is recorded for attribution
-// only, granting nothing beyond the principal user's permissions.
+// token's own sub.  Principals map to local users via users.oidc_sub, and
+// act_as_agent is recorded for attribution only, granting nothing beyond the
+// principal user's permissions.
+//
+// An unknown principal is rejected — unless delegated JIT provisioning is
+// configured (WithDelegatedJIT, SPA-6550) AND every one of its gates passes:
+// the token is a delegation presented by a configured trusted delegator, it
+// names this deployment's tenant, the person has no locally deprovisioned
+// account, and identity confirms — live, fail-closed — that the person is
+// active and a member of this tenant. Only then is an account created, with
+// the lowest built-in role. Signature, issuer, audience and scope checks run
+// first and are untouched.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -17,6 +27,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	userdom "github.com/Paca-AI/api/internal/domain/user"
+	"github.com/Paca-AI/api/internal/platform/vortexidentity"
 )
 
 // TokenVerifier validates a raw token against the trusted issuer (signature
@@ -30,12 +41,67 @@ type BearerUserStore interface {
 	FindByOIDCSub(ctx context.Context, sub string) (*userdom.User, error)
 }
 
+// DirectoryLookup asks the Vortex identity service about a user right now.
+// Implemented by *vortexidentity.Client.
+type DirectoryLookup interface {
+	LookupUser(ctx context.Context, userID string) (*vortexidentity.User, error)
+}
+
+// DelegatedProvisioner writes the local account for a delegated principal.
+// Implemented by *Service (ProvisionDelegatedUser).
+type DelegatedProvisioner interface {
+	ProvisionDelegatedUser(ctx context.Context, id Identity) (*userdom.User, error)
+}
+
+// DeletedUserFinder finds a user by OIDC subject including soft-deleted rows.
+// Implemented by the postgres UserRepository.
+type DeletedUserFinder interface {
+	FindByOIDCSubIncludingDeleted(ctx context.Context, sub string) (*userdom.User, error)
+}
+
+// DelegatedJIT configures just-in-time account creation on the bearer path
+// (SPA-6550). Every field is required; a partially filled config leaves JIT
+// off rather than running with a gate missing.
+type DelegatedJIT struct {
+	// Tenant is the tenant code this authenticator's graph serves. The token's
+	// effective tenant (act_as_tenant, else tenant) must equal it, and
+	// identity must list the person as an active member of it.
+	Tenant string
+	// Delegators are the token subjects / actors trusted to present a token on
+	// a person's behalf for the purpose of creating their account (e.g. the
+	// aggregating MCP gateway "galaxy-gateway").
+	Delegators []string
+	// Directory confirms the person with identity (status + memberships).
+	Directory DirectoryLookup
+	// Provisioner creates the account.
+	Provisioner DelegatedProvisioner
+	// Deleted detects a locally deprovisioned account for the same subject.
+	Deleted DeletedUserFinder
+}
+
+func (j *DelegatedJIT) complete() bool {
+	return j != nil && strings.TrimSpace(j.Tenant) != "" && len(j.Delegators) > 0 &&
+		j.Directory != nil && j.Provisioner != nil && j.Deleted != nil
+}
+
+func (j *DelegatedJIT) trusts(actor string) bool {
+	for _, d := range j.Delegators {
+		if d == actor {
+			return true
+		}
+	}
+	return false
+}
+
 // BearerAuthenticator resolves trusted-issuer bearer tokens to local users.
 // It satisfies the transport middleware's GalaxyBearerAuthenticator contract.
 type BearerAuthenticator struct {
 	verifier TokenVerifier
 	users    BearerUserStore
 	log      *slog.Logger
+
+	// jit, when non-nil, enables delegated JIT account creation (SPA-6550).
+	jit *DelegatedJIT
 
 	// audience, when non-empty, is enforced as the token's aud claim (PACA-C1):
 	// a token minted for a different resource is rejected, closing the
@@ -123,6 +189,31 @@ func (a *BearerAuthenticator) WithLegacyScopePrefixes(prefixes []string) *Bearer
 	return a
 }
 
+// WithDelegatedJIT enables just-in-time account creation for delegated bearer
+// tokens (SPA-6550). An incomplete config leaves it disabled. Returns the
+// receiver for fluent wiring.
+func (a *BearerAuthenticator) WithDelegatedJIT(cfg DelegatedJIT) *BearerAuthenticator {
+	cfg.Tenant = strings.ToLower(strings.TrimSpace(cfg.Tenant))
+	var delegators []string
+	for _, d := range cfg.Delegators {
+		if d = strings.TrimSpace(d); d != "" {
+			delegators = append(delegators, d)
+		}
+	}
+	cfg.Delegators = delegators
+	if !cfg.complete() {
+		a.jit = nil
+		return a
+	}
+	a.jit = &cfg
+	return a
+}
+
+// DelegatedJITEnabled reports whether delegated JIT provisioning is active.
+func (a *BearerAuthenticator) DelegatedJITEnabled() bool {
+	return a.jit != nil
+}
+
 // grantsPaca reports whether s is one of this service's own scopes, under any
 // name it has ever had, or the fleet scope that reaches it.
 func (a *BearerAuthenticator) grantsPaca(s string) bool {
@@ -164,9 +255,12 @@ func (a *BearerAuthenticator) AuthenticateBearer(ctx context.Context, rawToken, 
 	}
 
 	u, err := a.users.FindByOIDCSub(ctx, principal)
+	if errors.Is(err, userdom.ErrNotFound) && a.jit != nil {
+		// Unknown principal: only a delegation that passes every JIT gate
+		// gets an account; anything else is rejected exactly as before.
+		u, err = a.provisionDelegated(ctx, claims, tokenSub, principal)
+	}
 	if err != nil {
-		// Includes userdom.ErrNotFound: no auto-provisioning on the bearer
-		// path — unknown principals are rejected outright.
 		return nil, "", fmt.Errorf("galaxyauth: resolve bearer principal: %w", err)
 	}
 
@@ -176,6 +270,103 @@ func (a *BearerAuthenticator) AuthenticateBearer(ctx context.Context, rawToken, 
 			"agent", agentName, "principal_user", u.Username, "token_sub", tokenSub)
 	}
 	return u, agentName, nil
+}
+
+// provisionDelegated runs the delegated-JIT gates for an unknown principal and,
+// when all pass, creates the account (SPA-6550). Every refusal keeps
+// userdom.ErrNotFound in the chain so callers and logs read the same as the
+// pre-JIT rejection, with the reason appended.
+func (a *BearerAuthenticator) provisionDelegated(ctx context.Context, claims jwt.MapClaims, tokenSub, principal string) (*userdom.User, error) {
+	refuse := func(reason string, args ...any) (*userdom.User, error) {
+		why := fmt.Sprintf(reason, args...)
+		a.log.Warn("galaxyauth: bearer JIT refused",
+			"principal", principal, "token_sub", tokenSub, "reason", why)
+		return nil, fmt.Errorf("%w (no account created: %s)", userdom.ErrNotFound, why)
+	}
+
+	actor := delegatingActor(claims, tokenSub, principal)
+	if actor == "" {
+		return refuse("token is not a delegation")
+	}
+	if !a.jit.trusts(actor) {
+		return refuse("delegator %q is not trusted", actor)
+	}
+	tenant := tokenTenant(claims)
+	if tenant != a.jit.Tenant {
+		return refuse("token tenant %q is not this deployment's tenant %q", tenant, a.jit.Tenant)
+	}
+
+	prev, err := a.jit.Deleted.FindByOIDCSubIncludingDeleted(ctx, principal)
+	switch {
+	case err == nil && prev.DeletedAt != nil:
+		// Deprovisioned here (identity sync or a Paca admin). Re-creating
+		// a fresh account would silently undo that; restoring is
+		// nexussync's job, with its own confirmation.
+		return refuse("the local account for this person is deactivated")
+	case err == nil:
+		// An active row appeared between the two reads (concurrent JIT).
+		return prev, nil
+	case !errors.Is(err, userdom.ErrNotFound):
+		return nil, fmt.Errorf("galaxyauth: bearer JIT: check deactivated account: %w", err)
+	}
+
+	person, err := a.jit.Directory.LookupUser(ctx, principal)
+	if err != nil {
+		// Fail closed: identity unreachable, unconfigured, or unaware of
+		// the person — no account.
+		return refuse("identity could not confirm the person: %v", err)
+	}
+	if !person.Active() {
+		return refuse("identity lists the person as %q, not active", person.Status)
+	}
+	if !person.MemberOf(a.jit.Tenant) {
+		return refuse("identity lists no active membership in tenant %q", a.jit.Tenant)
+	}
+
+	u, err := a.jit.Provisioner.ProvisionDelegatedUser(ctx, Identity{
+		Subject: principal,
+		Email:   person.Email,
+		Name:    person.Name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("galaxyauth: bearer JIT: %w", err)
+	}
+	a.log.Info("galaxyauth: bearer JIT provisioned delegated principal",
+		"user_id", u.ID, "username", u.Username, "delegator", actor, "tenant", a.jit.Tenant)
+	return u, nil
+}
+
+// delegatingActor returns who presented the token on the principal's behalf,
+// or "" when the token is not a delegation:
+//   - flat act_as (the AI-proxy contract): the token's own sub asserted it;
+//   - RFC 8693 impersonation (sub = person, act.sub = the delegating client,
+//     e.g. "galaxy-gateway"): the OUTERMOST act.sub — the current actor; any
+//     prior chain nested inside it is provenance, not authority.
+func delegatingActor(claims jwt.MapClaims, tokenSub, principal string) string {
+	if principal != tokenSub {
+		// The principal came from act_as, so the token's subject is the one
+		// acting for it.
+		return tokenSub
+	}
+	if act, ok := claims["act"].(map[string]any); ok {
+		if s, ok := act["sub"].(string); ok {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
+}
+
+// tokenTenant mirrors the OIDC handler's effectiveTenant (ADR-058):
+// act_as_tenant, else tenant, trimmed and lower-cased.
+func tokenTenant(claims jwt.MapClaims) string {
+	for _, key := range []string{"act_as_tenant", "tenant"} {
+		if v, ok := claims[key].(string); ok {
+			if v = strings.ToLower(strings.TrimSpace(v)); v != "" {
+				return v
+			}
+		}
+	}
+	return ""
 }
 
 // effectivePrincipalSub extracts the acted-for subject from the act_as claim,
