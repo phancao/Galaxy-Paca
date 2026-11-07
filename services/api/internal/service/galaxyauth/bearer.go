@@ -3,12 +3,15 @@ package galaxyauth
 // Bearer authentication against the trusted Vortex issuer (ADR-038):
 // RS256 tokens carry the platform identity; the effective principal is the
 // act_as claim (an agent acting on a user's behalf) falling back to the
-// token's own sub.  Principals map to local users via users.oidc_sub — never
-// auto-created on this path — and act_as_agent is recorded for attribution
-// only, granting nothing beyond the principal user's permissions.
+// token's own sub.  Principals map to local users via users.oidc_sub; an
+// unknown act_as principal is provisioned only when a BearerPrincipalProvisioner
+// is configured and Vortex identity confirms it (bearer_provision.go,
+// SPA-6550) — otherwise it is rejected.  act_as_agent is recorded for
+// attribution only, granting nothing beyond the principal user's permissions.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -80,6 +83,11 @@ type BearerAuthenticator struct {
 	// two spellings, one thing. Read/write still comes from the scope's own
 	// action segment, so `mcp:pm:read` grants exactly reads.
 	legacyScopePrefixes []string
+
+	// provisioner, when set, creates or links the local account for an
+	// act_as principal the store does not know yet (SPA-6550).  Nil keeps
+	// the strict behaviour: unknown principals are rejected outright.
+	provisioner BearerPrincipalProvisioner
 }
 
 // NewBearerAuthenticator returns a configured BearerAuthenticator.
@@ -120,6 +128,13 @@ func (a *BearerAuthenticator) WithLegacyScopePrefixes(prefixes []string) *Bearer
 			a.legacyScopePrefixes = append(a.legacyScopePrefixes, p)
 		}
 	}
+	return a
+}
+
+// WithPrincipalProvisioner enables just-in-time provisioning of unknown act_as
+// principals (SPA-6550).  A nil provisioner leaves it off.
+func (a *BearerAuthenticator) WithPrincipalProvisioner(p BearerPrincipalProvisioner) *BearerAuthenticator {
+	a.provisioner = p
 	return a
 }
 
@@ -164,9 +179,13 @@ func (a *BearerAuthenticator) AuthenticateBearer(ctx context.Context, rawToken, 
 	}
 
 	u, err := a.users.FindByOIDCSub(ctx, principal)
+	if errors.Is(err, userdom.ErrNotFound) && a.provisioner != nil && actAsSub(claims) != "" {
+		// Only a principal named by act_as is ever provisioned: a token whose
+		// own sub is the principal is a service or a person signing in for
+		// themselves, and neither is created here.
+		u, err = a.provisioner.ProvisionBearerPrincipal(ctx, principal)
+	}
 	if err != nil {
-		// Includes userdom.ErrNotFound: no auto-provisioning on the bearer
-		// path — unknown principals are rejected outright.
 		return nil, "", fmt.Errorf("galaxyauth: resolve bearer principal: %w", err)
 	}
 
@@ -183,21 +202,24 @@ func (a *BearerAuthenticator) AuthenticateBearer(ctx context.Context, rawToken, 
 // falling back to the token's own sub.  Malformed act_as values fall back
 // rather than fail so a bare platform token still authenticates as itself.
 func effectivePrincipalSub(claims jwt.MapClaims, tokenSub string) string {
-	actAs, ok := claims["act_as"]
-	if !ok || actAs == nil {
-		return tokenSub
+	if s := actAsSub(claims); s != "" {
+		return s
 	}
-	switch v := actAs.(type) {
+	return tokenSub
+}
+
+// actAsSub returns the acted-for subject named by the act_as claim, or ""
+// when the claim is absent or malformed.
+func actAsSub(claims jwt.MapClaims) string {
+	switch v := claims["act_as"].(type) {
 	case string:
-		if v != "" {
-			return v
-		}
+		return v
 	case map[string]any:
-		if s, ok := v["sub"].(string); ok && s != "" {
+		if s, ok := v["sub"].(string); ok {
 			return s
 		}
 	}
-	return tokenSub
+	return ""
 }
 
 // enforceScope applies OAuth-scope enforcement to a verified token (PACA-C1).

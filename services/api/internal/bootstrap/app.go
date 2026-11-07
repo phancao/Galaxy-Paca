@@ -31,6 +31,7 @@ import (
 	"github.com/Paca-AI/api/internal/platform/secret"
 	"github.com/Paca-AI/api/internal/platform/storage"
 	jwttoken "github.com/Paca-AI/api/internal/platform/token"
+	"github.com/Paca-AI/api/internal/platform/vortexidentity"
 	"github.com/Paca-AI/api/internal/platform/wiki"
 	pgRepo "github.com/Paca-AI/api/internal/repository/postgres"
 	redisRepo "github.com/Paca-AI/api/internal/repository/redis"
@@ -469,10 +470,11 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	// OIDC SSO login against the Vortex identity provider. Off unless
 	// OIDC_ISSUER is set; discovery/JWKS are fetched lazily on first login.
 	var oidcHandler *handler.OIDCHandler
+	var galaxyAuthService *galaxyauthsvc.Service
 	if cfg.OIDC.Enabled() {
 		authHandler = authHandler.WithOIDC(cfg.OIDC.ButtonLabel)
 		oidcProvider := oidcplatform.NewProvider(cfg.OIDC.Issuer)
-		galaxyAuthService := galaxyauthsvc.New(userRepo, globalRoleRepo, cfg.OIDC.AutoCreateUsers, cfg.OIDC.DefaultRole, log)
+		galaxyAuthService = galaxyauthsvc.New(userRepo, globalRoleRepo, cfg.OIDC.AutoCreateUsers, cfg.OIDC.DefaultRole, log)
 		oidcHandler = handler.NewOIDCHandler(
 			oidcProvider,
 			handler.OIDCOptions{
@@ -493,14 +495,17 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	}
 
 	// Trusted-issuer RS256 bearer auth: platform tokens (with act_as) map to
-	// local users via users.oidc_sub; unknown principals are rejected.
+	// local users via users.oidc_sub.  An unknown act_as principal is
+	// provisioned like a first SSO login (same auto-create switch, same
+	// default role) only when Vortex identity confirms it is an active member
+	// of this tenant (SPA-6550); every other unknown principal is rejected.
 	var galaxyBearer httpmw.GalaxyBearerAuthenticator
 	if cfg.Security.GalaxyTrustedIssuer != "" {
 		// Audience + scope enforcement (PACA-C1): the aud claim is checked
 		// against the configured resource id, and scope-bearing tokens must
 		// target Paca (foreign-resource tokens rejected; read-only tokens
 		// denied writes).
-		galaxyBearer = galaxyauthsvc.NewBearerAuthenticator(
+		bearerAuth := galaxyauthsvc.NewBearerAuthenticator(
 			oidcplatform.NewProviderWithIssuerClaims(
 				cfg.Security.GalaxyTrustedIssuer, cfg.Security.GalaxyTrustedIssuerClaims),
 			userRepo, log).
@@ -508,7 +513,20 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 			WithResourceScopePrefix(cfg.Security.GalaxyResourceScopePrefix).
 			WithFleetScopePrefix(cfg.Security.GalaxyFleetScopePrefix).
 			WithLegacyScopePrefixes(cfg.Security.GalaxyLegacyScopePrefixes)
+		bearerJIT := false
+		if galaxyAuthService != nil && cfg.OIDC.AutoCreateUsers {
+			if dir := vortexidentity.FromEnv(); dir != nil {
+				bearerAuth = bearerAuth.WithPrincipalProvisioner(
+					galaxyauthsvc.NewBearerProvisioner(galaxyAuthService, dir, userRepo, tc.Code, log))
+				bearerJIT = true
+			} else {
+				log.Warn("bearer JIT provisioning off: GALAXY_INTERNAL_SERVICE_SECRET not set — " +
+					"a Vortex user reaching Paca only through MCP gets 401 until they sign in to Paca once (SPA-6550)")
+			}
+		}
+		galaxyBearer = bearerAuth
 		log.Info("Galaxy trusted-issuer bearer auth enabled",
+			"jit_provisioning", bearerJIT,
 			"issuer", cfg.Security.GalaxyTrustedIssuer,
 			"extra_issuer_claims", cfg.Security.GalaxyTrustedIssuerClaims,
 			"audience_enforced", cfg.Security.GalaxyBearerAudience != "",
