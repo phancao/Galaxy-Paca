@@ -34,8 +34,8 @@ pm_service/utils/notify_emit.py and Galaxy-Nexus services/notification-service):
   Redis with JSON: {user_ids: [vortex-sub…], type, title, body, deeplink,
   payload, source_app}, wrapped in the signed envelope of Galaxy-Vortex
   shared/notify_sign.py (see sign_fanout) — the receiver drops bare
-  messages since SPA-7509 / SCR-VTX-077. user_ids MUST be Vortex identity UUIDs — the
-  fan-out worker does UUID(raw) and drops anything else, which is why Paca
+  messages since SPA-7509 / SCR-VTX-077. user_ids MUST be Vortex identity
+  UUIDs — the fan-out worker does UUID(raw) and drops anything else, which is why Paca
   users without ``users.oidc_sub`` are skipped here (debug log).
 
 Deeplinks are the SPA's real route (apps/web routes):
@@ -57,7 +57,7 @@ Environment:
                            (runtime/galaxy-shared/notification.env). Unset →
                            messages go out unsigned and are dropped by the
                            receiver since Galaxy-Vortex SPA-7509.
-  PACA_PUBLIC_URL         REQUIRED when enabled — this estate's Paca origin
+  PACA_PUBLIC_URL          REQUIRED when enabled — this estate's Paca origin
                            (tasks.<estate>). No default: a staging fallback
                            would link every other estate's tasks to staging.
 
