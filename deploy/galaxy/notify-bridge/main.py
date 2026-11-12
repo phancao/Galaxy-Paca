@@ -32,7 +32,9 @@ Fan-out contract (mirrors Galaxy-AI-Project-Management
 pm_service/utils/notify_emit.py and Galaxy-Nexus services/notification-service):
   PUBLISH <NOTIFY_FANOUT_CHANNEL default notify.fan-out> on the platform
   Redis with JSON: {user_ids: [vortex-sub…], type, title, body, deeplink,
-  payload, source_app}. user_ids MUST be Vortex identity UUIDs — the
+  payload, source_app}, wrapped in the signed envelope of Galaxy-Vortex
+  shared/notify_sign.py (see sign_fanout) — the receiver drops bare
+  messages since SPA-7509 / SCR-VTX-077. user_ids MUST be Vortex identity UUIDs — the
   fan-out worker does UUID(raw) and drops anything else, which is why Paca
   users without ``users.oidc_sub`` are skipped here (debug log).
 
@@ -50,7 +52,12 @@ Environment:
   GALAXY_NOTIFY_REDIS_URL  default redis://agentops-redis:6379/0 (galaxy_network,
                            same convention as NOTIFY_REDIS_URL in pm_service)
   NOTIFY_FANOUT_CHANNEL    default notify.fan-out
-  PACA_PUBLIC_URL          REQUIRED when enabled — this estate's Paca origin
+  NOTIFY_SERVICE_TOKEN     key that signs every fan-out message (sign_fanout);
+                           same value as vortex-notification's token
+                           (runtime/galaxy-shared/notification.env). Unset →
+                           messages go out unsigned and are dropped by the
+                           receiver since Galaxy-Vortex SPA-7509.
+  PACA_PUBLIC_URL         REQUIRED when enabled — this estate's Paca origin
                            (tasks.<estate>). No default: a staging fallback
                            would link every other estate's tasks to staging.
 
@@ -60,6 +67,8 @@ writes (streams + DB rows), not from anything client-supplied.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -399,12 +408,52 @@ def map_comment_mentions(
     return events
 
 
-def publish_events(client: Any, channel: str, events: list[dict[str, Any]]) -> int:
+SIGN_VERSION = 1
+
+
+def sign_fanout(body: str, key: str, channel: str, *, now: float | None = None) -> str:
+    """Wrap ``body`` (JSON text) in the signed envelope vortex-notification
+    requires on the fan-out channel since Galaxy-Vortex SPA-7509 (SCR-VTX-077).
+
+    Copied from Galaxy-Vortex ``shared/notify_sign.py`` (``sign``/``_mac``) —
+    keep the two byte-identical; tests pin a vector that module produced:
+
+        {"v": 1, "ts": <unix s>, "body": "<JSON text>",
+         "sig": hex(HMAC-SHA256(key, "<channel>.<ts>.<body>"))}
+
+    The receiver accepts it for 5 minutes and only on the channel it was
+    signed for. ``key`` is NOTIFY_SERVICE_TOKEN, the same secret that opens
+    vortex-notification's ``POST /events``.
+    """
+    if not key:
+        raise ValueError("sign_fanout: empty key")
+    ts = int(time.time() if now is None else now)
+    sig = hmac.new(
+        key.encode(),
+        f"{channel}.{ts}.{body}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return json.dumps(
+        {"v": SIGN_VERSION, "ts": ts, "body": body, "sig": sig}, ensure_ascii=False
+    )
+
+
+def publish_events(
+    client: Any,
+    channel: str,
+    events: list[dict[str, Any]],
+    key: str | None = None,
+    *,
+    now: float | None = None,
+) -> int:
     """Publish each fan-out event as its own message (PM publishes one event
-    per notification too). Raises on Redis errors so the caller leaves the
-    stream entry unacked and retries."""
+    per notification too), signed with ``key`` when one is given. Raises on
+    Redis errors so the caller leaves the stream entry unacked and retries."""
     for event in events:
-        client.publish(channel, json.dumps(event, ensure_ascii=False, default=str))
+        body = json.dumps(event, ensure_ascii=False, default=str)
+        client.publish(
+            channel, sign_fanout(body, key, channel, now=now) if key else body
+        )
     return len(events)
 
 
@@ -514,6 +563,10 @@ class Bridge:
             "GALAXY_NOTIFY_REDIS_URL", "redis://agentops-redis:6379/0"
         )
         self.channel = os.getenv("NOTIFY_FANOUT_CHANNEL", "notify.fan-out")
+        # Signs every fan-out message (SPA-7556). Unset → bare JSON, which
+        # vortex-notification drops unless NOTIFY_FANOUT_ALLOW_UNSIGNED=true;
+        # main() logs that loudly at start.
+        self.sign_key = (os.getenv("NOTIFY_SERVICE_TOKEN") or "").strip() or None
         self.database_url = database_url or os.getenv(
             "PACA_DATABASE_URL",
             "postgres://paca:changeme@postgres:5432/paca?sslmode=disable",
@@ -651,7 +704,9 @@ class Bridge:
 
         events = self.map_entry(stream, etype, payload)
         if events:
-            published = publish_events(self.galaxy(), self.channel, events)
+            published = publish_events(
+                self.galaxy(), self.channel, events, self.sign_key
+            )
             log.info(
                 "%s %s: published %d notification(s) type=%s task=%s",
                 stream,
@@ -755,6 +810,15 @@ def main() -> int:
         CONSUMER_GROUP,
         bridges[0].channel,
     )
+    if bridges[0].sign_key:
+        log.info("fan-out messages are signed with NOTIFY_SERVICE_TOKEN")
+    else:
+        log.warning(
+            "NOTIFY_SERVICE_TOKEN is not set — fan-out messages go out UNSIGNED "
+            "and vortex-notification drops them (unless it runs with "
+            "NOTIFY_FANOUT_ALLOW_UNSIGNED=true): no Paca notification reaches "
+            "the inbox. Set it to the value in runtime/galaxy-shared/notification.env."
+        )
     # One thread per tenant. Each blocks on XREADGROUP against its own
     # Valkey, so they do not contend; a crash in one must not take the others
     # down, which is why each run() is wrapped rather than left to propagate.
