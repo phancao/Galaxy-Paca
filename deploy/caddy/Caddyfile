@@ -61,7 +61,12 @@
 		output stdout
 	}
 
+	# HSTS (SCR-VTX-606, SPA-8367): browsers only honour it over HTTPS, so a
+	# plain-HTTP ":80" gateway behind a TLS-terminating tunnel still gets it
+	# end to end. Start short per the security team (300–86400 s, no
+	# includeSubDomains, no preload) and raise PACA_HSTS_MAX_AGE in steps.
 	header {
+		Strict-Transport-Security "max-age={$PACA_HSTS_MAX_AGE:86400}"
 		X-Frame-Options "DENY"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"

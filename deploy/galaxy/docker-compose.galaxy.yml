@@ -339,6 +339,8 @@ services:
       # streams /dock.js + /api/agentops* + /api/identity* through to, over
       # galaxy_network (origin only — scheme://host[:port], no path).
       GALAXY_GATEWAY_URL: ${GALAXY_GATEWAY_URL:-http://vortex-gateway}
+      # HSTS max-age in seconds (SPA-8367). Start 86400, raise in steps.
+      PACA_HSTS_MAX_AGE: ${PACA_HSTS_MAX_AGE:-86400}
     volumes:
       # Relative paths resolve against the FIRST compose file's dir (deploy/).
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
