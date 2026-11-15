@@ -255,6 +255,11 @@ services:
       OIDC_TENANT: ${OIDC_TENANT:-}
       GALAXY_NOTIFY_REDIS_URL: ${GALAXY_NOTIFY_REDIS_URL:-redis://agentops-redis:6379/0}
       NOTIFY_FANOUT_CHANNEL: ${NOTIFY_FANOUT_CHANNEL:-notify.fan-out}
+      # Signs every fan-out message (SPA-7556). Same value as
+      # vortex-notification's NOTIFY_SERVICE_TOKEN (runtime/galaxy-shared/
+      # notification.env). Empty → unsigned messages, which vortex-notification
+      # drops since Galaxy-Vortex SPA-7509: no Paca notification in the inbox.
+      NOTIFY_SERVICE_TOKEN: ${NOTIFY_SERVICE_TOKEN:-}
       # No estate default: the bridge refuses to start without it.
       PACA_PUBLIC_URL: ${PUBLIC_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}

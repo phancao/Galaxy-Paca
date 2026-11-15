@@ -406,3 +406,128 @@ def test_publish_events_propagates_redis_errors():
 
     with pytest.raises(ConnectionError):
         publish_events(BrokenRedis(), "notify.fan-out", [build_fanout_event(SUB, "t", "t", None, "d", {})])
+
+
+# ── signed envelope (SPA-7556, after Galaxy-Vortex SPA-7509 / SCR-VTX-077) ──
+#
+# vortex-notification drops every message on notify.fan-out that is not
+# wrapped in the envelope of Galaxy-Vortex shared/notify_sign.py. `_verify`
+# below is a copy of that module's `verify` (standard library only), so these
+# tests check the bridge against what the receiver actually accepts.
+
+
+def _verify(raw, key, channel, now):
+    import hashlib
+    import hmac
+
+    if not key:
+        return None
+    try:
+        env = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(env, dict) or env.get("v") != 1:
+        return None
+    ts, body, sig = env.get("ts"), env.get("body"), env.get("sig")
+    if isinstance(ts, bool) or not isinstance(ts, int) or not isinstance(body, str) or not isinstance(sig, str):
+        return None
+    if abs(now - ts) > 300:
+        return None
+    mac = hmac.new(key.encode("utf-8"), f"{channel}.{ts}.{body}".encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig.encode("utf-8"), mac.encode("utf-8")):
+        return None
+    return body
+
+
+# Produced by Galaxy-Vortex shared/notify_sign.sign (PR #4049) for these exact
+# inputs — pins the byte format, not just "something that verifies".
+GOLDEN_BODY = (
+    '{"user_ids": ["99999999-9999-9999-9999-999999999999"], '
+    '"type": "task_assigned", "title": "Bạn được giao task PACA-7"}'
+)
+GOLDEN_ENVELOPE = (
+    '{"v": 1, "ts": 1763000000, "body": "{\\"user_ids\\": '
+    '[\\"99999999-9999-9999-9999-999999999999\\"], \\"type\\": '
+    '\\"task_assigned\\", \\"title\\": \\"Bạn được giao task PACA-7\\"}", '
+    '"sig": "2d0d26f17cb7496040919f5fbf1d919c496ea718f80971597ba7a000b85044a0"}'
+)
+
+
+def test_sign_fanout_matches_vortex_notify_sign_byte_for_byte():
+    assert main.sign_fanout(GOLDEN_BODY, "khoa-thu", "notify.fan-out", now=1763000000) == GOLDEN_ENVELOPE
+
+
+def test_sign_fanout_refuses_empty_key():
+    with pytest.raises(ValueError):
+        main.sign_fanout(GOLDEN_BODY, "", "notify.fan-out", now=1763000000)
+
+
+def test_publish_events_with_key_sends_envelopes_the_receiver_accepts():
+    fake = FakeRedis()
+    events = [
+        build_fanout_event(SUB, "task_assigned", "Bạn được giao task P-1", None, "https://x/1", {"a": 1}),
+        build_fanout_event(SUB, "task_mentioned", "t2", "b", "https://x/2", {}),
+    ]
+    now = 1763000000
+    count = publish_events(fake, "notify.fan-out", events, key="khoa-that", now=now)
+    assert count == 2
+    for (channel, message), event in zip(fake.published, events):
+        assert channel == "notify.fan-out"
+        body = _verify(message, "khoa-that", "notify.fan-out", now)
+        assert body is not None, "receiver would drop this message"
+        assert json.loads(body) == event
+        # A different key, another channel, or a stale timestamp must not pass.
+        assert _verify(message, "khoa-khac", "notify.fan-out", now) is None
+        assert _verify(message, "khoa-that", "notify.user.x", now) is None
+        assert _verify(message, "khoa-that", "notify.fan-out", now + 301) is None
+
+
+def test_publish_events_without_key_keeps_bare_json():
+    # No token configured: the bare event goes out unchanged, which only an
+    # old notification-service or NOTIFY_FANOUT_ALLOW_UNSIGNED=true accepts.
+    fake = FakeRedis()
+    event = build_fanout_event(SUB, "task_assigned", "t", None, "d", {})
+    publish_events(fake, "notify.fan-out", [event], key=None)
+    assert json.loads(fake.published[0][1]) == event
+
+
+class FakePaca:
+    def __init__(self):
+        self.acked = []
+
+    def xack(self, stream, group, entry_id):
+        self.acked.append((stream, group, entry_id))
+        return 1
+
+
+def _bridge_with_fakes(monkeypatch, token):
+    if token is None:
+        monkeypatch.delenv("NOTIFY_SERVICE_TOKEN", raising=False)
+    else:
+        monkeypatch.setenv("NOTIFY_SERVICE_TOKEN", token)
+    monkeypatch.setenv("NOTIFY_FANOUT_CHANNEL", "notify.fan-out")
+    bridge = main.Bridge()
+    bridge._paca = FakePaca()
+    bridge._galaxy = FakeRedis()
+    event = build_fanout_event(SUB, "task_assigned", "t", None, "https://x/1", {"task_id": UUID_TASK})
+    monkeypatch.setattr(bridge, "map_entry", lambda *a: [event])
+    fields = {"type": "task.assigned", "payload": json.dumps({"task_id": UUID_TASK})}
+    return bridge, event, fields
+
+
+def test_bridge_signs_with_notify_service_token_from_env(monkeypatch):
+    bridge, event, fields = _bridge_with_fakes(monkeypatch, "  khoa-moi-truong \n")
+    bridge.handle_entry(main.STREAM_ASSIGNMENTS, "1-0", fields)
+    [(channel, message)] = bridge._galaxy.published
+    import time
+
+    body = _verify(message, "khoa-moi-truong", channel, time.time())
+    assert body is not None and json.loads(body) == event
+    assert bridge._paca.acked == [(main.STREAM_ASSIGNMENTS, main.CONSUMER_GROUP, "1-0")]
+
+
+def test_bridge_without_token_publishes_bare_event(monkeypatch):
+    bridge, event, fields = _bridge_with_fakes(monkeypatch, "   ")
+    bridge.handle_entry(main.STREAM_ASSIGNMENTS, "1-0", fields)
+    [(_, message)] = bridge._galaxy.published
+    assert json.loads(message) == event
