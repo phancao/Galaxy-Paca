@@ -49,6 +49,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import signal
 import socket
 import threading
@@ -74,6 +75,20 @@ from main import (
 log = logging.getLogger("dock-trigger")
 
 CONSUMER_GROUP = "galaxy-dock-agent"
+
+DEFAULT_SERVICE_NAME = "paca-dock-trigger"
+_UNSAFE_NAME_CHARS = re.compile(r"[^A-Za-z0-9._:@/+=-]")
+
+
+def caller_headers() -> dict[str, str]:
+    """``X-Service-Name`` for Identity's ``[internal-caller]`` log line (SPA-8542).
+
+    ``GALAXY_SERVICE_NAME`` (read at call time, trimmed) or
+    "paca-dock-trigger"; chars outside ``[A-Za-z0-9._:@/+=-]`` become "-",
+    cut to 64. Self-declared, for logs only — not proof of who is calling.
+    """
+    name = os.getenv("GALAXY_SERVICE_NAME", "").strip() or DEFAULT_SERVICE_NAME
+    return {"X-Service-Name": _UNSAFE_NAME_CHARS.sub("-", name)[:64]}
 
 SQL_USER = """
 SELECT u.id::text, COALESCE(u.username, ''), COALESCE(u.full_name, ''),
@@ -309,7 +324,8 @@ class DockTrigger(bridge_lib.Bridge):
             r = httpx.post(
                 f"{self.identity_url}/internal/mint-service-token",
                 headers={"X-Service-Secret": self.service_secret,
-                         "Content-Type": "application/json"},
+                         "Content-Type": "application/json",
+                         **caller_headers()},
                 json={"sub": actor.oidc_sub, "aud": "agentops",
                       "ttl_seconds": 900, "extra": extra},
                 timeout=10.0,

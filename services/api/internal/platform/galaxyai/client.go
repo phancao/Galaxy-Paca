@@ -19,6 +19,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Paca-AI/api/internal/platform/callername"
 )
 
 // Client talks to the identity mint endpoint + the /ai/v1 chat proxy.
@@ -76,6 +78,7 @@ func (c *Client) mintActAsToken(ctx context.Context, userSub string) (string, er
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Service-Secret", c.serviceSecret)
+	callername.Set(req.Header) // self-declared caller name for Identity logs, not proof
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("mint request failed: %w", err)
