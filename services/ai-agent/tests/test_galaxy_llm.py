@@ -148,13 +148,18 @@ async def test_mint_sends_attribution_contract(monkeypatch):
 
 async def test_mint_without_app_credential_sends_shared_secret_only(monkeypatch):
     # SPA-1891: unset app credential → exactly today's headers.
+    monkeypatch.delenv("GALAXY_SERVICE_NAME", raising=False)
     _galaxy_settings(monkeypatch)
     fake = _FakeAsyncClient(response=_FakeResponse(200, {"access_token": "t"}))
     with patch.object(galaxy_llm.httpx, "AsyncClient", fake):
         await mint_llm_token("alice@example.com")
 
     headers = fake.calls[0]["headers"]
-    assert headers == {"X-Service-Secret": "platform-secret", "Content-Type": "application/json"}
+    assert headers == {
+        "X-Service-Secret": "platform-secret",
+        "Content-Type": "application/json",
+        "X-Service-Name": "paca-ai-agent",
+    }
 
 
 async def test_mint_with_app_credential_sends_app_auth_headers(monkeypatch):
@@ -355,3 +360,34 @@ async def test_mcp_mint_refused_raises(monkeypatch):
         with pytest.raises(RuntimeError) as err:
             await galaxy_mcp_bearer_token(MEMBER_ID)
     assert "403" in str(err.value)
+
+
+# SPA-8542: every mint self-declares X-Service-Name for Identity's
+# [internal-caller] log — default, env override (trimmed), sanitized + capped.
+@pytest.mark.parametrize(
+    ("env", "want"),
+    [
+        (None, "paca-ai-agent"),
+        ("   ", "paca-ai-agent"),
+        ("  paca-ai-agent-tmo  ", "paca-ai-agent-tmo"),
+        ("bad name\r\nX: y", "bad-name--X:-y"),
+        ("a" * 100, "a" * 64),
+    ],
+)
+async def test_mint_sends_service_name(monkeypatch, env, want):
+    if env is None:
+        monkeypatch.delenv("GALAXY_SERVICE_NAME", raising=False)
+    else:
+        monkeypatch.setenv("GALAXY_SERVICE_NAME", env)
+    _galaxy_settings(
+        monkeypatch, galaxy_app_id="paca", galaxy_app_client_secret="paca-client-secret"
+    )
+    fake = _FakeAsyncClient(response=_FakeResponse(200, {"access_token": "t"}))
+    with patch.object(galaxy_llm.httpx, "AsyncClient", fake):
+        await mint_llm_token("alice@example.com")
+
+    headers = fake.calls[0]["headers"]
+    assert headers["X-Service-Name"] == want
+    # Merged, not replacing: auth headers are untouched.
+    assert headers["X-Service-Secret"] == "platform-secret"
+    assert headers["X-App-ID"] == "paca"

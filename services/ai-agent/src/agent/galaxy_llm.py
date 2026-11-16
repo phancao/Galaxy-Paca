@@ -44,6 +44,8 @@ legacy X-API-Key/X-Agent-ID header pair the API rejects by design.
 from __future__ import annotations
 
 import logging
+import os
+import re
 
 import httpx
 
@@ -138,6 +140,21 @@ def _mint_base_url() -> str:
     return base.removesuffix("/ai/v1")
 
 
+_DEFAULT_SERVICE_NAME = "paca-ai-agent"
+_UNSAFE_NAME_CHARS = re.compile(r"[^A-Za-z0-9._:@/+=-]")
+
+
+def _caller_headers() -> dict[str, str]:
+    """``X-Service-Name`` for Identity's ``[internal-caller]`` log line (SPA-8542).
+
+    ``GALAXY_SERVICE_NAME`` (read at call time, trimmed) or "paca-ai-agent";
+    chars outside ``[A-Za-z0-9._:@/+=-]`` become "-", cut to 64.
+    Self-declared, for logs only — not proof; any holder of the secret can send any name.
+    """
+    name = os.getenv("GALAXY_SERVICE_NAME", "").strip() or _DEFAULT_SERVICE_NAME
+    return {"X-Service-Name": _UNSAFE_NAME_CHARS.sub("-", name)[:64]}
+
+
 def _mint_headers(service_secret: str) -> dict[str, str]:
     """Headers for the mint: the shared secret, plus Paca's app credential
     (X-App-ID + X-Client-Secret) when BOTH halves are configured (SPA-1891).
@@ -147,7 +164,11 @@ def _mint_headers(service_secret: str) -> dict[str, str]:
     credential is treated as none — the mint stays shared-secret only, as it
     always was. Secrets never reach the log.
     """
-    headers = {"X-Service-Secret": service_secret, "Content-Type": "application/json"}
+    headers = {
+        "X-Service-Secret": service_secret,
+        "Content-Type": "application/json",
+        **_caller_headers(),
+    }
     app_id = settings.galaxy_app_id.strip()
     app_secret = settings.galaxy_app_client_secret.strip()
     if app_id and app_secret:

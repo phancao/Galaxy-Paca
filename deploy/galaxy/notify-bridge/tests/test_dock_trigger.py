@@ -158,3 +158,44 @@ def test_prompt_contains_ids_and_loop_guard(trigger):
     assert "GXP-7" in prompt
     assert "paca_comment_add" in prompt
     assert "@galaxy-tasks-agent" in prompt  # the do-NOT-mention instruction
+
+
+# SPA-8542: the identity mint self-declares X-Service-Name (merged with the
+# secret header) — default, env override (trimmed), sanitized + capped.
+@pytest.mark.parametrize(
+    ("env", "want"),
+    [
+        (None, "paca-dock-trigger"),
+        ("  ", "paca-dock-trigger"),
+        (" paca-dock-trigger-tmo ", "paca-dock-trigger-tmo"),
+        ("bad name\r\nX: y", "bad-name--X:-y"),
+        ("a" * 100, "a" * 64),
+    ],
+)
+def test_mint_sends_service_name(trigger, monkeypatch, env, want):
+    import httpx
+
+    if env is None:
+        monkeypatch.delenv("GALAXY_SERVICE_NAME", raising=False)
+    else:
+        monkeypatch.setenv("GALAXY_SERVICE_NAME", env)
+    calls = []
+
+    class _Resp:
+        status_code = 200
+
+        def json(self):
+            return {"access_token": "tok"}
+
+    def fake_post(url, **kw):
+        calls.append((url, kw))
+        return _Resp()
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    trigger.service_secret = "s3cret"
+    trigger.identity_url = "http://identity"
+    assert trigger.mint_actor_token(ACTOR) == "tok"
+    url, kw = calls[0]
+    assert url == "http://identity/internal/mint-service-token"
+    assert kw["headers"]["X-Service-Name"] == want
+    assert kw["headers"]["X-Service-Secret"] == "s3cret"

@@ -23,6 +23,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Paca-AI/api/internal/platform/callername"
 )
 
 // DefaultBaseURL is the in-cluster address of the identity service, used when
@@ -123,6 +125,7 @@ func (c *Client) LookupUser(ctx context.Context, userID string) (*User, error) {
 	q.Set("ids", userID)
 	req.URL.RawQuery = q.Encode()
 	req.Header.Set("X-Service-Secret", c.Secret)
+	callername.Set(req.Header) // self-declared caller name for Identity logs, not proof
 
 	httpClient := c.HTTP
 	if httpClient == nil {

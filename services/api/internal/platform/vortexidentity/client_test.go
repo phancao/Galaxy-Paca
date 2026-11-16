@@ -106,3 +106,27 @@ func TestFromEnvReadsFallbackChain(t *testing.T) {
 		t.Fatalf("unexpected client %+v", c)
 	}
 }
+
+// SPA-8542: /internal/users carries the self-declared X-Service-Name.
+func TestLookupUserSendsServiceName(t *testing.T) {
+	for _, tc := range []struct{ env, want string }{
+		{"", "paca-api"},
+		{" paca-api-tmo ", "paca-api-tmo"},
+		{"bad name\nx", "bad-name-x"},
+	} {
+		t.Setenv("GALAXY_SERVICE_NAME", tc.env)
+		var got string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got = r.Header.Get("X-Service-Name")
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"id": "u-1", "status": "active"}})
+		}))
+		c := &Client{BaseURL: srv.URL, Secret: "s3cret", HTTP: srv.Client()}
+		if _, err := c.LookupUser(context.Background(), "u-1"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		srv.Close()
+		if got != tc.want {
+			t.Fatalf("env %q: X-Service-Name = %q, want %q", tc.env, got, tc.want)
+		}
+	}
+}
