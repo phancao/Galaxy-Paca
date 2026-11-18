@@ -1,7 +1,10 @@
--- Add description_write trigger prompt column and extend trigger_type constraint.
-
-ALTER TABLE agents
-    ADD COLUMN IF NOT EXISTS description_write_trigger_prompt TEXT NOT NULL DEFAULT '';
+-- Extend the agent_conversations trigger_type constraint to include
+-- 'description_write'.
+--
+-- This file also used to add agents.description_write_trigger_prompt. That
+-- column is retired by 000019_drop_agent_trigger_prompts.sql, and re-adding it
+-- on every boot burnt one attnum per boot until agents hit the 1600-column
+-- limit (SPA-8755) — see 000010.
 
 -- Extend the trigger_type check constraint to include 'description_write'.
 ALTER TABLE agent_conversations
