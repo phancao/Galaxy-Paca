@@ -1,8 +1,11 @@
--- Add per-trigger system prompt columns to the agents table.
--- The executor appends the matching column to the base system_prompt at runtime
--- depending on how the agent was invoked (task assignment / comment / chat).
-
-ALTER TABLE agents
-    ADD COLUMN IF NOT EXISTS task_trigger_prompt        TEXT NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS doc_comment_trigger_prompt TEXT NOT NULL DEFAULT '',
-    ADD COLUMN IF NOT EXISTS chat_trigger_prompt        TEXT NOT NULL DEFAULT '';
+-- Formerly: add per-trigger system prompt columns (task_trigger_prompt,
+-- doc_comment_trigger_prompt, chat_trigger_prompt) to the agents table.
+--
+-- Retired by 000019_drop_agent_trigger_prompts.sql. Every migration file re-runs
+-- on every boot (RunMigrationsFS keeps no ledger), so keeping the ADD COLUMN
+-- here made each boot add these columns and 000019 drop them again. Postgres
+-- never reclaims the attnum of a dropped column, so after ~400 boots the agents
+-- table reached the 1600-column limit and this very file failed with SQLSTATE
+-- 54011, crash-looping the API (SPA-8755). The file stays, empty, so the
+-- numbering is unchanged; TestMigrationsDoNotReAddRetiredColumns keeps it so.
+SELECT 1;
