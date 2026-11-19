@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/url"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
@@ -295,4 +297,78 @@ func mustExec(t *testing.T, db *sqlx.DB, query string, args ...any) {
 func isSQLState(err error, code string) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == code
+}
+
+// Two replicas booting at once: the second one runs 000033 while the first
+// holds the lock and rebuilds agents. Once the first commits, the second must
+// see the clean table and do nothing, not fail on the oid of the table that was
+// just dropped (cross-check note on #63).
+func TestMigrations_AgentsRebuildConcurrentBootIsNoOp(t *testing.T) {
+	ctx := context.Background()
+	db := newMigrationDB(t)
+	migrate(t, db)
+	burnAgentsAttnums(t, db, 150)
+
+	body, err := fs.ReadFile(migrations.FS, "000033_rebuild_agents_reclaim_dropped_columns.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = first.Rollback() }()
+	if _, err := first.ExecContext(ctx, `LOCK TABLE public.agents IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatal(err)
+	}
+
+	// The second boot reads the old oid, then waits on the lock.
+	second := make(chan error, 1)
+	go func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			second <- err
+			return
+		}
+		if _, err := tx.ExecContext(ctx, string(body)); err != nil {
+			_ = tx.Rollback()
+			second <- err
+			return
+		}
+		second <- tx.Commit()
+	}()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var waiting int
+		if err := db.Get(&waiting, `SELECT count(*) FROM pg_locks WHERE relation = 'public.agents'::regclass AND NOT granted`); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("second boot never queued on the agents lock")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if _, err := first.ExecContext(ctx, string(body)); err != nil {
+		t.Fatalf("first boot rebuild: %v", err)
+	}
+	if err := first.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case err := <-second:
+		if err != nil {
+			t.Fatalf("second boot failed after the first rebuilt agents: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("second boot did not finish")
+	}
+	if a := attnums(t, db)["agents"]; a[1] != 0 {
+		t.Fatalf("agents still has %d dropped columns", a[1])
+	}
 }
