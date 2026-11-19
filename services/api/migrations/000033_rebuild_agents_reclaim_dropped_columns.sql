@@ -18,7 +18,10 @@
 -- The rebuild runs inside the one transaction the runner opens for this file:
 -- any error rolls the whole thing back and leaves the old table untouched.
 --   1. Take ACCESS EXCLUSIVE on agents (000019/000020 take the same lock on
---      every boot already, so this waits no longer than they do).
+--      every boot already, so this waits no longer than they do), then look
+--      the table up and count its dropped columns again under the lock: a
+--      second boot that waited while the first rebuilt agents finds it clean
+--      and stops.
 --   2. Record, from the catalog, everything that belongs to agents and that
 --      CREATE TABLE ... LIKE does not carry over: its constraints (primary key,
 --      unique, check, outgoing foreign keys) by name, its other indexes by
@@ -63,6 +66,19 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Same lock 000019/000020 already take on agents earlier in every boot.
+    LOCK TABLE public.agents IN ACCESS EXCLUSIVE MODE;
+
+    -- Another boot may have rebuilt agents while this one waited for the lock:
+    -- the oid read above then names the dropped table. Read it again and recount
+    -- under the lock, so a concurrent boot sees the clean table and stops here.
+    rel := to_regclass('public.agents');
+    SELECT count(*) INTO n_dropped
+      FROM pg_attribute WHERE attrelid = rel AND attnum > 0 AND attisdropped;
+    IF n_dropped < 100 THEN
+        RETURN;
+    END IF;
+
     -- Things this rebuild would silently lose: skip instead.
     SELECT CASE
         WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = rel AND NOT tgisinternal) THEN 'triggers'
@@ -83,9 +99,6 @@ BEGIN
         RAISE NOTICE 'agents has % dropped columns but has %; not rebuilding it (SPA-8852)', n_dropped, blocker;
         RETURN;
     END IF;
-
-    -- Same lock 000019/000020 already take on agents earlier in every boot.
-    LOCK TABLE public.agents IN ACCESS EXCLUSIVE MODE;
 
     SELECT pg_get_userbyid(relowner), relacl, relrowsecurity, relforcerowsecurity, obj_description(oid, 'pg_class')
       INTO owner_name, acl, rls_on, rls_forced, tbl_comment
