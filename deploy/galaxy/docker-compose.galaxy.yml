@@ -70,6 +70,11 @@ services:
       # Unset = just OIDC_TENANT, i.e. exactly the single-tenant deployment
       # this used to be.
       PACA_TENANTS: ${PACA_TENANTS:-}
+      # ADR-036 T2 (SPA-9343): DATABASE_URL is the OWNER's DSN, used to create
+      # tenant databases and run migrations. Set DB_APP_ROLE=paca_app and the
+      # request path, workers and plugin runtime connect as that non-superuser,
+      # DML-only role, which the api provisions at start. Empty = owner, as before.
+      DB_APP_ROLE: ${DB_APP_ROLE:-}
       # Password door: only registered when true. Unset = false whenever OIDC
       # is configured (break-glass by env, D7).
       AUTH_LOCAL_LOGIN_ENABLED: ${AUTH_LOCAL_LOGIN_ENABLED:-}
@@ -250,6 +255,8 @@ services:
       BRIDGE_ENABLED: ${BRIDGE_ENABLED:-false}
       PACA_VALKEY_URL: ${PACA_VALKEY_URL:-redis://valkey:6379/0}
       PACA_DATABASE_URL: ${PACA_DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      # Same role as the api (SPA-9343); the DSN is derived, no second secret.
+      DB_APP_ROLE: ${DB_APP_ROLE:-}
       # One consumer loop per tenant, on that tenant's own Valkey + database.
       PACA_TENANTS: ${PACA_TENANTS:-}
       OIDC_TENANT: ${OIDC_TENANT:-}
@@ -302,6 +309,8 @@ services:
       DOCK_TRIGGER_TIMEOUT_S: ${DOCK_TRIGGER_TIMEOUT_S:-300}
       PACA_VALKEY_URL: ${PACA_VALKEY_URL:-redis://valkey:6379/0}
       PACA_DATABASE_URL: ${PACA_DATABASE_URL:-postgres://${POSTGRES_USER:-paca}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-paca}?sslmode=disable}
+      # Same role as the api (SPA-9343); the DSN is derived, no second secret.
+      DB_APP_ROLE: ${DB_APP_ROLE:-}
       # One consumer loop per tenant, on that tenant's own Valkey + database.
       PACA_TENANTS: ${PACA_TENANTS:-}
       OIDC_TENANT: ${OIDC_TENANT:-}

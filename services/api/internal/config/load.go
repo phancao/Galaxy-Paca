@@ -59,6 +59,10 @@ func Load() (*Config, error) {
 	if err != nil {
 		errs = append(errs, err)
 	}
+	dbAppRole := strings.TrimSpace(env("DB_APP_ROLE", ""))
+	if dbAppRole != "" && !validRoleName(dbAppRole) {
+		errs = append(errs, fmt.Errorf("config: DB_APP_ROLE=%q is not a plain lower-case role name", dbAppRole))
+	}
 
 	redisURL, err := requireEnv("REDIS_URL")
 	if err != nil {
@@ -200,7 +204,8 @@ func Load() (*Config, error) {
 			PublicURL:    publicURL,
 		},
 		Database: DatabaseConfig{
-			DSN: dsn,
+			DSN:     dsn,
+			AppRole: dbAppRole,
 		},
 		Redis: RedisConfig{
 			URL: redisURL,
@@ -527,6 +532,23 @@ func parseInt64(s string) (int64, error) {
 		return 0, fmt.Errorf("invalid int64 %q: %w", s, err)
 	}
 	return v, nil
+}
+
+// validRoleName reports whether s is a plain lower-case PostgreSQL role name
+// ([a-z_][a-z0-9_]{0,62}) — the only shape DB_APP_ROLE accepts.
+func validRoleName(s string) bool {
+	if s == "" || len(s) > 63 {
+		return false
+	}
+	for i, c := range s {
+		switch {
+		case c == '_', c >= 'a' && c <= 'z':
+		case c >= '0' && c <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // splitCommaList parses a comma-separated env value into trimmed, non-empty
