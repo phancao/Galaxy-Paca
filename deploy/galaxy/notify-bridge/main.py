@@ -104,6 +104,15 @@ BODY_MAX = 140  # PM truncates notification bodies to 140 chars
 READ_COUNT = 50
 READ_BLOCK_MS = 5000
 
+# SPA-10094 (SCR-VTX-536, CIS Docker 4.6): tệp nhịp cho healthcheck của Swarm.
+# Worker không nghe cổng, python là PID 1 nên `kill -0 1` luôn đúng khi container
+# còn sống. Luồng heartbeat_loop chỉ ghi mtime tệp này khi MỌI bridge (mỗi tenant
+# một luồng) vừa đi một vòng gần đây — luồng tenant chết hay treo thì tệp cũ đi và
+# healthcheck (`time.time() - mtime > 120`) đỏ.
+HEARTBEAT_FILE = os.getenv("HEARTBEAT_FILE", "/tmp/heartbeat")
+HEARTBEAT_EVERY_S = 10.0
+HEARTBEAT_STALE_S = float(os.getenv("HEARTBEAT_STALE_S", "90"))
+
 
 # ── Resolved row shapes (filled from read-only Postgres lookups) ────────────
 
@@ -617,6 +626,18 @@ class Bridge:
         self._galaxy: Any = None
         self._db: Any = None
         self.stopping = False
+        # Lần cuối vòng đọc tiến lên (monotonic). Xem heartbeat_loop.
+        self.last_beat = time.monotonic()
+        self.stale_after_s = HEARTBEAT_STALE_S
+
+    def beat(self) -> None:
+        self.last_beat = time.monotonic()
+
+    def fresh(self, now: float | None = None) -> bool:
+        if self.stopping:
+            return True
+        now = time.monotonic() if now is None else now
+        return now - self.last_beat <= self.stale_after_s
 
     # -- connections (lazy; reconnect on failure) ---------------------------
 
@@ -768,6 +789,7 @@ class Bridge:
             for entry_id, fields in entries:
                 if self.stopping:
                     return handled
+                self.beat()
                 self.handle_entry(stream, entry_id, fields)
                 handled += 1
         return handled
@@ -784,6 +806,9 @@ class Bridge:
 
         backoff = 1.0
         while not self.stopping:
+            # Mỗi vòng, kể cả vòng lùi khi Valkey/Postgres lỗi: đang thử lại là
+            # đang sống, khởi động lại không chữa được phụ thuộc hỏng.
+            self.beat()
             try:
                 self.drain(">")
                 backoff = 1.0
@@ -800,6 +825,40 @@ class Bridge:
                 self._db = None
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 30.0)
+
+
+def touch_heartbeat(path: str | None = None) -> bool:
+    """Ghi mtime tệp nhịp. Lỗi ghi không được làm chết worker: trả False."""
+    try:
+        with open(path or HEARTBEAT_FILE, "w") as f:
+            f.write(str(int(time.time())))
+        return True
+    except OSError as exc:
+        log.warning("heartbeat write failed: %s", exc)
+        return False
+
+
+def heartbeat_loop(
+    bridges: list["Bridge"], every_s: float = HEARTBEAT_EVERY_S,
+    path: str | None = None,
+) -> None:
+    """Chạy trên luồng riêng: ghi tệp nhịp khi mọi bridge còn tươi."""
+    while not bridges[0].stopping:
+        now = time.monotonic()
+        stale = [b.tenant or "default" for b in bridges if not b.fresh(now)]
+        if stale:
+            log.warning("heartbeat withheld: tenant(s) %s made no progress", stale)
+        else:
+            touch_heartbeat(path)
+        time.sleep(every_s)
+
+
+def start_heartbeat(bridges: list["Bridge"]) -> threading.Thread:
+    th = threading.Thread(
+        target=heartbeat_loop, args=(bridges,), name="heartbeat", daemon=True
+    )
+    th.start()
+    return th
 
 
 def main() -> int:
@@ -828,6 +887,7 @@ def main() -> int:
             "(set BRIDGE_ENABLED=true, or --scale notify-bridge=0 to remove)"
         )
         while not bridges[0].stopping:
+            touch_heartbeat()
             time.sleep(5)
         return 0
     if not bridges[0].public_url:
@@ -854,6 +914,7 @@ def main() -> int:
             "NOTIFY_FANOUT_ALLOW_UNSIGNED=true): no Paca notification reaches "
             "the inbox. Set it to the value in runtime/galaxy-shared/notification.env."
         )
+    start_heartbeat(bridges)
     # One thread per tenant. Each blocks on XREADGROUP against its own
     # Valkey, so they do not contend; a crash in one must not take the others
     # down, which is why each run() is wrapped rather than left to propagate.
