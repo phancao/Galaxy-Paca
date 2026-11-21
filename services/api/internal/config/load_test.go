@@ -116,6 +116,47 @@ func TestLoad_Success(t *testing.T) {
 	}
 }
 
+func setMinimalEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("JWT_SECRET", "secret")
+	t.Setenv("DATABASE_URL", "postgres://u:p@h/paca")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
+	t.Setenv("ADMIN_USERNAME", "admin")
+	t.Setenv("ADMIN_PASSWORD", "password")
+	t.Setenv("STORAGE_ACCESS_KEY_ID", "access-key")
+	t.Setenv("STORAGE_SECRET_ACCESS_KEY", "secret-key")
+}
+
+// DB_APP_ROLE (ADR-036 T2, SPA-9343): off when unset, a plain role name when
+// set, and a startup error — not a silent fallback to the owner — otherwise.
+func TestLoad_DBAppRole(t *testing.T) {
+	setMinimalEnv(t)
+	t.Setenv("DB_APP_ROLE", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Database.AppRole != "" {
+		t.Fatalf("expected no app role, got %q", cfg.Database.AppRole)
+	}
+
+	t.Setenv("DB_APP_ROLE", " paca_app ")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Database.AppRole != "paca_app" {
+		t.Fatalf("expected paca_app, got %q", cfg.Database.AppRole)
+	}
+
+	for _, bad := range []string{"Paca", "1paca", "paca app", `paca"`, "paca;drop", strings.Repeat("a", 64)} {
+		t.Setenv("DB_APP_ROLE", bad)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "DB_APP_ROLE") {
+			t.Fatalf("%q: expected a DB_APP_ROLE error, got %v", bad, err)
+		}
+	}
+}
+
 func TestLoad_MissingRequired(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	t.Setenv("DATABASE_URL", "")

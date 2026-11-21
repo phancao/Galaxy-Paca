@@ -189,6 +189,11 @@ type AdminConfig struct {
 // DatabaseConfig holds the primary database connection settings.
 type DatabaseConfig struct {
 	DSN string
+	// AppRole (DB_APP_ROLE, ADR-036 T2 / SPA-9343) is the non-superuser,
+	// DML-only role the request path, workers and plugin runtime connect as.
+	// The DSNs stay the OWNER's and are used only to create databases and
+	// run migrations. Empty = everything keeps connecting as the owner.
+	AppRole string
 }
 
 // RedisConfig holds Redis connection settings.

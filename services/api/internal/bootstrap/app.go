@@ -204,13 +204,53 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	// would arrive as "too many connections" under load — never in a test,
 	// because a test never runs seven pools at once.
 	open, idle := poolBudget(len(cfg.Tenants))
-	db, err := database.Open(database.Config{
+	ownerDB, err := database.Open(database.Config{
 		DSN:          tc.DSN,
 		MaxOpenConns: open,
 		MaxIdleConns: idle,
 	}, log)
 	if err != nil {
 		return nil, fmt.Errorf("bootstrap: %w", err)
+	}
+
+	// --- Schema migration ---------------------------------------------------
+	// All statements use CREATE TABLE IF NOT EXISTS / INSERT … ON CONFLICT so
+	// they are idempotent and safe to re-run on every startup. Always as the
+	// OWNER: the app role below cannot run DDL.
+	if err := database.RunMigrationsFS(ownerDB.DB, migrations.FS); err != nil {
+		return nil, fmt.Errorf("bootstrap: auto-migrate: %w", err)
+	}
+	log.Info("schema migrations applied")
+
+	// --- Request-path connection (ADR-036 T2, SPA-9343) ---------------------
+	// With DB_APP_ROLE set, everything below — repositories, workers, the
+	// plugin runtime's paca.db_query/db_exec — uses a pool on that
+	// non-superuser, DML-only role. The owner pool shrinks to what plugin
+	// migrations need (CREATE SCHEMA/TABLE when a plugin is installed).
+	db := ownerDB
+	if role := cfg.Database.AppRole; role != "" {
+		if err := database.ProvisionAppRole(context.Background(), ownerDB.DB, tc.DSN, role); err != nil {
+			return nil, fmt.Errorf("bootstrap: tenant %q: %w", tc.Code, err)
+		}
+		appDSN, err := database.AppRoleDSN(tc.DSN, role)
+		if err != nil {
+			return nil, fmt.Errorf("bootstrap: tenant %q: app role dsn: %w", tc.Code, err)
+		}
+		db, err = database.Open(database.Config{
+			DSN:          appDSN,
+			MaxOpenConns: open,
+			MaxIdleConns: idle,
+		}, log)
+		if err != nil {
+			return nil, fmt.Errorf("bootstrap: tenant %q: open as %s: %w", tc.Code, role, err)
+		}
+		var who string
+		if err := db.QueryRowContext(context.Background(), `SELECT current_user`).Scan(&who); err != nil || who != role {
+			return nil, fmt.Errorf("bootstrap: tenant %q: request pool is %q, want %q (%v)", tc.Code, who, role, err)
+		}
+		ownerDB.SetMaxOpenConns(2)
+		ownerDB.SetMaxIdleConns(0)
+		log.Info("request path runs on the app role", "tenant", tc.Code, "role", role)
 	}
 
 	redisClient, err := cache.NewClient(tc.RedisURL, log)
@@ -257,14 +297,6 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 	// StatusUsedByWorkflow, a Postgres-specific check outside the
 	// workflowdom.Repository interface this decorator implements.
 	workflowRepo := workflowsvc.NewCachedRepository(rawWorkflowRepo, cacheStore, cfg.Cache.ConfigTTL, log)
-
-	// --- Schema migration ---------------------------------------------------
-	// All statements use CREATE TABLE IF NOT EXISTS / INSERT … ON CONFLICT so
-	// they are idempotent and safe to re-run on every startup.
-	if err := database.RunMigrationsFS(db.DB, migrations.FS); err != nil {
-		return nil, fmt.Errorf("bootstrap: auto-migrate: %w", err)
-	}
-	log.Info("schema migrations applied")
 
 	// --- Admin seeding -------------------------------------------------------
 	// seedDefaultRoles must run first so the ADMIN global role exists before
@@ -376,7 +408,9 @@ func newTenant(cfg *config.Config, tc config.TenantConfig, log *slog.Logger) (*t
 		return nil, fmt.Errorf("bootstrap: plugin store: %w", err)
 	}
 
-	pluginMigrationRunner := pluginrt.NewMigrationRunner(sqlDB, pluginStore, log)
+	// Plugin migrations create schemas and tables: the owner's job. The owner's
+	// default privileges hand the app role DML on whatever they create.
+	pluginMigrationRunner := pluginrt.NewMigrationRunner(ownerDB.DB, pluginStore, log)
 
 	pluginRuntime := pluginrt.NewRuntime(pluginStore, pluginrt.HostServices{
 		DB:         sqlDB,

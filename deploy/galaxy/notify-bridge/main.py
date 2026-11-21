@@ -515,19 +515,54 @@ def tenant_connections() -> list[tuple[str, str, str]]:
     primary = os.getenv("OIDC_TENANT", "").strip().lower()
     if primary:
         codes = [primary] + [c for c in codes if c != primary]
+    role = app_role()
     if not codes:
-        return [("", base_valkey, base_db)]
+        return [("", base_valkey, app_role_dsn(base_db, role))]
 
     out: list[tuple[str, str, str]] = []
     for i, code in enumerate(codes):
         if i == 0:
-            out.append((code, base_valkey, base_db))
+            out.append((code, base_valkey, app_role_dsn(base_db, role)))
             continue
         up = code.replace("-", "_").upper()
         valkey = os.getenv(f"PACA_TENANT_REDIS_{up}") or _with_redis_db(base_valkey, i)
         db = os.getenv(f"PACA_TENANT_DSN_{up}") or _with_db_suffix(base_db, code)
-        out.append((code, valkey, db))
+        out.append((code, valkey, app_role_dsn(db, role)))
     return out
+
+
+# ADR-036 T2 (SPA-9343). PACA_DATABASE_URL is the OWNER's DSN — on staging a
+# SUPERUSER. With DB_APP_ROLE set, paca-api provisions that non-superuser,
+# DML-only role on every tenant database at start, and the bridges connect as
+# it too: same derivation as paca-api (database.AppRoleDSN) and as app_role.py
+# in the Crawler/Hackathon services, so no second secret exists anywhere.
+_APP_ROLE_KDF_LABEL = b"galaxy-db-app-role/v1/"
+
+
+def app_role() -> str:
+    role = os.getenv("DB_APP_ROLE", "").strip()
+    if role and not re.fullmatch(r"[a-z_][a-z0-9_]{0,62}", role):
+        raise ValueError(f"DB_APP_ROLE={role!r} is not a plain lower-case role name")
+    return role
+
+
+def app_role_dsn(dsn: str, role: str) -> str:
+    """`dsn` with the owner's credentials replaced by `role`'s; unchanged
+    when no role is configured."""
+    if not role:
+        return dsn
+    from urllib.parse import quote, unquote, urlsplit, urlunsplit
+
+    s = urlsplit(dsn)
+    userinfo, sep, hostport = s.netloc.rpartition("@")
+    _user, has_pw, password = userinfo.partition(":")
+    if not sep or not has_pw or not password:
+        raise ValueError("DB_APP_ROLE is set but the database URL carries no password")
+    derived = hmac.new(
+        unquote(password).encode(), _APP_ROLE_KDF_LABEL + role.encode(), hashlib.sha256
+    ).hexdigest()
+    netloc = f"{quote(role, safe='')}:{derived}@{hostport}"
+    return urlunsplit((s.scheme, netloc, s.path, s.query, s.fragment))
 
 
 def _with_redis_db(url: str, index: int) -> str:
