@@ -197,6 +197,9 @@ class DockTrigger(bridge_lib.Bridge):
         ).rstrip("/")
         self.service_secret = os.getenv("GALAXY_INTERNAL_SERVICE_SECRET", "")
         self.run_timeout_s = float(os.getenv("DOCK_TRIGGER_TIMEOUT_S", "300"))
+        # Một lần đọc luồng agent được chờ tới run_timeout_s (httpx read), nên
+        # nhịp chỉ coi là cũ sau quãng ấy cộng biên kết nối/tra cứu.
+        self.stale_after_s = max(bridge_lib.HEARTBEAT_STALE_S, self.run_timeout_s + 60.0)
 
     # -- lookups --------------------------------------------------------------
 
@@ -386,6 +389,7 @@ class DockTrigger(bridge_lib.Bridge):
                 ) as resp:
                     ev = None
                     for line in resp.iter_lines():
+                        self.beat()
                         if time.monotonic() > deadline:
                             outcome = "timeout"
                             break
@@ -468,6 +472,7 @@ class DockTrigger(bridge_lib.Bridge):
             for entry_id, fields in entries:
                 if self.stopping:
                     return handled
+                self.beat()
                 self.handle_entry(stream, entry_id, fields)
                 handled += 1
         return handled
@@ -496,6 +501,7 @@ def main() -> int:
     if os.getenv("DOCK_TRIGGER_ENABLED", "false").strip().lower() != "true":
         log.info("DOCK_TRIGGER_ENABLED != true — dock-trigger idle")
         while not triggers[0].stopping:
+            bridge_lib.touch_heartbeat()
             time.sleep(5)
         return 0
     if not triggers[0].public_url:
@@ -511,6 +517,7 @@ def main() -> int:
         STREAM_ASSIGNMENTS, STREAM_PLUGIN_EVENTS, CONSUMER_GROUP,
         triggers[0].agentops_url, sorted(triggers[0].trigger_usernames),
     )
+    bridge_lib.start_heartbeat(triggers)
     if len(triggers) == 1:
         # Runs on the main thread, so name it too — otherwise the one
         # tenant's lines would read "MainThread" while the many-tenant
